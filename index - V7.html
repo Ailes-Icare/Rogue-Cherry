@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="appTitle">Outil d'Analyse et Remplacement de Code V6.7</title>
+    <style>
+        /* === VARIABLES & THEME === */
+        :root {
+            --bg-dark: #1e1e1e; --bg-panel: #252526; --bg-panel-light: #2d2d2d;
+            --text-light: #d4d4d4; --primary: #007acc; --primary-hover: #005999;
+            --danger: #d16969; --disabled: #555555; --border: #444;
+            --hl-yellow: #FFD700; --hl-linebg: rgba(198, 142, 255, 0.35); 
+            --hl-line-mod: #59466D; --hl-word-mod: #9E67BA; 
+            --hl-ins: #FF007F; --hl-del: #FF0000; --gutter-mod: #00FF7F; 
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-dark); color: var(--text-light); overflow: hidden; font-size: 13px; }
+        .app-container { display: flex; width: 100vw; height: 100vh; }
+        
+        .panel { display: flex; flex-direction: column; box-sizing: border-box; padding: 10px; background-color: var(--bg-panel); overflow: hidden; }
+        .panel-left { width: 25%; min-width: 200px; gap: 10px; }
+        .panel-center { width: 45%; min-width: 300px; background-color: var(--bg-dark); gap: 5px; }
+        .panel-right { flex: 1; min-width: 250px; background-color: var(--bg-panel-light); gap: 10px; }
+
+        .resizer-x { width: 5px; background-color: var(--border); cursor: col-resize; transition: 0.2s; z-index: 10; }
+        .resizer-x:hover { background-color: var(--primary); }
+        .resizer-y { height: 5px; background-color: var(--border); cursor: row-resize; transition: 0.2s; flex-shrink: 0; }
+        .resizer-y:hover { background-color: var(--primary); }
+
+        .box-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; flex-shrink: 0; }
+        .box-title { font-weight: bold; font-size: 0.85em; text-transform: uppercase; color: #9cdcfe; margin-top: 5px; display: inline-block; }
+        .box-title-large { font-size: 1.15em; } 
+        
+        .mini-title { font-size: 0.75em; color: #888; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center;}
+        
+        button { background-color: var(--primary); color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.85em; transition: 0.2s; }
+        button:hover:not(:disabled) { background-color: var(--primary-hover); }
+        button:disabled { background-color: var(--disabled); cursor: not-allowed; opacity: 0.7; }
+        .btn-danger { background-color: var(--danger); }
+        .btn-danger:hover:not(:disabled) { background-color: #a34a4a; }
+        .btn-large { padding: 10px; font-size: 1em; font-weight: bold; width: 100%; margin-top: 5px; }
+        
+        .btn-square { width: 35px; height: 35px; padding: 0; display: flex; justify-content: center; align-items: center; font-size: 1.5em; flex-shrink: 0;}
+        .btn-importer { padding: 8px 16px; font-size: 1em; font-weight: bold; }
+        .btn-vider-small { padding: 6px 10px; font-size: 0.85em; background-color: var(--danger); color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-vider-small:hover { background-color: #a34a4a; }
+        .btn-nav-large { padding: 8px 15px; font-size: 1em; font-weight: bold; flex: 1; }
+
+        .project-input { background: #1e1e1e; border: 1px solid var(--border); color: #d4d4d4; padding: 4px 6px; font-size: 0.9em; border-radius: 3px; width: 100%; box-sizing: border-box; }
+        .project-input:placeholder-shown { border-color: var(--danger); background-color: rgba(209, 105, 105, 0.1); }
+
+        .text-box-wrapper { display: flex; flex-direction: column; flex: 1; min-height: 50px; }
+        .code-container { flex: 1; display: flex; background-color: #1e1e1e; border: 1px solid var(--border); overflow: hidden; position: relative; }
+        
+        .backdrop-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-sizing: border-box; color: #d4d4d4; background-color: #1e1e1e; z-index: 1; overflow: hidden; pointer-events: none; white-space: pre; padding: 10px; font-family: 'Consolas', monospace; font-size: 10px;}
+        .overlay-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-sizing: border-box; color: transparent !important; background: transparent !important; caret-color: white; z-index: 2; resize: none; margin: 0; outline: none; border: none; white-space: pre; padding: 10px; font-family: 'Consolas', monospace; font-size: 10px; overflow: auto;}
+
+        div.sync-text { flex: 1; padding: 10px; font-family: 'Consolas', monospace; font-size: 10px; overflow: auto; white-space: pre; background-color: #1e1e1e; color: #d4d4d4; cursor: text; }
+
+        .main-editor-wrapper { flex: 1; display: flex; border: 1px solid var(--border); overflow: hidden; background: #1e1e1e; }
+        .line-numbers { white-space: pre; width: 40px; padding: 10px 5px 25px 5px; text-align: right; color: #858585; background: #252526; border-right: 1px solid var(--border); user-select: none; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; overflow: hidden; flex-shrink: 0; cursor: pointer; }
+        .gutter-mod { background-color: var(--gutter-mod); color: #000; font-weight: bold; border-radius: 2px; padding: 0 2px;}
+        .main-code { flex: 1; padding: 10px; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; overflow: auto; white-space: pre; outline: none; }
+        .status-bar { display: flex; justify-content: space-between; font-size: 0.75em; background: #007acc; color: white; padding: 2px 10px; border-radius: 3px; }
+
+        .prompt-zone { background: #333; padding: 8px; border-radius: 4px; font-size: 0.8em; border: 1px dashed #555; flex-shrink: 0; }
+        .prompt-zone pre { margin: 3px 0 0 0; color: #9cdcfe; font-size: 0.9em; white-space: pre-wrap; min-height: 120px; overflow-y: auto; }
+        .history-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 100px; }
+        .history-table-container { flex: 1; overflow-y: auto; border: 1px solid var(--border); background: #1e1e1e; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        th { background-color: #333; position: sticky; top: 0; padding: 6px; text-align: left; }
+        td { padding: 4px 6px; border-bottom: 1px solid #333; cursor: pointer; }
+        tr:hover { background-color: #2a2d2e; }
+        tr.selected { background-color: #37373d; border-left: 3px solid var(--primary); }
+        .mini-views-container { display: flex; flex-direction: column; flex: 1; gap: 5px; min-height: 100px; }
+        .mini-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .nav-buttons { display: flex; gap: 5px; justify-content: space-between; margin-top: 5px; flex-shrink: 0; }
+
+        /* === GESTION DES COULEURS === */
+        mark { background: transparent; color: inherit; padding: 0; border-radius: 2px; }
+        .hl-linebg { background-color: var(--hl-linebg); } 
+        .hl-yellow { background-color: var(--hl-yellow) !important; color: #000 !important; font-weight: bold; } 
+        .hl-line-mod { background-color: var(--hl-line-mod) !important; color: white !important; }
+        .hl-word-mod { background-color: var(--hl-word-mod) !important; color: white !important; } 
+        .hl-ins { background-color: var(--hl-ins) !important; color: white !important; }
+        .hl-del-txt { color: #888 !important; text-decoration: line-through !important; background: transparent !important; }
+        .hl-del { background: transparent !important; user-select: none; }
+        .hl-del::after { content: '[✖]'; color: var(--hl-del); font-weight: bold; font-size: 0.9em; user-select: none; margin: 0 1px;}
+        
+        .hidden { display: none !important; }
+        .param-zone { font-size: 0.8em; margin-top: 5px; display: flex; flex-direction: column; gap: 5px; color: #aaa; }
+
+        /* === MODALE DEBUG (V7) === */
+        .modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.75); z-index: 1000; justify-content: flex-end; align-items: center; padding-right: 1%; box-sizing: border-box;}
+        .modal-backdrop.active { display: flex; }
+        .modal-content { background-color: var(--bg-panel); width: 80%; height: 95%; border: 1px solid var(--primary); display: flex; flex-direction: column; box-shadow: -5px 0 20px rgba(0,0,0,0.8); border-radius: 4px; overflow: hidden; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background-color: var(--bg-dark); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .modal-body { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 10px; }
+        .modal-col-left { width: 30%; min-width: 250px; display: flex; flex-direction: column; gap: 10px; }
+        .modal-col-right { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 10px; }
+        .modal-footer { padding: 10px; background-color: var(--bg-dark); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; }
+        
+        .modal-textarea-main { width: 100%; height: 150px; background: #1e1e1e; border: 1px dashed var(--primary); color: #d4d4d4; font-family: 'Consolas', monospace; font-size: 11px; padding: 10px; box-sizing: border-box; resize: vertical; outline: none; }
+        .modal-textarea-main:focus { border-color: var(--hl-yellow); }
+        
+        .search-bar-container { display: flex; gap: 5px; align-items: center; background: #1e1e1e; padding: 5px 10px; border: 1px solid var(--border); }
+        .search-input { flex: 1; background: transparent; border: none; color: white; outline: none; font-family: 'Consolas', monospace; font-size: 13px; }
+        .btn-icon { background: #333; padding: 4px 8px; font-size: 1em; }
+        .btn-icon:hover:not(:disabled) { background: var(--primary); }
+        
+        /* === AFFICHAGE CARACTERES CACHES === */
+        /* On garde les vrais espaces pour le presse-papier, et on projette les symboles par-dessus via ::after */
+        .hc-space, .hc-tab { position: relative; }
+        .hc-space::after { content: '·'; position: absolute; left: 0; right: 0; text-align: center; color: #666; font-weight: bold; pointer-events: none; user-select: none; }
+        .hc-tab::after { content: '→'; position: absolute; left: 0; right: 0; text-align: center; color: #666; font-weight: bold; pointer-events: none; user-select: none; }
+        .hc-nl { display: inline-block; width: 0; position: relative; }
+        .hc-nl::after { content: '↵'; position: absolute; left: 0; color: #666; font-weight: bold; pointer-events: none; user-select: none; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="app">
+        <div class="panel panel-left" id="panel-left">
+            <div class="prompt-zone" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; padding: 10px; position: relative;">
+                <div style="flex: 1; min-width: 0; padding-bottom: 5px;">
+                    <div style="font-weight: 900; color:var(--primary); font-size: 1.6em; margin-bottom: 8px; text-transform: uppercase;" data-i18n="iaPromptTitle"></div>
+                    <span data-i18n="syntaxText" style="font-size: 0.9em; color: #888;"></span>
+                    <pre id="syntax-display" style="font-size: 1.55em; line-height: 1.15; margin-top: 5px; margin-bottom: 10px; overflow-x: hidden; transition: color 0.3s;">##SYNTAX_COPIE## [MULTI:FALSE]
+##FIND##
+(1)
+##REPLACE##
+(2)
+##END_COPIE##</pre>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; flex-shrink: 0; width: 68px; margin: 0; padding-bottom: 18px;">
+                    <button class="btn-square" style="width: 100%; height: 68px; font-size: 3.5em; border-radius: 6px; box-shadow: 0 4px 8px rgba(0,0,0,0.4);" onclick="copyPrompt()" data-tooltip="ttCopyPrompt">📋</button>
+                    <div style="text-align: center; line-height: 0.9; margin-top: 10px; display: flex; flex-direction: column; justify-content: center; flex: 1;">
+                        <span style="font-family: Arial, sans-serif; font-weight: bold; font-size: 1.35em; color: var(--primary); letter-spacing: 1px;" data-i18n="askToAIText1"></span>
+                        <span style="font-family: 'Arial Black', Arial, sans-serif; font-weight: 900; font-size: 4.8em; color: var(--hl-yellow); margin-top: 4px; transform: scaleY(1.3); transform-origin: top;" data-i18n="askToAIText2"></span>
+                    </div>
+                </div>
+                <button class="btn-square" style="position: absolute; bottom: 4px; right: 4px; width: 22px; height: 22px; font-size: 1em; background: transparent; border: none; color: #666; border-radius: 4px; cursor: pointer; transition: 0.2s;" onclick="openSettingsModal()" data-tooltip="ttSyntaxSettings" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='#666'">⚙️</button>
+            </div>
+
+            <div class="text-box-wrapper" style="margin-top: 10px;">
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 5px;">
+                    <div style="display: flex; gap: 5px; height: 36px; width: 100%;">
+                        <button class="btn-importer" onclick="pasteToLeft('text1')" style="flex: 1; height: 100%; font-weight: bold; font-size: 0.95em; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 4px; padding: 0;" data-tooltip="ttImport1">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.5 9.5 0 0 1 6.7 2.7L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
+                            <span data-i18n="btnImport"></span>
+                        </button>
+                        <button id="btn-rechercher" onclick="effectuerRecherche()" disabled style="flex: 1; font-weight: bold; font-size: 0.95em; border-radius: 4px;" data-tooltip="ttSearch">🔍 <span data-i18n="btnSearch"></span></button>
+                        <button id="btn-remplacer" onclick="effectuerRemplacement()" disabled style="flex: 1; font-weight: bold; font-size: 0.95em; border-radius: 4px;" data-tooltip="ttReplace"><span data-i18n="btnReplace"></span> ⚙️</button>
+                    </div>
+                    <span class="mini-title" style="font-size: 1.15em; color: white; font-weight: bold; margin: 0; align-self: flex-end;" data-i18n="text1Title"></span> 
+                </div>
+                <div class="code-container" style="position: relative;">
+                    <div id="backdrop1" class="backdrop-layer"></div>
+                    <textarea id="text1" class="overlay-layer" oninput="handleText1Input()" onscroll="document.getElementById('backdrop1').scrollTop = this.scrollTop; document.getElementById('backdrop1').scrollLeft = this.scrollLeft;"></textarea>
+                </div>
+            </div>
+
+            <div class="text-box-wrapper" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; height: 36px;">
+                    <button class="btn-importer" onclick="pasteToLeft('text2')" style="height: 100%; width: calc(33.33% - 3.33px); font-weight: bold; font-size: 0.95em; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0; border-radius: 4px; transform: translateY(-5px);" data-tooltip="ttImport2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.5 9.5 0 0 1 6.7 2.7L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
+                        <span data-i18n="btnImport"></span>
+                    </button>
+                    <span class="mini-title" style="font-size: 1.15em; color: white; font-weight: bold; margin: 0; line-height: 1; padding-bottom: 2px;" data-i18n="text2Title"></span> 
+                </div>
+                <div class="code-container" style="position: relative;">
+                    <div id="backdrop2" class="backdrop-layer"></div>
+                    <textarea id="text2" class="overlay-layer" oninput="handleText2Input()" onscroll="document.getElementById('backdrop2').scrollTop = this.scrollTop; document.getElementById('backdrop2').scrollLeft = this.scrollLeft;"></textarea>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; flex-shrink: 0;">
+                <div class="param-zone" style="font-size: 0.95em; margin: 0; flex: 1; color: #ccc;">
+                    <div data-tooltip="ttChkStrict" style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="chk-split-chars" onchange="updateLiveDiffBackdrops()" style="transform: scale(1.3); margin: 0;">
+                        <label for="chk-split-chars" data-i18n="chkStrict" style="cursor: pointer; font-weight: 500;"></label>
+                    </div>
+                    <div data-tooltip="ttChkMulti" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                        <input type="checkbox" id="chk-multi" onchange="state.multiMode = this.checked; checkSearchState(); if(document.getElementById('text1').value) effectuerRecherche();" style="transform: scale(1.3); margin: 0;">
+                        <label id="lbl-multi" for="chk-multi" data-i18n="chkMulti" style="cursor: pointer; font-weight: 500;"></label>
+                    </div>
+                </div>
+                <button class="btn-vider-small" style="height: 36px; font-weight: bold; font-size: 0.9em; padding: 0 15px; margin-bottom: 2px;" onclick="viderInputsConfirm()" data-tooltip="ttEmpty12" data-i18n="btnEmpty"></button>
+            </div>
+            
+            <div style="margin-top: 15px; text-align: left; font-size: 0.85em; color: #E0E0E0; padding-left: 2px;" data-i18n="appVersionLabel"></div>
+        </div>
+
+        <div class="resizer-x" id="drag-left"></div>
+
+        <div class="panel panel-center" id="panel-center">
+            
+            <div class="box-header" style="align-items: flex-start; gap: 15px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <div style="display: flex; flex-direction: column; justify-content: space-between; flex: 1; height: 75px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="project-name" style="font-size: 1.1em; color: #aaa; font-weight: bold; white-space: nowrap;" data-i18n="lblProjectName" data-tooltip="ttProjectName"></label>
+                        <input type="text" id="project-name" class="project-input" style="font-size: 1.1em; padding: 6px 10px;" onchange="state.projectName = this.value; updateMainView();" data-tooltip="ttProjectName">
+                    </div>
+                    <span class="box-title" style="margin: 0; font-size: 1.8em; line-height: 1;">
+                        <span data-i18n="sourceCodeTitle"></span> - 
+                        <span id="project-name-display" style="color: #FF4500;">XXXXXXX</span> - 
+                        <span id="version-display" style="color:var(--hl-yellow); font-weight: 900; margin-left: 5px;">V0.0.0</span>
+                    </span>
+                </div>
+                
+                <div style="display: flex; gap: 8px; flex-wrap: nowrap; align-items: stretch; height: 75px;">
+                    <button onclick="importMainCode()" style="font-size: 0.9em; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; padding: 5px 15px; gap: 4px; flex: 1; background-color: var(--bg-panel-light); border: 1px solid var(--border); transition: 0.2s;" data-tooltip="ttImportClip" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="#4da6ff" stroke-width="2" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline stroke="#4da6ff" stroke-width="2" points="14 2 14 8 20 8"></polyline>
+                            <path stroke="#ff3333" stroke-width="3" d="M12 18v-6"></path>
+                            <path stroke="#ff3333" stroke-width="3" d="M9 15l3 3 3-3"></path>
+                        </svg>
+                        <span data-i18n="btnImportClip" style="text-align: center; line-height: 1.1; color: #4da6ff; font-weight: bold;"></span>
+                    </button>
+
+                    <button onclick="copyMainCode()" style="font-size: 0.9em; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; padding: 5px 15px; gap: 4px; flex: 1; background-color: var(--bg-panel-light); border: 1px solid var(--border); transition: 0.2s;" data-tooltip="ttCopyClip" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="#4da6ff" stroke-width="2" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline stroke="#4da6ff" stroke-width="2" points="14 2 14 8 20 8"></polyline>
+                            <path stroke="#ff3333" stroke-width="3" d="M12 11v7"></path>
+                            <path stroke="#ff3333" stroke-width="3" d="M9 14l3-3 3 3"></path>
+                        </svg>
+                        <span data-i18n="btnCopyClip" style="text-align: center; line-height: 1.1; color: #4da6ff; font-weight: bold;"></span>
+                    </button>
+
+                    <button onclick="btnVersionner()" style="font-size: 0.9em; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; padding: 5px 15px; gap: 4px; flex: 1; background-color: var(--bg-panel-light); border: 1px solid var(--border); transition: 0.2s;" data-tooltip="ttVersion" onmouseover="this.style.borderColor='#20b2aa'" onmouseout="this.style.borderColor='var(--border)'">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#20b2aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                            <polyline points="17 6 23 6 23 12"></polyline>
+                        </svg>
+                        <span data-i18n="btnVersion" style="text-align: center; line-height: 1.1; color: #20b2aa; font-weight: bold;"></span>
+                    </button>
+
+                    <div style="display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; width: 45px;">
+                        <button onclick="zoomMain(1)" style="flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; background-color: var(--bg-panel-light); border: 1px solid var(--border); color: white; transition: 0.2s;" data-tooltip="ttZoomIn" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        </button>
+                        <button onclick="zoomMain(-1)" style="flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; background-color: var(--bg-panel-light); border: 1px solid var(--border); color: white; transition: 0.2s;" data-tooltip="ttZoomOut" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="main-editor-wrapper">
+                <div class="line-numbers" id="line-numbers"><span>1</span></div>
+                <div id="text3" class="main-code" tabindex="0" onclick="updateCursorPos()" onkeyup="updateCursorPos()"></div>
+            </div>
+            
+            <div class="status-bar">
+                <span id="status-cursor"></span>
+                <span id="status-stats"></span>
+            </div>
+        </div>
+
+        <div class="resizer-x" id="drag-right"></div>
+
+        <div class="panel panel-right" id="panel-right">
+            <div class="box-header" style="align-items: flex-start; margin-bottom: 8px; flex-direction: column; gap: 8px;">
+                <div style="display: flex; gap: 8px; flex-wrap: nowrap; align-items: stretch; height: 55px; width: 100%;">
+                    <button onclick="exportHistory()" style="font-size: 0.85em; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; padding: 4px 10px; gap: 4px; flex: 1; background-color: var(--bg-panel-light); border: 1px solid var(--border); transition: 0.2s;" data-tooltip="ttSave" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+                        <span style="font-size: 1.8em; line-height: 1;">💾</span>
+                        <span data-i18n="btnSave" style="color: #d4d4d4; font-weight: bold; letter-spacing: 1px;"></span>
+                    </button>
+                    <button onclick="triggerImport()" style="font-size: 0.85em; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; padding: 4px 10px; gap: 4px; flex: 1; background-color: var(--bg-panel-light); border: 1px solid var(--border); transition: 0.2s;" data-tooltip="ttOpen" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+                        <span style="font-size: 1.8em; line-height: 1;">📂</span>
+                        <span data-i18n="btnOpen" style="color: #d4d4d4; font-weight: bold; letter-spacing: 1px;"></span>
+                    </button>
+                    <input type="file" id="import-file" style="display:none" accept=".json" onchange="importHistory(event)">
+                    <button class="btn-danger" onclick="resetAll()" style="font-size: 0.85em; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; padding: 4px 10px; gap: 4px; flex: 1; border: 1px solid var(--danger); transition: 0.2s;" data-tooltip="ttReset" onmouseover="this.style.borderColor='#ff6666'" onmouseout="this.style.borderColor='var(--danger)'">
+                        <span style="font-size: 1.8em; line-height: 1;">🔄</span>
+                        <span data-i18n="btnResetText" style="color: white; font-weight: bold; letter-spacing: 1px;"></span>
+                    </button>
+                </div>
+                <div style="font-weight: 900; color:var(--primary); font-size: 1.6em; text-transform: uppercase; width: 100%; margin-top: 4px;" data-i18n="historyTitle" data-tooltip="ttHistoryList"></div>
+            </div>
+
+            <div class="history-wrapper" id="history-container">
+                <div class="history-table-container">
+                    <table>
+                        <thead><tr><th width="30%" data-i18n="colVer"></th><th width="45%" data-i18n="colAction"></th><th data-i18n="colTime"></th></tr></thead>
+                        <tbody id="history-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="resizer-y" id="drag-history"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: stretch; margin-top: 6px; margin-bottom: 6px; gap: 10px;">
+                <div style="background: #333; padding: 8px; border-radius: 4px; border: 1px dashed #555; flex: 1; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-style: italic; color: #888; font-size: 0.95em; text-align: center;" data-i18n="futureOpts"></span>
+                </div>
+                <div style="display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; flex-shrink: 0;">
+                    <span style="font-size: 0.8em; color: white; font-weight: bold; margin-bottom: 6px;" data-i18n="detailsTitle"></span>
+                    <div style="display: flex; gap: 5px;">
+                        <button onclick="toggleSyncT4T5()" id="btn-toggle-sync" data-tooltip="ttSync">🔗</button>
+                        <button onclick="toggleMiniViews()" id="btn-toggle-mini" style="min-width: 105px; display: flex; justify-content: space-between; align-items: center; padding: 4px 10px;" data-i18n="btnHide"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mini-views-container" id="mini-views-container">
+                <div class="mini-view">
+                    <span class="mini-title" data-i18n="beforeTitle"></span>
+                    <div class="code-container"><div id="text4" class="sync-text" tabindex="0"></div></div>
+                </div>
+                <div class="mini-view">
+                    <span class="mini-title" data-i18n="afterTitle"></span>
+                    <div class="code-container"><div id="text5" class="sync-text" tabindex="0"></div></div>
+                </div>
+            </div>
+
+            <div class="nav-buttons" style="height: 55px; margin-top: 10px; gap: 8px;">
+                <button id="btn-prev" onclick="navigateHistory(-1)" disabled style="flex: 1; font-weight: bold; font-size: 1.1em; border-radius: 4px;" data-tooltip="ttPrev" data-i18n="btnPrev"></button>
+                <button id="btn-apply" onclick="applySelectedBranch()" class="btn-danger" style="flex: 2; font-weight: bold; font-size: 1.05em; border-radius: 4px; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 0 10px;" disabled data-tooltip="ttBranch">
+                    <span data-i18n="btnApplyBranch" style="text-align: right; line-height: 1.1;"></span>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; transform: scaleY(-1);">
+                        <line x1="6" y1="3" x2="6" y2="15"></line>
+                        <circle cx="18" cy="6" r="3"></circle>
+                        <circle cx="6" cy="18" r="3"></circle>
+                        <path d="M18 9a9 9 0 0 1-9 9"></path>
+                    </svg>
+                </button>
+                <button id="btn-next" onclick="navigateHistory(1)" disabled style="flex: 1; font-weight: bold; font-size: 1.1em; border-radius: 4px;" data-tooltip="ttNext" data-i18n="btnNext"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="debug-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="box-title box-title-large" style="color: #FF8C00;" data-i18n="modalTitle"></span>
+                <button class="btn-danger" onclick="closeDebugModal()">X</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-col-left" id="modal-panel-left">
+                    <span class="mini-title" data-i18n="modalInputTitle"></span>
+                    <textarea id="modal-raw-input" class="modal-textarea-main" spellcheck="false" oninput="processModalInput()"></textarea>
+                    
+                    <div class="text-box-wrapper">
+                        <span class="mini-title" data-i18n="text1Title"></span>
+                        <div class="code-container" style="position: relative; flex:1;">
+                            <div id="modal-backdrop1" class="backdrop-layer"></div>
+                            <textarea id="modal-text1" class="overlay-layer" readonly spellcheck="false" oninput="updateRawFromFields()" onscroll="document.getElementById('modal-backdrop1').scrollTop = this.scrollTop; document.getElementById('modal-backdrop1').scrollLeft = this.scrollLeft;"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="text-box-wrapper">
+                        <span class="mini-title" data-i18n="text2Title"></span>
+                        <div class="code-container" style="position: relative; flex:1;">
+                            <div id="modal-backdrop2" class="backdrop-layer"></div>
+                            <textarea id="modal-text2" class="overlay-layer" readonly spellcheck="false" oninput="updateRawFromFields()" onscroll="document.getElementById('modal-backdrop2').scrollTop = this.scrollTop; document.getElementById('modal-backdrop2').scrollLeft = this.scrollLeft;"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resizer-x" id="modal-drag-x"></div>
+
+                <div class="modal-col-right">
+                    <span class="mini-title" data-i18n="modalFindTitle"></span>
+                    <div class="search-bar-container">
+                        <span style="color: var(--primary);">🔍</span>
+                        <input type="text" id="modal-find-input" class="search-input" autocomplete="off" spellcheck="false">
+                        <span id="modal-find-count" style="font-size: 0.8em; color: #888; margin-right: 10px;">0/0</span>
+                        <button class="btn-icon" id="btn-modal-prev" disabled>▲</button>
+                        <button class="btn-icon" id="btn-modal-next" disabled>▼</button>
+                    </div>
+
+                    <div class="main-editor-wrapper">
+                        <div class="line-numbers" id="modal-line-numbers"><span>1</span></div>
+                        <div id="modal-text3" class="main-code" tabindex="0"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-large" style="background-color: var(--disabled); width: auto;" onclick="closeDebugModal()" data-i18n="btnCancel"></button>
+                <button class="btn-large" id="btn-modal-apply" style="width: auto;" disabled data-i18n="btnModalApply"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="settings-modal" style="justify-content: center;">
+        <div class="modal-content" style="width: 400px; height: auto; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <span class="box-title box-title-large" style="color: #20b2aa;">⚙️ PARAMÈTRES SYNTAXE</span>
+                <button class="btn-danger" onclick="closeSettingsModal()">X</button>
+            </div>
+            <div class="modal-body" style="flex-direction: column; padding: 15px; gap: 12px; overflow: visible;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="color: #aaa; font-size: 0.9em;">Balise de Début</label>
+                    <input type="text" id="set-start" class="project-input" style="font-family: monospace;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="color: #aaa; font-size: 0.9em;">Balise Recherche (FIND)</label>
+                    <input type="text" id="set-find" class="project-input" style="font-family: monospace;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="color: #aaa; font-size: 0.9em;">Balise Remplacement (REPLACE)</label>
+                    <input type="text" id="set-replace" class="project-input" style="font-family: monospace;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="color: #aaa; font-size: 0.9em;">Balise de Fin</label>
+                    <input type="text" id="set-end" class="project-input" style="font-family: monospace;">
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button class="btn-danger" style="width: auto; display: flex; align-items: center; gap: 5px;" onclick="resetSettings()">🔄 Reset</button>
+                <button class="btn-large" style="width: auto; background-color: var(--primary);" onclick="applySettings()">VALIDER</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION SYNTAXE (DYNAMIQUE)
+        // ==========================================
+        let SYNTAX_CONFIG = {
+            START: "##SYNTAX_COPIE##",
+            FIND: "##FIND##",
+            REPLACE: "##REPLACE##",
+            END: "##END_COPIE##"
+        };
+
+        // ==========================================
+        // DICTIONNAIRE GLOBAL (APP_CONFIG)
+        // ==========================================
+        const APP_CONFIG = {
+            colors: {
+                bgDark: "#1e1e1e", bgPanel: "#252526", bgPanelLight: "#2d2d2d",
+                textLight: "#d4d4d4", primary: "#007acc", primaryHover: "#005999",
+                danger: "#d16969", disabled: "#555555", border: "#444",
+                hlYellow: "#FFD700", hlLinebg: "rgba(198, 142, 255, 0.35)",
+                hlLineMod: "#59466D", hlWordMod: "#9E67BA",
+                hlIns: "#FF007F", hlDel: "#FF0000", gutterMod: "#00FF7F"
+            },
+            tooltips: {
+                ttCopyPrompt: "prompt pré codé pour avoir une requete formaté proprement, a coller en consigne dans votre IA, se met dans votre presse papier",
+                ttEmpty12: "vider les texte recherché et a remplacer / supprimer la requete en court",
+                ttImport1: "importer depuis le presse papier une requete formaté\nOU le texte brute a chercher",
+                ttImport2: "importer depuis le presse papier une requete formaté\nOU le texte brute qui remplacera le texte recherché au dessus",
+                ttSearch: "rechercher le texte 1 dans le code source",
+                ttReplace: "remplacer le ou les occurence trouvé du texte 1 dans le code source par le code du texte 2",
+                ttDelete: "supprimer le ou les occurence du texte 1 trouvé dans le code source",
+                ttChkStrict: "permet de couper ou non les mots reconnus comme modifié entre le texte 1 et 2; sans incidence, sert surtout a facilier le controle manuel",
+                ttChkMulti: "si coché, permet de remplacer TOUTE les occurence du texte 1 trouvé en un coup.\nsi décoché (par défaut) ne remplace que UNE SEULE occurence du texte 1 et DOIT ETRE UNIQUE dans ce cas précis",
+                ttDelZone: "Zone totalement supprimée",
+                ttDeletedText: "Texte supprimé",
+                ttBtnApplyBranch: "",
+                ttProjectName: "entrez ici le nom du projet; cela deviendra le nom du fichier contenant le code et toute les itération passé",
+                ttImportClip: "coller le code a modifier depuis le presse papier",
+                ttCopyClip: "copie le code modifié dans le presse papier",
+                ttVersion: "permet de passer de la V1.0.0 a la V2.0.0 ou la V1.1.0",
+                ttZoomIn: "augmenter la taille du code source",
+                ttZoomOut: "diminuer la taille du code source",
+                ttHistoryList: "liste des version du code modifié poussé étape par étape",
+                ttSave: "sauvegarde toute la pile de version dans un fichier",
+                ttOpen: "ouvre un projet avec tout son historique",
+                ttReset: "creer un nouveau projet vierge et tout vider",
+                ttSync: "lier ou non les défilement de avant / apres",
+                ttPrev: "enregistrement précédent, avant modif du dernier push",
+                ttNext: "enregistrement suivant apres application du dernier push",
+                ttBranch: "a partir de cet ancien enregistement, ignorer tout les elements suivant, et creer un nouveau point de départ qui reviens sur cette ancienne version.\nprovoque automatiquement un incrément de version mineur (V1.0.0 deviens V1.1.0)",
+                ttSyntaxSettings: "modifier ponctuellement la requete en cas de besoin"
+            },
+            texts: {
+                appVersionLabel: "© Insosama 2027 - Stack-Parseur V1.0 Release (V7.0 internal)",
+                appTitle: "Stack-Parseur V1.0 Release",
+                warnResetUnsaved: "LE PROJET ACTUEL CONTIENT DES MODIFICATIONS QUI N'ONT PAS ÉTÉ ENREGISTRÉES.",
+                iaPromptTitle: "Assistant format requete",
+                askToAIText1: "ASK TO",
+                askToAIText2: "AI",
+                syntaxText: "Syntaxe :",
+                text1Title: "Texte à chercher (1)",
+                btnEmpty: "🗑️ VIDER 1 & 2",
+                btnImport: "Importer",
+                placeholderText1: "Importez depuis le presse-papier...",
+                text2Title: "À remplacer par (2)",
+                placeholderText2: "Laissez vide pour supprimer...",
+                chkStrict: "Rejeter \"-\" et \"_\" des variables (Moteur strict)",
+                chkMulti: "Recherche et remplacement multiple autorisé",
+                chkMultiCount: "Remplacement de {0} occurrence(s) trouvé(s) autorisé",
+                btnSearch: "RECHERCHER",
+                btnReplace: "REMPLACER",
+                btnDelete: "SUPPRIMER",
+                lblProjectName: "Nom du projet",
+                placeholderProject: "Donner un nom à votre projet qui soit unique et explicite",
+                sourceCodeTitle: "Code Source",
+                btnImportClip: "coller /<br>IMPORT",
+                btnCopyClip: "copier /<br>EXPORT",
+                btnZoomIn: "Zoom +",
+                btnVersion: "Versionner<br>VX.Y.Z +1",
+                btnZoomOut: "Zoom -",
+                historyTitle: "HISTORIQUE DES VERSIONS",
+                btnSave: "SAVE",
+                btnOpen: "OPEN",
+                btnResetText: "RESET",
+                colVer: "Ver.",
+                colAction: "Action",
+                colTime: "Heure",
+                detailsTitle: "Détails (état du texte avant / après)",
+                futureOpts: "futures options d'optimisation - release V2.0",
+                btnHide: "<span>Masquer</span> <span>▲</span>",
+                btnShow: "<span>Afficher</span> <span>▼</span>",
+                beforeTitle: "AVANT",
+                afterTitle: "APRÈS",
+                btnPrev: "◀ Préc.",
+                btnApplyBranch: "CREER BRANCHE<br>A PARTIR DE",
+                btnNext: "Suiv. ▶",
+                
+                btnCancel: "ANNULER",
+                modalTitle: "🛠️ DÉBOGUEUR DE REQUÊTE IA",
+                modalInputTitle: "Requête Brute (Éditable)",
+                modalFindTitle: "Recherche Live dans le Code Source (T3)",
+                btnModalApply: "VALIDER & IMPORTER LA REQUÊTE",
+                
+                statusCursorInit: "Ligne: 1, Col: 1",
+                statusCursorUpdate: "Ligne: {0}, Col: {1}",
+                statusStatsInit: "Lignes: 0 | Caractères: 0",
+                statusStatsUpdate: "Lignes: {0} | Caractères: {1}",
+                waitingImport: "En attente d'import...",
+                msgLoading: "<br><br><center><i>Chargement en cours...</i></center>",
+                
+                msgCopyPrompt: "Agis comme un expert en modification de code source.\nJe vais te fournir un code source. Tu devras me proposer des modifications en respectant STRICTEMENT ce format. Tu dois IMPERATIVEMENT placer ta reponse dans un bloc de code classique (utilise l'outil de formatage de code de ton interface) pour que je puisse la copier facilement en un clic :\n\n##SYNTAX_COPIE## [MULTI:FALSE]\n##FIND##\n[Texte exact à trouver, avec lignes avant/après pour être UNIQUE. Fais très attention aux indentations, espaces et caractères spéciaux cachés !]\n##REPLACE##\n[Texte de remplacement complet, incluant les lignes avant/après conservées + modifications]\n##END_COPIE##\n\nRègle d'or MANDATORY \n- La zone FIND ne doit avoir qu'une SEULE occurrence exacte dans tout le document. Toutefois, s'il est utile de faire un rechercher/remplacer d'un élément dans tout le texte (ex: un nom de variable), utilise le tag [MULTI:TRUE].\n- tu utilisera le marqueur \"trois accent grave\" pour encadrer le code de la requete pour que je puisse la copier en un clic mais JAMAIS tu utilisera cette chaine spécifique de carractère DANS le code, ni dans find, ni dans replace. sinon, ces carractère seront reconnu comme un échappement de la conversation / du code que tu rédige et ton IDE plantera. \nen lisant ce prompt, ne fais pas l'erreur de me dire que tu l'as compris en écrivant la chaine de carractère en question, évidement.\n- tu sera particulièrement vigilent avec les saut de ligne, les espace, les indentation et les caractères invisible. le systeme de reconnaissance de syntaxe est chirurgical et intransigeant : toute faute conduira soit a ne pas trouver le code (find) soit a une requete non reconnue.\n- CAS EXCEPTIONNEL (MODE FURTIF) : Si tu dois modifier le parseur lui-même et que tes instructions contiennent les balises standard (ce qui ferait planter l'outil), tu dois utiliser le mode furtif. Commence EXACTEMENT ta réponse par la ligne [REQMODIFIER], suivie sur les 4 lignes suivantes de tes nouvelles balises personnalisées (ex: @@NOUVEAU_DEBUT@@, @@CHERCHER@@, @@REMPLACER@@, @@NOUVELLE_FIN@@). Rédige ensuite ta requête avec ces balises.",
+                alertPromptCopied: "Prompt copié !",
+                alertNotFoundDebug: "Le texte recherché est introuvable dans le code source.\n\nCliquez sur OK pour l'éditer dans le débogueur, ou sur Annuler pour ignorer.",
+                alertClipboardDenied: "Accès presse-papier refusé.",
+                confirmEmptyInputs: "Voulez-vous vraiment effacer les zones de recherche (1) et de remplacement (2) ?",
+                alertSyntaxInvalid: "Erreur : La structure de la requête est invalide.\nAssurez-vous qu'il n'y ait qu'une seule occurrence exacte des balises FIND et REPLACE.",
+                alertSyntaxFormat: "Erreur : Le format ##SYNTAX_COPIE## a été détecté, mais la structure interne ou les sauts de ligne sont incorrects.",
+                alertSearchNotFound: "Texte introuvable.",
+                alertSearchMultiple: "Erreur: Trouvé {0} fois. Occurrence unique requise en mode [MULTI:FALSE].\n\n[OK] : Annuler la recherche et vider les champs.\n[Annuler] : Garder les zones en jaune (Remplacement bloqué).",
+                confirmDeleteReplace: "ATTENTION : La zone de remplacement est vide. Voulez-vous vraiment SUPPRIMER cette occurrence du code ?",
+                confirmOverwriteHistory: "Écraser et vider l'historique ?",
+                alertCodeCopied: "Code copié !",
+                promptVersionType: "{0} (actuel).\nVoulez-vous passer à la {1} (Majeur) ou la {2} (Mineur) ?\n\nEcrivez M pour Majeur ou m pour mineur :",
+                confirmBranch: "Créer une branche depuis {0} ? Le code actuel sera écrasé et les recherches en cours annulées.",
+                alertNothingToExport: "Rien à exporter.",
+                alertNoProjectName: "Le champ 'Nom du projet' (en haut de l'éditeur central) est vide. Veuillez le remplir avant d'exporter.",
+                confirmExport: "Sauvegarder le fichier JSON dans vos documents sous le projet : \"{0}\" ?",
+                warnImportOverwrite: "ATTENTION : L'importation d'un fichier va écraser tout votre travail actuel.\n\n",
+                warnImportUnsaved: "Votre projet actuel \"{0}\" a évolué depuis la dernière sauvegarde et contient des modifications non exportées.\n\n",
+                warnImportContinue: "Êtes-vous sûr de vouloir continuer ?",
+                alertImportSuccess: "Chargement réussi du projet : \"{0}\".",
+                alertImportError: "Erreur: Impossible de lire ce fichier JSON. Il est corrompu ou d'un format incorrect.",
+                confirmResetAll: "ATTENTION : EFFACER TOUT le projet actuel et repartir à zéro ?",
+                importInitAction: "IMPORT INITIAL"
+            }
+        };
+
+        function formatText(key, ...args) {
+            let str = APP_CONFIG.texts[key] || key;
+            args.forEach((arg, i) => { str = str.replace(`{${i}}`, arg); });
+            return str;
+        }
+
+        function initUI() {
+            document.title = APP_CONFIG.texts.appTitle;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (APP_CONFIG.texts[key] !== undefined) el.innerHTML = APP_CONFIG.texts[key];
+            });
+            document.querySelectorAll('[data-tooltip]').forEach(el => {
+                const key = el.getAttribute('data-tooltip');
+                if (APP_CONFIG.tooltips[key]) el.setAttribute('title', APP_CONFIG.tooltips[key]);
+            });
+            document.getElementById('text1').setAttribute('placeholder', APP_CONFIG.texts.placeholderText1);
+            document.getElementById('text2').setAttribute('placeholder', APP_CONFIG.texts.placeholderText2);
+            document.getElementById('project-name').setAttribute('placeholder', APP_CONFIG.texts.placeholderProject);
+
+            const root = document.documentElement;
+            root.style.setProperty('--bg-dark', APP_CONFIG.colors.bgDark);
+            root.style.setProperty('--bg-panel', APP_CONFIG.colors.bgPanel);
+            root.style.setProperty('--bg-panel-light', APP_CONFIG.colors.bgPanelLight);
+            root.style.setProperty('--text-light', APP_CONFIG.colors.textLight);
+            root.style.setProperty('--primary', APP_CONFIG.colors.primary);
+            root.style.setProperty('--primary-hover', APP_CONFIG.colors.primaryHover);
+            root.style.setProperty('--danger', APP_CONFIG.colors.danger);
+            root.style.setProperty('--disabled', APP_CONFIG.colors.disabled);
+            root.style.setProperty('--border', APP_CONFIG.colors.border);
+            root.style.setProperty('--hl-yellow', APP_CONFIG.colors.hlYellow);
+            root.style.setProperty('--hl-linebg', APP_CONFIG.colors.hlLinebg);
+            root.style.setProperty('--hl-line-mod', APP_CONFIG.colors.hlLineMod);
+            root.style.setProperty('--hl-word-mod', APP_CONFIG.colors.hlWordMod);
+            root.style.setProperty('--hl-ins', APP_CONFIG.colors.hlIns);
+            root.style.setProperty('--hl-del', APP_CONFIG.colors.hlDel);
+            root.style.setProperty('--gutter-mod', APP_CONFIG.colors.gutterMod);
+
+            document.getElementById('status-cursor').innerText = APP_CONFIG.texts.statusCursorInit;
+            document.getElementById('status-stats').innerText = APP_CONFIG.texts.statusStatsInit;
+            document.getElementById('text3').innerHTML = APP_CONFIG.texts.waitingImport;
+        }
+
+        // ==========================================
+        // ETAT GLOBAL (STATE) & PREPARATION MODALE
+        // ==========================================
+        let state = {
+            projectName: "", vX: 0, vY: 0, vZ: 0, rawText: "", history: [], selectedIndex: -1,
+            searchStr: "", replaceStr: "", tempSearchIndex: -1, marks: [], yellowMarks: [], multiMode: false
+        };
+        
+        let modalState = { isActive: false, rawText: "", findText: "", replaceText: "", multiMode: false };
+        
+        let isProjectDirty = false;
+        let skipDeleteWarning = false;
+
+        // ==========================================
+        // UI & SPLITTERS
+        // ==========================================
+        let mainZoom = 14; let miniZoomR = 10;
+
+        function initSplitters() {
+            const dragLeft = document.getElementById('drag-left'), dragRight = document.getElementById('drag-right'), dragHist = document.getElementById('drag-history');
+            const panelLeft = document.getElementById('panel-left'), panelCenter = document.getElementById('panel-center'), histContainer = document.getElementById('history-container');
+            let activeSplitter = null, startX, startY, startWidthL, startWidthC, startHeightH;
+
+            const onMouseMove = (e) => {
+                if (!activeSplitter) return;
+                if (activeSplitter === dragLeft) { const newW = startWidthL + (e.clientX - startX); if (newW > 150) panelLeft.style.width = newW + 'px'; }
+                else if (activeSplitter === dragRight) { const newW = startWidthC + (e.clientX - startX); if (newW > 200) panelCenter.style.width = newW + 'px'; }
+                else if (activeSplitter === dragHist) { const newH = startHeightH + (e.clientY - startY); if (newH > 50 && newH < window.innerHeight - 150) histContainer.style.flex = `0 0 ${newH}px`; }
+            };
+            const onMouseUp = () => { activeSplitter = null; document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); document.body.style.cursor = 'default'; };
+            const bindDrag = (el) => {
+                el.addEventListener('mousedown', (e) => {
+                    activeSplitter = el; startX = e.clientX; startY = e.clientY; 
+                    startWidthL = panelLeft.getBoundingClientRect().width; startWidthC = panelCenter.getBoundingClientRect().width; startHeightH = histContainer.getBoundingClientRect().height;
+                    document.body.style.cursor = el.classList.contains('resizer-x') ? 'col-resize' : 'row-resize';
+                    document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
+                });
+            };
+            bindDrag(dragLeft); bindDrag(dragRight); bindDrag(dragHist);
+        }
+        initSplitters();
+
+        let miniViewsSavedHeight = "";
+        function toggleMiniViews() {
+            const container = document.getElementById('mini-views-container'), resizer = document.getElementById('drag-history'), histContainer = document.getElementById('history-container'), btn = document.getElementById('btn-toggle-mini');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden'); resizer.classList.remove('hidden');
+                histContainer.style.flex = miniViewsSavedHeight || "1"; btn.innerHTML = APP_CONFIG.texts.btnHide;
+            } else {
+                miniViewsSavedHeight = histContainer.style.flex; container.classList.add('hidden'); resizer.classList.add('hidden');
+                histContainer.style.flex = "1"; btn.innerHTML = APP_CONFIG.texts.btnShow;
+            }
+        }
+
+        let isT4T5Synced = true;
+        let syncOffsetTop = 0;
+        let syncOffsetLeft = 0;
+
+        function toggleSyncT4T5() {
+            const btn = document.getElementById('btn-toggle-sync');
+            isT4T5Synced = !isT4T5Synced;
+            if (isT4T5Synced) {
+                btn.innerText = "🔗";
+                btn.setAttribute("title", APP_CONFIG.tooltips.ttSync);
+                const el1 = document.getElementById('text4');
+                const el2 = document.getElementById('text5');
+                syncOffsetTop = el2.scrollTop - el1.scrollTop;
+                syncOffsetLeft = el2.scrollLeft - el1.scrollLeft;
+            } else {
+                btn.innerText = "🔓";
+                btn.setAttribute("title", APP_CONFIG.tooltips.ttSync);
+            }
+        }
+
+        function setupSync(id1, id2, getZoom, setZoom) {
+            const el1 = document.getElementById(id1), el2 = document.getElementById(id2);
+            let isSyncing1 = false, isSyncing2 = false;
+            
+            el1.addEventListener('scroll', () => { 
+                if(!isSyncing1 && isT4T5Synced) { 
+                    isSyncing2 = true; 
+                    el2.scrollTop = el1.scrollTop + syncOffsetTop; 
+                    el2.scrollLeft = el1.scrollLeft + syncOffsetLeft; 
+                } 
+                isSyncing1 = false; 
+            });
+            
+            el2.addEventListener('scroll', () => { 
+                if(!isSyncing2 && isT4T5Synced) { 
+                    isSyncing1 = true; 
+                    el1.scrollTop = el2.scrollTop - syncOffsetTop; 
+                    el1.scrollLeft = el2.scrollLeft - syncOffsetLeft; 
+                } 
+                isSyncing2 = false; 
+            });
+            
+            const handleWheel = (e) => { if (e.ctrlKey) { e.preventDefault(); let z = getZoom() + (e.deltaY < 0 ? 1 : -1); if(z < 6) z = 6; if(z > 30) z = 30; setZoom(z); el1.style.fontSize = z + "px"; el2.style.fontSize = z + "px"; } };
+            el1.addEventListener('wheel', handleWheel, {passive: false}); el2.addEventListener('wheel', handleWheel, {passive: false});
+        }
+        setupSync('text4', 'text5', () => miniZoomR, (v) => miniZoomR = v);
+
+        document.getElementById('text3').addEventListener('scroll', function() { document.getElementById('line-numbers').scrollTop = this.scrollTop; });
+        function zoomMain(dir) {
+            mainZoom += (dir * 2); if (mainZoom < 8) mainZoom = 8; if (mainZoom > 40) mainZoom = 40;
+            document.getElementById('text3').style.fontSize = mainZoom + "px"; document.getElementById('line-numbers').style.fontSize = mainZoom + "px";
+        }
+        document.getElementById('text3').addEventListener('wheel', (e) => { if(e.ctrlKey) { e.preventDefault(); zoomMain(e.deltaY < 0 ? 1 : -1); } }, {passive: false});
+
+        // ==========================================
+        // HELPERS
+        // ==========================================
+        const escapeHtml = (unsafe) => { if (!unsafe) return ""; return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+        const normalize = (text) => text.replace(/\r\n/g, '\n');
+        function formatVersion() { return `V${state.vX}.${state.vY}.${state.vZ}`; }
+        function getTimestamp() { const d = new Date(); return `${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR')}`; }
+
+        function copyPrompt() { 
+            let p = APP_CONFIG.texts.msgCopyPrompt;
+            p = p.replace(/##SYNTAX_COPIE##/g, SYNTAX_CONFIG.START)
+                 .replace(/##FIND##/g, SYNTAX_CONFIG.FIND)
+                 .replace(/##REPLACE##/g, SYNTAX_CONFIG.REPLACE)
+                 .replace(/##END_COPIE##/g, SYNTAX_CONFIG.END);
+            navigator.clipboard.writeText(p); 
+            alert(APP_CONFIG.texts.alertPromptCopied); 
+        }
+
+        // --- GESTION SETTINGS SYNTAXE ---
+        function openSettingsModal() {
+            document.getElementById('settings-modal').classList.add('active');
+            document.getElementById('set-start').value = SYNTAX_CONFIG.START;
+            document.getElementById('set-find').value = SYNTAX_CONFIG.FIND;
+            document.getElementById('set-replace').value = SYNTAX_CONFIG.REPLACE;
+            document.getElementById('set-end').value = SYNTAX_CONFIG.END;
+        }
+        function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('active'); }
+        function resetSettings(silent = false) {
+            SYNTAX_CONFIG = { START: "##SYNTAX_COPIE##", FIND: "##FIND##", REPLACE: "##REPLACE##", END: "##END_COPIE##" };
+            updateSyntaxDisplay(); 
+            if (!silent) closeSettingsModal();
+        }
+        function applySettings() {
+            SYNTAX_CONFIG.START = document.getElementById('set-start').value || "##SYNTAX_COPIE##";
+            SYNTAX_CONFIG.FIND = document.getElementById('set-find').value || "##FIND##";
+            SYNTAX_CONFIG.REPLACE = document.getElementById('set-replace').value || "##REPLACE##";
+            SYNTAX_CONFIG.END = document.getElementById('set-end').value || "##END_COPIE##";
+            updateSyntaxDisplay(); closeSettingsModal();
+        }
+        function updateSyntaxDisplay() {
+            const pre = document.getElementById('syntax-display');
+            if(pre) {
+                pre.innerText = `${SYNTAX_CONFIG.START} [MULTI:FALSE]\n${SYNTAX_CONFIG.FIND}\n(1)\n${SYNTAX_CONFIG.REPLACE}\n(2)\n${SYNTAX_CONFIG.END}`;
+                const isDefault = (SYNTAX_CONFIG.START === "##SYNTAX_COPIE##" && SYNTAX_CONFIG.FIND === "##FIND##" && SYNTAX_CONFIG.REPLACE === "##REPLACE##" && SYNTAX_CONFIG.END === "##END_COPIE##");
+                pre.style.color = isDefault ? "" : "var(--hl-yellow)";
+            }
+        }
+
+        async function readClipboard() { try { return await navigator.clipboard.readText(); } catch (err) { alert(APP_CONFIG.texts.alertClipboardDenied); return null; } }
+
+        function updateCursorPos() {
+            if (!state.rawText) return;
+            const sel = window.getSelection(); let pos = 0;
+            if (sel.rangeCount > 0 && document.getElementById('text3').contains(sel.anchorNode)) {
+                const range = sel.getRangeAt(0), preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(document.getElementById('text3'));
+                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                pos = preCaretRange.toString().length;
+            }
+            const textUpToCursor = state.rawText.substring(0, pos);
+            const line = textUpToCursor.split('\n').length;
+            const col = textUpToCursor.length - textUpToCursor.lastIndexOf('\n');
+            document.getElementById('status-cursor').innerText = formatText('statusCursorUpdate', line, col);
+        }
+        
+        let isDraggingGutter = false, gutterStartLine = 0;
+        function setSelectionRange(el, startIdx, endIdx) {
+            let range = document.createRange(), sel = window.getSelection(), charIndex = 0;
+            let startNode = null, startOffset = 0, endNode = null, endOffset = 0;
+            function traverse(node) {
+                if (node.nodeType === 3) {
+                    let len = node.length;
+                    if (!startNode && startIdx <= charIndex + len) { startNode = node; startOffset = startIdx - charIndex; }
+                    if (!endNode && endIdx <= charIndex + len) { endNode = node; endOffset = endIdx - charIndex; }
+                    charIndex += len;
+                } else { for (let child of node.childNodes) traverse(child); }
+            }
+            traverse(el);
+            if (startNode && endNode) { range.setStart(startNode, startOffset); range.setEnd(endNode, endOffset); sel.removeAllRanges(); sel.addRange(range); }
+        }
+        function selectLinesInCode(lineA, lineB) {
+            if(!state.rawText) return;
+            let startL = Math.min(lineA, lineB), endL = Math.max(lineA, lineB);
+            let lines = state.rawText.split('\n'); let startIdx = 0;
+            for(let i=0; i<startL-1; i++) startIdx += lines[i].length + 1;
+            let endIdx = startIdx;
+            for(let i=startL-1; i<endL; i++) endIdx += lines[i].length + 1;
+            endIdx = Math.max(0, endIdx - 1); 
+            setSelectionRange(document.getElementById('text3'), startIdx, endIdx);
+        }
+        document.getElementById('line-numbers').addEventListener('mousedown', (e) => {
+            if(e.target.tagName === 'SPAN' && e.target.dataset.line) { isDraggingGutter = true; gutterStartLine = parseInt(e.target.dataset.line); selectLinesInCode(gutterStartLine, gutterStartLine); }
+        });
+        document.getElementById('line-numbers').addEventListener('mouseover', (e) => {
+            if(isDraggingGutter && e.target.tagName === 'SPAN' && e.target.dataset.line) { selectLinesInCode(gutterStartLine, parseInt(e.target.dataset.line)); }
+        });
+        document.addEventListener('mouseup', () => { isDraggingGutter = false; });
+
+        // ==========================================
+        // ISOLATION DU PARSEUR DE REQUETE (POUR MODALE)
+        // ==========================================
+        function parseSyntaxRequest(rawText) {
+            if (!rawText.includes(SYNTAX_CONFIG.START)) return { isSyntax: false };
+            
+            const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const sStart = escapeRegExp(SYNTAX_CONFIG.START);
+            const sFind = escapeRegExp(SYNTAX_CONFIG.FIND);
+            const sReplace = escapeRegExp(SYNTAX_CONFIG.REPLACE);
+            const sEnd = escapeRegExp(SYNTAX_CONFIG.END);
+
+            const countStr = (str, search) => (str.match(new RegExp(escapeRegExp(search), 'g')) || []).length;
+            if (countStr(rawText, SYNTAX_CONFIG.START) !== 1 || countStr(rawText, SYNTAX_CONFIG.FIND) !== 1 || countStr(rawText, SYNTAX_CONFIG.REPLACE) !== 1 || countStr(rawText, SYNTAX_CONFIG.END) !== 1) {
+                return { isSyntax: true, isValid: false, error: APP_CONFIG.texts.alertSyntaxInvalid };
+            }
+
+            const regexStr = `^[\\s\\S]*?${sStart}(?:\\s*\\[MULTI:(TRUE|FALSE)\\])?\\s*${sFind}\\n([\\s\\S]*?)\\n${sReplace}\\n([\\s\\S]*?)\\n${sEnd}[\\s\\S]*$`;
+            const match = rawText.match(new RegExp(regexStr));
+            if (match) { 
+                return { isSyntax: true, isValid: true, multiMode: (match[1] === 'TRUE'), findText: match[2], replaceText: match[3] };
+            }
+            return { isSyntax: true, isValid: false, error: APP_CONFIG.texts.alertSyntaxFormat };
+        }
+
+        // --- GESTION DE LA MODALE DE DEBUG (V7) ---
+        function openDebugModal(rawQuery) {
+            modalState.isActive = true;
+            modalState.rawText = state.rawText; // Copie du code source actuel (T3)
+            modalState.yellowMarks = [];
+            
+            document.getElementById('debug-modal').classList.add('active');
+            document.getElementById('modal-raw-input').value = rawQuery;
+            document.getElementById('modal-find-input').value = "";
+            document.getElementById('modal-text3').innerHTML = renderHighlights(modalState.rawText, []);
+            updateLineNumbers(modalState.rawText, [], 'modal-line-numbers'); // ID spécifique à la modale
+            
+            // Amorce du parsing (Fonction développée au Tir 3)
+            if (typeof processModalInput === "function") processModalInput(); 
+        }
+
+        function closeDebugModal() {
+            modalState.isActive = false;
+            document.getElementById('debug-modal').classList.remove('active');
+            document.getElementById('modal-raw-input').value = "";
+            document.getElementById('modal-text1').value = "";
+            document.getElementById('modal-text2').value = "";
+        }
+
+        // --- SYNCHRONISATION & SPLITTER MODALE ---
+        function initModalSplitter() {
+            const dragX = document.getElementById('modal-drag-x');
+            const panelLeft = document.getElementById('modal-panel-left');
+            let active = false, startX, startWidth;
+            if(!dragX) return;
+            dragX.addEventListener('mousedown', (e) => {
+                active = true; startX = e.clientX; startWidth = panelLeft.getBoundingClientRect().width;
+                document.body.style.cursor = 'col-resize';
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (!active) return;
+                let newW = startWidth + (e.clientX - startX);
+                if (newW > 200 && newW < window.innerWidth * 0.7) panelLeft.style.width = newW + 'px';
+            });
+            document.addEventListener('mouseup', () => { active = false; document.body.style.cursor = 'default'; });
+        }
+        window.addEventListener('DOMContentLoaded', initModalSplitter);
+
+        function processModalInput() {
+            if (!modalState.isActive) return;
+            const raw = document.getElementById('modal-raw-input').value;
+            const res = parseSyntaxRequest(raw);
+            const t1 = document.getElementById('modal-text1');
+            const t2 = document.getElementById('modal-text2');
+            
+            if (res.isSyntax && res.isValid) {
+                // On met à jour T1 et T2 seulement si on tape dans la zone brute ou si on vient de l'ouvrir
+                if (document.activeElement === document.getElementById('modal-raw-input') || t1.readOnly) {
+                    t1.value = res.findText;
+                    t2.value = res.replaceText;
+                }
+                t1.readOnly = false; t2.readOnly = false;
+                modalState.multiMode = res.multiMode;
+            } else {
+                t1.readOnly = true; t2.readOnly = true;
+            }
+            
+            // Mise à jour visuelle des caractères cachés
+            const bd1 = document.getElementById('modal-backdrop1');
+            const bd2 = document.getElementById('modal-backdrop2');
+            if(bd1) bd1.innerHTML = renderHighlights(t1.value, [], true);
+            if(bd2) bd2.innerHTML = renderHighlights(t2.value, [], true);
+
+            if (typeof liveFindModal === "function") liveFindModal(); 
+        }
+
+        function updateRawFromFields() {
+            if (!modalState.isActive) return;
+            // On s'assure de ne réécrire que si on tape activement dans T1 ou T2
+            if (document.activeElement !== document.getElementById('modal-text1') && document.activeElement !== document.getElementById('modal-text2')) return;
+            
+            const t1 = document.getElementById('modal-text1').value;
+            const t2 = document.getElementById('modal-text2').value;
+            const multiStr = modalState.multiMode ? "[MULTI:TRUE]" : "[MULTI:FALSE]";
+            document.getElementById('modal-raw-input').value = `${SYNTAX_CONFIG.START} ${multiStr}\n${SYNTAX_CONFIG.FIND}\n${t1}\n${SYNTAX_CONFIG.REPLACE}\n${t2}\n${SYNTAX_CONFIG.END}`;
+            
+            const bd1 = document.getElementById('modal-backdrop1');
+            const bd2 = document.getElementById('modal-backdrop2');
+            if(bd1) bd1.innerHTML = renderHighlights(t1, [], true);
+            if(bd2) bd2.innerHTML = renderHighlights(t2, [], true);
+
+            if (typeof liveFindModal === "function") liveFindModal(); 
+        }
+
+        function applyModalQuery() {
+            const raw = document.getElementById('modal-raw-input').value;
+            const finalize = () => {
+                closeDebugModal();
+                // Injection forcée dans la fenêtre principale
+                document.getElementById('text1').value = document.getElementById('modal-text1').value;
+                document.getElementById('text2').value = document.getElementById('modal-text2').value;
+                const chkMulti = document.getElementById('chk-multi');
+                chkMulti.checked = modalState.multiMode;
+                chkMulti.disabled = true;
+                state.multiMode = modalState.multiMode;
+                state.tempSearchIndex = -1; state.yellowMarks = [];
+                updateLiveDiffBackdrops();
+                checkSearchState();
+                if (document.getElementById('text1').value !== "") effectuerRecherche(); 
+            };
+
+            // Fix du plantage : L'API Clipboard échoue silencieusement si la fenêtre bloque la permission
+            navigator.clipboard.writeText(raw)
+                .then(finalize)
+                .catch(err => {
+                    console.warn("Copie presse-papier ignorée par le navigateur.", err);
+                    finalize(); // On applique quand même la suite !
+                });
+        }
+        document.getElementById('btn-modal-apply').addEventListener('click', applyModalQuery);
+
+        // --- MOTEUR DE RECHERCHE LIVE MODALE (Tir 4) ---
+        let modalCurrentFindIndex = 0;
+        
+        function liveFindModal() {
+            if (!modalState.isActive) return;
+            
+            let searchStr = "";
+            const findInput = document.getElementById('modal-find-input');
+            const t1Input = document.getElementById('modal-text1');
+            const rawInput = document.getElementById('modal-raw-input');
+            
+            // Détermine si on cherche depuis T1 (Modif de la requête) ou depuis la barre Find
+            if (document.activeElement === t1Input || document.activeElement === rawInput || document.activeElement === document.getElementById('modal-text2')) {
+                searchStr = t1Input.value;
+                findInput.value = ""; // Vider la barre manuelle comme demandé
+                modalCurrentFindIndex = 0;
+            } else if (document.activeElement === findInput || document.activeElement === document.getElementById('btn-modal-prev') || document.activeElement === document.getElementById('btn-modal-next')) {
+                searchStr = findInput.value;
+            } else {
+                searchStr = t1Input.value; // Par défaut à l'ouverture
+            }
+
+            modalState.yellowMarks = [];
+            let count = 0;
+            
+            if (searchStr) {
+                let idx = modalState.rawText.indexOf(searchStr);
+                while (idx !== -1) {
+                    modalState.yellowMarks.push({ start: idx, length: searchStr.length, type: 'hl-yellow', scroll: false });
+                    idx = modalState.rawText.indexOf(searchStr, idx + searchStr.length);
+                }
+                count = modalState.yellowMarks.length;
+            }
+
+            if (count > 0) {
+                if (modalCurrentFindIndex >= count) modalCurrentFindIndex = 0;
+                if (modalCurrentFindIndex < 0) modalCurrentFindIndex = count - 1;
+                
+                modalState.yellowMarks[modalCurrentFindIndex].scroll = true;
+                
+                document.getElementById('modal-find-count').innerText = `${modalCurrentFindIndex + 1}/${count}`;
+                document.getElementById('btn-modal-prev').disabled = count <= 1;
+                document.getElementById('btn-modal-next').disabled = count <= 1;
+            } else {
+                document.getElementById('modal-find-count').innerText = "0/0";
+                document.getElementById('btn-modal-prev').disabled = true;
+                document.getElementById('btn-modal-next').disabled = true;
+            }
+
+            // Validation du bouton OK
+            const isValidReq = !t1Input.readOnly && t1Input.value !== "";
+            const t1Found = t1Input.value ? modalState.rawText.includes(t1Input.value) : false;
+            document.getElementById('btn-modal-apply').disabled = !(isValidReq && t1Found);
+
+            // Rendu de T3 (avec showHidden activé)
+            document.getElementById('modal-text3').innerHTML = renderHighlights(modalState.rawText, modalState.yellowMarks, true);
+            updateLineNumbers(modalState.rawText, modalState.yellowMarks, 'modal-line-numbers');
+            scrollToTarget('modal-text3');
+        }
+
+        function navigateModalFind(dir) {
+            modalCurrentFindIndex += dir;
+            liveFindModal();
+        }
+
+        document.getElementById('modal-find-input').addEventListener('input', () => {
+            modalCurrentFindIndex = 0;
+            liveFindModal();
+        });
+        
+        document.getElementById('btn-modal-prev').addEventListener('click', () => navigateModalFind(-1));
+        document.getElementById('btn-modal-next').addEventListener('click', () => navigateModalFind(1));
+
+        // ==========================================
+        // MOTEUR ALGORITHMIQUE LOCAL
+        // ==========================================
+        function getSimilarity(str1, str2) {
+            let t1 = str1.match(/[a-zA-Z0-9\-_]+/g) || []; let t2 = str2.match(/[a-zA-Z0-9\-_]+/g) || [];
+            if (t1.length === 0 && t2.length === 0) return 1; if (t1.length === 0 || t2.length === 0) return 0;
+            let s1 = new Set(t1), s2 = new Set(t2); let intersection = new Set([...s1].filter(x => s2.has(x)));
+            return intersection.size / Math.max(s1.size, s2.size);
+        }
+
+        function computeLiveDiff(str1, str2, splitChars) {
+            let marksT1 = [], marksT2 = [];
+            if (!str1) return { marksT1, marksT2: [{start: 0, length: str2.length, type: 'hl-ins'}] };
+            if (!str2) return { marksT1: [{start: 0, length: str1.length, type: 'hl-del-txt'}], marksT2: [{start: 0, length: 0, type: 'hl-del'}] };
+
+            function getIntraMarks(s1, s2, o1, o2) {
+                let mT1 = [], mT2 = [];
+                const regexPattern = splitChars ? "[a-zA-Z0-9]+|\\s+|." : "[a-zA-Z0-9\\-_]+|\\s+|.";
+                const regex = new RegExp(regexPattern, "g");
+                let t1 = s1.match(regex) || [], t2 = s2.match(regex) || [];
+                const m = t1.length, n = t2.length;
+                const dp = Array(m + 1).fill(null).map(() => new Int32Array(n + 1));
+                
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        if (t1[i - 1] === t2[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+                        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+
+                let i = m, j = n, ops = [];
+                while (i > 0 && j > 0) {
+                    if (t1[i - 1] === t2[j - 1]) { ops.push({type: 'eq', text: t1[i - 1]}); i--; j--; }
+                    else if (dp[i - 1][j] > dp[i][j - 1]) { ops.push({type: 'del', text: t1[i - 1]}); i--; }
+                    else { ops.push({type: 'ins', text: t2[j - 1]}); j--; }
+                }
+                while (i > 0) { ops.push({type: 'del', text: t1[i - 1]}); i--; }
+                while (j > 0) { ops.push({type: 'ins', text: t2[j - 1]}); j--; }
+                ops.reverse();
+
+                let hunks = [], currentHunk = [];
+                for (let op of ops) {
+                    if (op.type === 'eq') { if (currentHunk.length > 0) { hunks.push(currentHunk); currentHunk = []; } hunks.push([op]); } 
+                    else { currentHunk.push(op); }
+                }
+                if (currentHunk.length > 0) hunks.push(currentHunk);
+
+                let ptr1 = o1, ptr2 = o2;
+                for (let hunk of hunks) {
+                    if (hunk[0].type === 'eq') { ptr1 += hunk[0].text.length; ptr2 += hunk[0].text.length; } 
+                    else {
+                        let delText = "", insText = "";
+                        for (let op of hunk) { if (op.type === 'del') delText += op.text; if (op.type === 'ins') insText += op.text; }
+                        if (delText && insText) {
+                            mT1.push({ start: ptr1, length: delText.length, type: 'hl-word-mod' });
+                            mT2.push({ start: ptr2, length: insText.length, type: 'hl-word-mod' });
+                            ptr1 += delText.length; ptr2 += insText.length;
+                        } else if (delText) {
+                            mT1.push({ start: ptr1, length: delText.length, type: 'hl-del-txt' });
+                            mT2.push({ start: ptr2, length: 0, type: 'hl-del' });
+                            ptr1 += delText.length;
+                        } else if (insText) {
+                            mT2.push({ start: ptr2, length: insText.length, type: 'hl-ins' });
+                            ptr2 += insText.length;
+                        }
+                    }
+                }
+                return { mT1, mT2 };
+            }
+
+            let l1 = str1.replace(/\r\n/g, '\n').split('\n'); let l2 = str2.replace(/\r\n/g, '\n').split('\n');
+            let t1 = l1.map(l => ({ raw: l, trim: l.trimStart(), state: -1, link: -1 })); let t2 = l2.map(l => ({ raw: l, trim: l.trimStart(), state: -1, link: -1 }));
+
+            let dp = Array(t1.length + 1).fill(0).map(() => Array(t2.length + 1).fill(0));
+            for (let i = 1; i <= t1.length; i++) {
+                for (let j = 1; j <= t2.length; j++) {
+                    if (t1[i-1].trim === t2[j-1].trim) dp[i][j] = dp[i-1][j-1] + 1;
+                    else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+                }
+            }
+            
+            let i = t1.length, j = t2.length;
+            while (i > 0 && j > 0) {
+                if (t1[i-1].trim === t2[j-1].trim) { t1[i-1].state = 0; t2[j-1].state = 0; t1[i-1].link = j-1; t2[j-1].link = i-1; i--; j--; } 
+                else if (dp[i-1][j] > dp[i][j-1]) i--; else j--;
+            }
+
+            let uiRows = [];
+            const evaluerEcart = (start1, end1, start2, end2) => {
+                let ecart1 = t1.slice(start1, end1); let ecart2 = t2.slice(start2, end2);
+                let eDp = Array(ecart1.length + 1).fill(0).map(() => Array(ecart2.length + 1).fill(0));
+                for(let x = 1; x <= ecart1.length; x++) {
+                    for(let y = 1; y <= ecart2.length; y++) {
+                        let sim = getSimilarity(ecart1[x-1].trim, ecart2[y-1].trim);
+                        if (sim >= 0.25) eDp[x][y] = eDp[x-1][y-1] + sim;
+                        else eDp[x][y] = Math.max(eDp[x-1][y], eDp[x][y-1]);
+                    }
+                }
+                let x = ecart1.length, y = ecart2.length;
+                while(x > 0 && y > 0) {
+                    let sim = getSimilarity(ecart1[x-1].trim, ecart2[y-1].trim);
+                    if (sim >= 0.25 && Math.abs(eDp[x][y] - (eDp[x-1][y-1] + sim)) < 0.0001) {
+                        ecart1[x-1].state = 3; ecart2[y-1].state = 3; ecart1[x-1].link = y-1; ecart2[y-1].link = x-1; x--; y--;
+                    } else if (eDp[x-1][y] >= eDp[x][y-1]) x--; else y--;
+                }
+                let p1 = 0, p2 = 0;
+                while(p1 < ecart1.length || p2 < ecart2.length) {
+                    if (p1 < ecart1.length && ecart1[p1].state === 3 && p2 < ecart2.length && ecart2[p2].state === 3 && ecart1[p1].link === p2) {
+                        uiRows.push({ state: 3, raw1: ecart1[p1].raw, raw2: ecart2[p2].raw }); p1++; p2++;
+                    } else if (p1 < ecart1.length && ecart1[p1].state !== 3) {
+                        uiRows.push({ state: 1, raw1: ecart1[p1].raw, raw2: null }); p1++;
+                    } else if (p2 < ecart2.length && ecart2[p2].state !== 3) {
+                        uiRows.push({ state: 2, raw1: null, raw2: ecart2[p2].raw }); p2++;
+                    }
+                }
+            };
+
+            let cur1 = 0, cur2 = 0;
+            while (cur1 < t1.length || cur2 < t2.length) {
+                let next1 = cur1; while (next1 < t1.length && t1[next1].state !== 0) next1++;
+                let next2 = cur2; while (next2 < t2.length && t2[next2].state !== 0) next2++;
+                evaluerEcart(cur1, next1, cur2, next2);
+                if (next1 < t1.length && next2 < t2.length) uiRows.push({ state: 0, raw1: t1[next1].raw, raw2: t2[next2].raw });
+                cur1 = next1 + 1; cur2 = next2 + 1;
+            }
+
+            let firstChange = uiRows.findIndex(r => r.state !== 0); let lastChange = uiRows.findLastIndex(r => r.state !== 0);
+            if (firstChange === -1) { firstChange = uiRows.length; lastChange = -1; }
+            uiRows.forEach((r, idx) => { if (idx < firstChange || idx > lastChange) r.trimBg = true; });
+
+            let c1 = 0, c2 = 0;
+            uiRows.forEach((row, rowIndex) => {
+                let isLast = rowIndex === uiRows.length - 1;
+                let nl1 = isLast && !str1.endsWith('\n') ? 0 : 1; let nl2 = isLast && !str2.endsWith('\n') ? 0 : 1;
+
+                if (row.state === 0) { 
+                    if (!row.trimBg) {
+                        marksT1.push({ start: c1, length: row.raw1.length, type: 'hl-line-mod' });
+                        marksT2.push({ start: c2, length: row.raw2.length, type: 'hl-line-mod' });
+                    }
+                    c1 += row.raw1.length + nl1; c2 += row.raw2.length + nl2;
+                } 
+                else if (row.state === 1) { 
+                    marksT1.push({ start: c1, length: row.raw1.length, type: 'hl-del-txt' });
+                    marksT2.push({ start: c2, length: 0, type: 'hl-del' });
+                    c1 += row.raw1.length + nl1;
+                } 
+                else if (row.state === 2) { 
+                    marksT2.push({ start: c2, length: row.raw2.length, type: 'hl-ins' });
+                    c2 += row.raw2.length + nl2;
+                } 
+                else if (row.state === 3) { 
+                    let intra = getIntraMarks(row.raw1, row.raw2, c1, c2);
+                    marksT1.push({ start: c1, length: row.raw1.length, type: 'hl-line-mod' });
+                    marksT2.push({ start: c2, length: row.raw2.length, type: 'hl-line-mod' });
+                    marksT1.push(...intra.mT1); marksT2.push(...intra.mT2);
+                    c1 += row.raw1.length + nl1; c2 += row.raw2.length + nl2;
+                }
+            });
+            return { marksT1, marksT2 };
+        }
+
+        // ==========================================
+        // MOTEUR DE RENDU DOM (GENERALISE POUR MODALE)
+        // ==========================================
+        function renderHighlights(text, marksToApply, showHidden = false) {
+            if (!text) return "";
+            let events = [];
+            marksToApply.forEach((m, i) => {
+                if (m.type === 'hl-del') events.push({ pos: m.start, type: 'del_marker', scroll: m.scroll });
+                else if (m.length > 0) { 
+                    events.push({ pos: m.start, type: 'start', mark: m, id: i });
+                    events.push({ pos: m.start + m.length, type: 'end', mark: m, id: i });
+                }
+            });
+
+            events.sort((a, b) => {
+                if (a.pos !== b.pos) return a.pos - b.pos;
+                if (a.type !== b.type) return a.type === 'end' ? -1 : 1;
+                return 0;
+            });
+
+            let result = "", currentIndex = 0, activeMarks = new Set(), scrollAdded = false;
+            
+            const formatSeg = (seg) => showHidden ? seg.replace(/ /g, '<span class="hc-space"> </span>').replace(/\t/g, '<span class="hc-tab">\t</span>').replace(/\n/g, '<span class="hc-nl"></span>\n') : seg;
+
+            for (let ev of events) {
+                if (ev.pos > currentIndex) {
+                    let segment = formatSeg(escapeHtml(text.substring(currentIndex, ev.pos)));
+                    if (activeMarks.size > 0) {
+                        let classes = [...new Set(Array.from(activeMarks).map(m => m.type))].join(" ");
+                        let idStr = "";
+                        if (Array.from(activeMarks).some(m => m.scroll) && !scrollAdded) { idStr = ' id="scroll-target"'; scrollAdded = true; }
+                        result += `<mark class="${classes}"${idStr}>${segment}</mark>`;
+                    } else result += segment;
+                    currentIndex = ev.pos;
+                }
+                if (ev.type === 'start') activeMarks.add(ev.mark);
+                else if (ev.type === 'end') activeMarks.delete(ev.mark);
+                else if (ev.type === 'del_marker') {
+                    let idStr = ev.scroll && !scrollAdded ? ' id="scroll-target"' : "";
+                    if (idStr) scrollAdded = true;
+                    let ttip = APP_CONFIG.tooltips.ttDeletedText;
+                    result += `<mark class="hl-del"${idStr} title="${ttip}"></mark>`;
+                }
+            }
+            if (currentIndex < text.length) result += formatSeg(escapeHtml(text.substring(currentIndex)));
+            return result;
+        }
+
+        function scrollToTarget(containerId) {
+            setTimeout(() => {
+                const container = document.getElementById(containerId);
+                const target = container.querySelector('#scroll-target');
+                if (target) container.scrollTop = target.offsetTop - (container.clientHeight / 2);
+            }, 50);
+        }
+
+        // Modification majeure : Injection paramétrable pour la future fenêtre de debug
+        function updateLineNumbers(text, marks = [], targetLineContainerId = 'line-numbers', targetStatsContainerId = 'status-stats') {
+            const linesCount = text ? text.split('\n').length : 0;
+            let modifiedLines = new Set();
+            for(let m of marks) {
+                if(m.type === 'hl-line-mod' || m.type === 'hl-ins' || m.type === 'hl-linebg' || m.type === 'hl-del') {
+                    let textUpToStart = text.substring(0, m.start);
+                    let startLine = textUpToStart.split('\n').length;
+                    let blockText = text.substring(m.start, m.start + m.length);
+                    let linesInBlock = blockText.split('\n').length;
+                    for(let i=0; i<linesInBlock; i++) modifiedLines.add(startLine + i);
+                }
+            }
+            let html = "";
+            for(let i=1; i<=linesCount; i++) {
+                let cls = modifiedLines.has(i) ? ' class="gutter-mod"' : '';
+                html += `<span data-line="${i}"${cls}>${i}</span>\n`;
+            }
+            
+            const lineEl = document.getElementById(targetLineContainerId);
+            const statEl = document.getElementById(targetStatsContainerId);
+            if (lineEl) lineEl.innerHTML = html;
+            if (statEl) statEl.innerText = formatText('statusStatsUpdate', linesCount, text.length);
+        }
+
+        function updateMainView() {
+            document.getElementById('version-display').innerText = formatVersion();
+            document.getElementById('project-name').value = state.projectName; 
+            
+            const pNameDisp = document.getElementById('project-name-display');
+            if (pNameDisp) {
+                pNameDisp.innerText = state.projectName ? state.projectName : "XXXXXXX";
+                pNameDisp.style.color = state.projectName ? "#FFB347" : "#FF4500";
+            }
+            
+            if (!state.rawText) { 
+                document.getElementById('text3').innerHTML = APP_CONFIG.texts.waitingImport; 
+                updateLineNumbers("", [], 'line-numbers', 'status-stats'); 
+                return; 
+            }
+            
+            let marks = [...state.marks]; 
+            if (state.yellowMarks && state.yellowMarks.length > 0) marks.push(...state.yellowMarks);
+            
+            document.getElementById('text3').innerHTML = renderHighlights(state.rawText, marks);
+            updateLineNumbers(state.rawText, state.marks, 'line-numbers', 'status-stats');
+        }
+
+        // ==========================================
+        // LOGIQUE METIER (RECHERCHE & REMPLACEMENT)
+        // ==========================================
+        function updateLiveDiffBackdrops() {
+            const val1 = document.getElementById('text1').value, val2 = document.getElementById('text2').value;
+            const splitChars = document.getElementById('chk-split-chars').checked;
+
+            if (!val1 && !val2) { document.getElementById('backdrop1').innerHTML = ""; document.getElementById('backdrop2').innerHTML = ""; return; }
+            if (val1 && !val2) {
+                document.getElementById('backdrop1').innerHTML = renderHighlights(val1, [{start:0, length:val1.length, type:'hl-del-txt'}]);
+                let ttip = APP_CONFIG.tooltips.ttDelZone;
+                document.getElementById('backdrop2').innerHTML = `<mark class="hl-del" title="${ttip}"></mark>`;
+                return;
+            }
+            const { marksT1, marksT2 } = computeLiveDiff(val1, val2, splitChars);
+            document.getElementById('backdrop1').innerHTML = renderHighlights(val1, marksT1);
+            document.getElementById('backdrop2').innerHTML = renderHighlights(val2, marksT2);
+        }
+
+        function handleText1Input() { state.tempSearchIndex = -1; state.yellowMarks = []; updateLiveDiffBackdrops(); checkSearchState(); updateMainView(); }
+        function handleText2Input() { updateLiveDiffBackdrops(); checkSearchState(); }
+
+        function viderInputs() {
+            document.getElementById('text1').value = ""; 
+            document.getElementById('text2').value = "";
+            const chkMulti = document.getElementById('chk-multi');
+            chkMulti.checked = false;
+            chkMulti.disabled = false; // Rendu cliquable manuel
+            state.multiMode = false;
+            handleText1Input(); 
+            handleText2Input();
+        }
+        
+        function viderInputsConfirm() {
+            if (confirm(APP_CONFIG.texts.confirmEmptyInputs)) {
+                viderInputs();
+            }
+        }
+
+        async function pasteToLeft(targetId) {
+            let clipText = await readClipboard(); if (!clipText) return; clipText = normalize(clipText);
+            
+            // LOGIQUE SMART "REQMODIFIER"
+            let lines = clipText.split('\n');
+            if (lines.length >= 5 && lines[0].trim() === "[REQMODIFIER]") {
+                SYNTAX_CONFIG.START = lines[1].trim() || "##SYNTAX_COPIE##";
+                SYNTAX_CONFIG.FIND = lines[2].trim() || "##FIND##";
+                SYNTAX_CONFIG.REPLACE = lines[3].trim() || "##REPLACE##";
+                SYNTAX_CONFIG.END = lines[4].trim() || "##END_COPIE##";
+                updateSyntaxDisplay();
+                lines.splice(0, 5); // Expurger les 5 lignes
+                clipText = lines.join('\n');
+            } else {
+                resetSettings(true); // Reset par défaut silencieux
+            }
+
+            const parseResult = parseSyntaxRequest(clipText);
+            const chkMulti = document.getElementById('chk-multi');
+
+            if (parseResult.isSyntax) {
+                if (!parseResult.isValid) {
+                    let confirmMsg = parseResult.error + "\n\n[Annuler] pour ne rien faire, [OK] pour essayer de débug la requête manuellement.";
+                    if (confirm(confirmMsg)) {
+                        openDebugModal(clipText);
+                    }
+                    return;
+                }
+                
+                state.multiMode = parseResult.multiMode;
+                document.getElementById('text1').value = parseResult.findText; 
+                document.getElementById('text2').value = parseResult.replaceText; 
+                
+                chkMulti.checked = parseResult.multiMode; 
+                chkMulti.disabled = true; // Automatique, on grise
+                
+                state.tempSearchIndex = -1; state.yellowMarks = [];
+                if (parseResult.replaceText.trim() === "") skipDeleteWarning = true;
+            } else { 
+                document.getElementById(targetId).value = clipText; 
+                chkMulti.disabled = false; // Texte manuel, on dégrise
+                if (targetId === 'text1') { state.tempSearchIndex = -1; state.yellowMarks = []; }
+            }
+            
+            updateLiveDiffBackdrops(); checkSearchState(); updateMainView();
+        }
+
+        function checkSearchState() {
+            const s = document.getElementById('text1').value, r = document.getElementById('text2').value;
+            const btnChercher = document.getElementById('btn-rechercher'), btnRemplacer = document.getElementById('btn-remplacer');
+            const lblMulti = document.getElementById('lbl-multi');
+            
+            btnChercher.disabled = (s === "");
+            if (s !== "" && state.yellowMarks && state.yellowMarks.length > 0) {
+                btnRemplacer.disabled = false;
+                if (r === "") { 
+                    btnRemplacer.innerHTML = APP_CONFIG.texts.btnDelete + " ✂️"; 
+                    btnRemplacer.classList.add("btn-danger");
+                    btnRemplacer.setAttribute("title", APP_CONFIG.tooltips.ttDelete || "");
+                } 
+                else { 
+                    btnRemplacer.innerHTML = APP_CONFIG.texts.btnReplace + " ⚙️"; 
+                    btnRemplacer.classList.remove("btn-danger");
+                    btnRemplacer.setAttribute("title", APP_CONFIG.tooltips.ttReplace || "");
+                }
+                lblMulti.innerText = formatText('chkMultiCount', state.yellowMarks.length);
+            } else { 
+                btnRemplacer.disabled = true; 
+                btnRemplacer.innerHTML = APP_CONFIG.texts.btnReplace + " ⚙️"; 
+                btnRemplacer.classList.remove("btn-danger");
+                btnRemplacer.setAttribute("title", APP_CONFIG.tooltips.ttReplace || "");
+                lblMulti.innerText = APP_CONFIG.texts.chkMulti;
+            }
+        }
+
+        function effectuerRecherche() {
+            const searchStr = document.getElementById('text1').value; if (!state.rawText) return;
+            const occurrences = state.rawText.split(searchStr).length - 1;
+            
+            if (occurrences === 0) { 
+                if (confirm(APP_CONFIG.texts.alertNotFoundDebug)) {
+                    const t1 = document.getElementById('text1').value || "";
+                    const t2 = document.getElementById('text2').value || "";
+                    const multiStr = state.multiMode ? "[MULTI:TRUE]" : "[MULTI:FALSE]";
+                    const rawReq = `${SYNTAX_CONFIG.START} ${multiStr}\n${SYNTAX_CONFIG.FIND}\n${t1}\n${SYNTAX_CONFIG.REPLACE}\n${t2}\n${SYNTAX_CONFIG.END}`;
+                    if (typeof openDebugModal === 'function') openDebugModal(rawReq);
+                }
+                return; 
+            }
+
+            let tempMarks = [];
+            let idx = state.rawText.indexOf(searchStr);
+            while(idx !== -1) {
+                tempMarks.push({ start: idx, length: searchStr.length, type: 'hl-yellow', scroll: tempMarks.length === 0 });
+                idx = state.rawText.indexOf(searchStr, idx + searchStr.length);
+            }
+
+            if (occurrences > 1 && !state.multiMode) {
+                state.yellowMarks = tempMarks;
+                updateMainView();
+                if(confirm(formatText('alertSearchMultiple', occurrences))) {
+                    viderInputs(); state.yellowMarks = []; updateMainView();
+                } else {
+                    document.getElementById('btn-remplacer').disabled = true;
+                }
+                return;
+            }
+            
+            state.searchStr = searchStr;
+            state.yellowMarks = tempMarks;
+            state.tempSearchIndex = state.yellowMarks[0].start;
+            checkSearchState(); updateMainView(); scrollToTarget('text3');
+        }
+
+        function effectuerRemplacement() {
+            if (!state.yellowMarks || state.yellowMarks.length === 0) return;
+            state.replaceStr = document.getElementById('text2').value;
+            const splitChars = document.getElementById('chk-split-chars').checked;
+            const textBefore = state.rawText; const marksBefore = JSON.parse(JSON.stringify(state.marks));
+
+            if (state.replaceStr === "" && !skipDeleteWarning) {
+                if(!confirm(APP_CONFIG.texts.confirmDeleteReplace)) return;
+            }
+            skipDeleteWarning = false;
+
+            let overlap = false;
+            for(let ym of state.yellowMarks) {
+                if (state.marks.some(m => (ym.start < m.start + m.length && ym.start + state.searchStr.length > m.start))) { overlap = true; break; }
+            }
+            
+            // CORRECTIF BUG : On n'écrase l'historique visuel (state.marks) QUE si le MULTI:TRUE n'est pas actif.
+            if (overlap) { 
+                state.vY++; state.vZ = 0; 
+                if (!state.multiMode) { state.marks = []; } 
+            } else { state.vZ++; }
+
+            let currentText = state.rawText;
+            let currentMarks = JSON.parse(JSON.stringify(state.marks));
+            const shiftLen = state.replaceStr.length - state.searchStr.length;
+
+            let displayMarksBefore = [...state.yellowMarks];
+            let displayMarksAfter = [];
+
+            for (let i = state.yellowMarks.length - 1; i >= 0; i--) {
+                let tIndex = state.yellowMarks[i].start;
+
+                const p1 = currentText.substring(0, tIndex);
+                const p2 = currentText.substring(tIndex + state.searchStr.length);
+                currentText = p1 + state.replaceStr + p2;
+
+                const { marksT2 } = computeLiveDiff(state.searchStr, state.replaceStr, splitChars);
+                
+                const newMarksToInject = marksT2.map(m => ({ start: m.start + tIndex, length: m.length, type: m.type }));
+                
+                currentMarks = currentMarks.map(m => (m.start > tIndex) ? { ...m, start: m.start + shiftLen } : m);
+                currentMarks = [...currentMarks, ...newMarksToInject];
+
+                displayMarksAfter = displayMarksAfter.map(m => (m.start > tIndex) ? { ...m, start: m.start + shiftLen } : m);
+                displayMarksAfter = [...displayMarksAfter, ...newMarksToInject];
+            }
+
+            state.rawText = currentText;
+            state.marks = currentMarks;
+
+            let actionName = `Opération Z${state.vZ}`;
+            if (state.yellowMarks.length > 1) actionName += ` (x${state.yellowMarks.length})`;
+
+            addHistoryRecord(actionName, textBefore, state.rawText, marksBefore, state.marks, 
+                displayMarksBefore, displayMarksAfter);
+
+            viderInputs(); state.tempSearchIndex = -1; state.yellowMarks = [];
+            checkSearchState(); updateMainView(); scrollToTarget('text3');
+        }
+
+        // ==========================================
+        // GESTION HISTORIQUE & FICHIERS
+        // ==========================================
+        function addHistoryRecord(action, tBefore, tAfter, mBefore, mAfter, displayMarksBefore, displayMarksAfter) {
+            state.history.push({ version: formatVersion(), action: action, timestamp: getTimestamp(), tBefore, tAfter, mBefore, mAfter, displayMarksBefore, displayMarksAfter });
+            state.selectedIndex = state.history.length - 1; 
+            isProjectDirty = true;
+            renderHistoryTable();
+        }
+
+        async function importMainCode() {
+            let clipText = await readClipboard(); if (!clipText) return; clipText = normalize(clipText);
+            if (state.history.length > 0 && !confirm(APP_CONFIG.texts.confirmOverwriteHistory)) return;
+            state = { projectName: state.projectName, vX: 1, vY: 0, vZ: 0, rawText: clipText, history: [], selectedIndex: -1, marks: [], searchStr:"", replaceStr:"", tempSearchIndex:-1, yellowMarks: [], multiMode: false };
+            addHistoryRecord(APP_CONFIG.texts.importInitAction, "", clipText, [], [], [], []);
+            viderInputs(); checkSearchState(); updateMainView();
+        }
+
+        function copyMainCode() { navigator.clipboard.writeText(state.rawText); alert(APP_CONFIG.texts.alertCodeCopied); }
+
+        function btnVersionner() {
+            if (state.history.length === 0) return;
+            const currentV = formatVersion();
+            const majV = `V${state.vX + 1}.0.0`;
+            const minV = `V${state.vX}.${state.vY + 1}.0`;
+            
+            let type = null;
+            while(true) {
+                type = prompt(formatText('promptVersionType', currentV, majV, minV));
+                if (type === null) return; 
+                if (type === 'M' || type === 'm') break;
+            }
+
+            if (type === 'M') { state.vX++; state.vY = 0; state.vZ = 0; } 
+            else { state.vY++; state.vZ = 0; }
+            
+            const oldMarks = [...state.marks]; state.marks = []; state.yellowMarks = [];
+            addHistoryRecord(`VERSION (${currentV} -> ${formatVersion()})`, state.rawText, state.rawText, oldMarks, [], [], []);
+            updateMainView();
+        }
+
+        function applySelectedBranch() {
+            const rec = state.history[state.selectedIndex];
+            if (!confirm(formatText('confirmBranch', rec.version))) return;
+            
+            const latestRec = state.history[state.history.length - 1];
+            const parts = latestRec.version.replace('V', '').split('.');
+            let nX = parseInt(parts[0]) || 0; let nY = parseInt(parts[1]) || 0; let nZ = parseInt(parts[2]) || 0;
+            
+            nY++; nZ = 0; 
+            state.vX = nX; state.vY = nY; state.vZ = nZ;
+            
+            viderInputs(); state.tempSearchIndex = -1; state.yellowMarks = []; checkSearchState();
+
+            state.rawText = rec.tAfter; state.marks = []; 
+            addHistoryRecord(`Branche dep ${rec.version}`, rec.tAfter, rec.tAfter, rec.mAfter, [], [], []); 
+            updateMainView();
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById('history-body'); tbody.innerHTML = "";
+            state.history.forEach((rec, i) => {
+                const tr = document.createElement('tr'); if (i === state.selectedIndex) tr.className = 'selected';
+                tr.innerHTML = `<td>${rec.version}</td><td>${rec.action}</td><td>${rec.timestamp.split(' ')[1]}</td>`;
+                tr.onclick = () => { state.selectedIndex = i; renderHistoryTable(); }; tbody.appendChild(tr);
+            });
+            tbody.lastElementChild?.scrollIntoView(); updateMiniViews(); updateNavButtons();
+        }
+
+        function updateMiniViews() {
+            const bBefore = document.getElementById('text4'), bAfter = document.getElementById('text5');
+            if (state.selectedIndex < 0) { bBefore.innerHTML = ""; bAfter.innerHTML = ""; return; }
+            const rec = state.history[state.selectedIndex];
+            bBefore.innerHTML = renderHighlights(rec.tBefore, [...rec.mBefore, ...(rec.displayMarksBefore || [])]);
+            
+            let marksAfter = rec.action.startsWith("Opération") ? [...rec.mBefore, ...(rec.displayMarksAfter || [])] : rec.mAfter;
+            bAfter.innerHTML = renderHighlights(rec.tAfter, marksAfter);
+            scrollToTarget('text4'); scrollToTarget('text5');
+        }
+
+        function updateNavButtons() {
+            document.getElementById('btn-prev').disabled = state.selectedIndex <= 0;
+            document.getElementById('btn-next').disabled = state.selectedIndex >= state.history.length - 1;
+            document.getElementById('btn-apply').disabled = state.selectedIndex === state.history.length - 1;
+        }
+
+        function navigateHistory(dir) {
+            const n = state.selectedIndex + dir; if (n >= 0 && n < state.history.length) { state.selectedIndex = n; renderHistoryTable(); }
+        }
+
+        function exportHistory() {
+            if (state.history.length === 0) return alert(APP_CONFIG.texts.alertNothingToExport);
+            
+            if (!state.projectName) {
+                alert(APP_CONFIG.texts.alertNoProjectName);
+                document.getElementById('project-name').focus();
+                return;
+            } else {
+                if(!confirm(formatText('confirmExport', state.projectName))) return;
+            }
+
+            isProjectDirty = false; 
+            const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const a = document.createElement('a'); a.href = data; 
+            
+            const safeName = state.projectName.replace(/[^a-z0-9]/gi, '_');
+            a.download = `${safeName}_V${state.vX}_${state.vY}_${state.vZ}.json`; 
+            a.click();
+        }
+
+        function triggerImport() {
+            if (!resetAll(false)) return; 
+            setTimeout(() => { document.getElementById('import-file').click(); }, 100);
+        }
+
+        function importHistory(event) {
+            const f = event.target.files[0]; if (!f) return; 
+            
+            document.getElementById('text3').innerHTML = APP_CONFIG.texts.msgLoading;
+
+            setTimeout(() => {
+                const r = new FileReader();
+                r.onload = function(e) { 
+                try { 
+                    let importedState = JSON.parse(e.target.result); 
+                    if (!importedState.history) throw new Error("Fichier JSON non conforme.");
+                    
+                    state = importedState;
+                    if (!state.projectName) state.projectName = "Projet_Importe";
+                    
+                    if (state.history.length > 0) {
+                        state.selectedIndex = state.history.length - 1;
+                        let lastRec = state.history[state.selectedIndex];
+                        state.rawText = lastRec.tAfter;
+                        state.marks = lastRec.mAfter || [];
+                    }
+
+                    document.getElementById('project-name').value = state.projectName; 
+                    viderInputs(); updateLiveDiffBackdrops(); checkSearchState();
+                    renderHistoryTable(); updateMainView(); 
+                    isProjectDirty = false;
+                    alert(formatText('alertImportSuccess', state.projectName)); 
+                } catch(err) { 
+                    alert(APP_CONFIG.texts.alertImportError); 
+                    resetAll(true); 
+                } 
+            };
+            r.readAsText(f); event.target.value = '';
+            }, 50); 
+        }
+
+        function resetAll(force = false) {
+            if (state.history.length === 0 && !state.rawText && document.getElementById('text1').value === "" && document.getElementById('text2').value === "") {
+                return true;
+            }
+
+            let msg = APP_CONFIG.texts.confirmResetAll;
+            if (!force && isProjectDirty) {
+                msg += "\n\n" + APP_CONFIG.texts.warnResetUnsaved;
+            }
+            if (force || confirm(msg)) {
+                state = { projectName: "", vX: 0, vY: 0, vZ: 0, rawText: "", history: [], selectedIndex: -1, marks: [], searchStr:"", replaceStr:"", tempSearchIndex:-1, yellowMarks: [], multiMode: false };
+                isProjectDirty = false;
+                document.getElementById('text3').innerHTML = APP_CONFIG.texts.waitingImport;
+                document.getElementById('text4').innerHTML = "";
+                document.getElementById('text5').innerHTML = "";
+                viderInputs(); updateLiveDiffBackdrops(); checkSearchState(); updateMainView(); renderHistoryTable();
+                return true;
+            }
+            return false;
+        }
+
+        window.addEventListener('DOMContentLoaded', initUI);
+    </script>
+</body>
+</html>
