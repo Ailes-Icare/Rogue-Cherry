@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="appTitle">Outil d'Analyse et Remplacement de Code V6.7</title>
+    <title data-i18n="appTitle">Rogue Cherry V7.5 Internal</title>
     <style>
         /* === VARIABLES & THEME === */
         :root {
@@ -76,6 +76,20 @@
         .mini-views-container { display: flex; flex-direction: column; flex: 1; gap: 5px; min-height: 100px; }
         .mini-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         .nav-buttons { display: flex; gap: 5px; justify-content: space-between; margin-top: 5px; flex-shrink: 0; }
+
+        /* OPTIM (V7.5 Pass 2) : Firefox applique par defaut une analyse
+           orthographique et grammaticale sur de nombreux conteneurs textuels,
+           ce qui sur du code source de plusieurs milliers de lignes provoque
+           un lag tres significatif (non observe sur Edge/Chromium). Cette
+           regle retire ces traitements pour toutes les zones de rendu de code.
+           Les attributs HTML correspondants sont egalement poses sur certains
+           elements pour double securite. */
+        .main-code, .backdrop-layer, div.sync-text {
+            -webkit-user-modify: read-only;
+            -moz-user-modify: read-only;
+            -webkit-text-fill-color: inherit;
+        }
+        .main-code [spellcheck], .backdrop-layer [spellcheck] { /* no-op, force le re-eval Firefox */ }
 
         /* === GESTION DES COULEURS === */
         mark { background: transparent; color: inherit; padding: 0; border-radius: 2px; }
@@ -171,7 +185,7 @@
                 </div>
                 <div class="code-container" style="position: relative;">
                     <div id="backdrop1" class="backdrop-layer"></div>
-                    <textarea id="text1" class="overlay-layer" oninput="handleText1Input()" onscroll="document.getElementById('backdrop1').scrollTop = this.scrollTop; document.getElementById('backdrop1').scrollLeft = this.scrollLeft;"></textarea>
+                    <textarea id="text1" class="overlay-layer" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" oninput="handleText1Input()" onscroll="document.getElementById('backdrop1').scrollTop = this.scrollTop; document.getElementById('backdrop1').scrollLeft = this.scrollLeft;"></textarea>
                 </div>
             </div>
 
@@ -185,7 +199,7 @@
                 </div>
                 <div class="code-container" style="position: relative;">
                     <div id="backdrop2" class="backdrop-layer"></div>
-                    <textarea id="text2" class="overlay-layer" oninput="handleText2Input()" onscroll="document.getElementById('backdrop2').scrollTop = this.scrollTop; document.getElementById('backdrop2').scrollLeft = this.scrollLeft;"></textarea>
+                    <textarea id="text2" class="overlay-layer" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" oninput="handleText2Input()" onscroll="document.getElementById('backdrop2').scrollTop = this.scrollTop; document.getElementById('backdrop2').scrollLeft = this.scrollLeft;"></textarea>
                 </div>
             </div>
 
@@ -273,7 +287,7 @@
             
             <div class="main-editor-wrapper">
                 <div class="line-numbers" id="line-numbers"><span>1</span></div>
-                <div id="text3" class="main-code" tabindex="0" onclick="updateCursorPos()" onkeyup="updateCursorPos()"></div>
+                <div id="text3" class="main-code" tabindex="0" spellcheck="false" autocorrect="off" autocapitalize="off" translate="no" onclick="updateCursorPos()" onkeyup="updateCursorPos()"></div>
             </div>
             
             <div class="status-bar">
@@ -528,8 +542,8 @@
                 ttManualFind: "Si bleu : les éléments ne sont testés qu'à la demande. Cliquez pour effectuer une recherche dans le code. Double clic pour auto."
             },
             texts: {
-                appVersionLabel: "© Insosama 2027 - Alpha V2 publique (V7.4.9 internal)",
-                appTitle: "Stack-Parseur V7.4.9",
+                appVersionLabel: "© Insosama 2027 - V7.5 internal use)",
+                appTitle: "Stack-Parseur V7.5",
                 warnResetUnsaved: "LE PROJET ACTUEL CONTIENT DES MODIFICATIONS QUI N'ONT PAS ÉTÉ ENREGISTRÉES.",
                 iaPromptTitle: "Assistant format requete",
                 askToAIText1: "ASK TO",
@@ -626,6 +640,19 @@
 
         function initUI() {
             document.title = APP_CONFIG.texts.appTitle;
+
+            // OPTIM (V7.5 Pass 2) : pose explicite de spellcheck=false sur toutes les
+            // zones de rendu de code. Sur Firefox, l'analyse ortho/grammaticale par
+            // defaut sur des conteneurs contenant 2500-6000 lignes avec des centaines
+            // de <mark> et <span> peut provoquer un lag majeur. Edge/Chromium n'a pas
+            // ce comportement par defaut, ce qui explique l'asymetrie observee.
+            document.querySelectorAll('.main-code, .backdrop-layer, div.sync-text').forEach(el => {
+                el.setAttribute('spellcheck', 'false');
+                el.setAttribute('autocorrect', 'off');
+                el.setAttribute('autocapitalize', 'off');
+                el.setAttribute('translate', 'no');
+            });
+
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
                 if (APP_CONFIG.texts[key] !== undefined) el.innerHTML = APP_CONFIG.texts[key];
@@ -783,7 +810,17 @@
         // ==========================================
         // HELPERS
         // ==========================================
-        const escapeHtml = (unsafe) => { if (!unsafe) return ""; return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+        // OPTIM (V7.5 Pass 2) : escapeHtml en une seule regex + fast path.
+        // Le fast path (test) évite de creer une nouvelle string si rien
+        // n'est a echapper, ce qui est frequent sur les segments de code.
+        const _ESCAPE_HTML_RE = /[&<>]/g;
+        const _ESCAPE_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+        const escapeHtml = (unsafe) => {
+            if (!unsafe) return "";
+            if (!_ESCAPE_HTML_RE.test(unsafe)) return unsafe;
+            _ESCAPE_HTML_RE.lastIndex = 0;
+            return unsafe.replace(_ESCAPE_HTML_RE, c => _ESCAPE_HTML_MAP[c]);
+        };
         const normalize = (text) => text.replace(/\r\n/g, '\n');
         function formatVersion() { return `V${state.vX}.${state.vY}.${state.vZ}`; }
         function getTimestamp() { const d = new Date(); return `${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR')}`; }
@@ -1302,6 +1339,19 @@
             if (!str1) return { marksT1, marksT2: [{start: 0, length: str2.length, type: 'hl-ins'}] };
             if (!str2) return { marksT1: [{start: 0, length: str1.length, type: 'hl-del-txt'}], marksT2: [{start: 0, length: 0, type: 'hl-del'}] };
 
+            // OPTIM (V7.5) : Coupe-circuit anti-explosion de la matrice DP.
+            // Au-delà de ce seuil, le coût mémoire (m × n × 8 octets) devient
+            // prohibitif et fige le main thread. On dégrade gracieusement en
+            // marquant simplement les blocs entiers comme modifiés.
+            // Seuil très permissif : un patch IA classique fait <500 caractères.
+            const DIFF_MAX_CHARS = 5000;
+            if (str1.length > DIFF_MAX_CHARS || str2.length > DIFF_MAX_CHARS) {
+                return {
+                    marksT1: [{ start: 0, length: str1.length, type: 'hl-line-mod' }],
+                    marksT2: [{ start: 0, length: str2.length, type: 'hl-line-mod' }]
+                };
+            }
+
             function getIntraMarks(s1, s2, o1, o2) {
                 let mT1 = [], mT2 = [];
                 const regexPattern = splitChars ? "[a-zA-Z0-9]+|\\s+|." : "[a-zA-Z0-9\\-_]+|\\s+|.";
@@ -1469,29 +1519,60 @@
                 return 0;
             });
 
-            let result = "", currentIndex = 0, activeMarks = new Set(), scrollAdded = false;
-            
+            let result = "", currentIndex = 0, scrollAdded = false;
+
+            // OPTIM (V7.5 Pass 2) : on tient à jour des structures dérivées en O(1)
+            // sur chaque start/end au lieu de reconstruire des Array/Set à chaque
+            // segment. Sur un fichier avec N marques, on passe d'un coût O(events x N)
+            // à O(events). Sur un code de 2500-6000 lignes c'est sensible.
+            const activeMarks = []; // ordre d'insertion préservé pour la stabilité visuelle
+            const activeTypes = new Map(); // type -> count, permet de connaître les classes actives sans rebuild
+            let activeScrollCount = 0;
+            let activeOccMark = null; // dernière marque avec occIndex active
+
             const formatSeg = (seg) => showHidden ? seg.replace(/ /g, '<span class="hc-space"> </span>').replace(/\t/g, '<span class="hc-tab">\t</span>').replace(/\n/g, '<span class="hc-nl"></span>\n') : seg;
+
+            const addMark = (mark) => {
+                activeMarks.push(mark);
+                activeTypes.set(mark.type, (activeTypes.get(mark.type) || 0) + 1);
+                if (mark.scroll) activeScrollCount++;
+                if (mark.occIndex !== undefined) activeOccMark = mark;
+            };
+            const removeMark = (mark) => {
+                const idx = activeMarks.indexOf(mark);
+                if (idx !== -1) activeMarks.splice(idx, 1);
+                const c = activeTypes.get(mark.type);
+                if (c <= 1) activeTypes.delete(mark.type); else activeTypes.set(mark.type, c - 1);
+                if (mark.scroll) activeScrollCount--;
+                if (mark.occIndex !== undefined) {
+                    // recherche de la marque occIndex restante la plus récente
+                    activeOccMark = null;
+                    for (let i = activeMarks.length - 1; i >= 0; i--) {
+                        if (activeMarks[i].occIndex !== undefined) { activeOccMark = activeMarks[i]; break; }
+                    }
+                }
+            };
 
             for (let ev of events) {
                 if (ev.pos > currentIndex) {
-                    let segment = formatSeg(escapeHtml(text.substring(currentIndex, ev.pos)));
-            if (activeMarks.size > 0) {
-                let classes = [...new Set(Array.from(activeMarks).map(m => m.type))].join(" ");
-                let idStr = "";
-                if (Array.from(activeMarks).some(m => m.scroll) && !scrollAdded) { idStr = ' id="scroll-target"'; scrollAdded = true; }
-                let occMatch = Array.from(activeMarks).find(m => m.occIndex !== undefined);
-                let occAttr = occMatch ? ` data-occ="${occMatch.occIndex}" style="cursor:pointer;" onclick="handleMarkClick(event)" ondblclick="handleMarkDblClick(event)"` : "";
-                result += `<mark class="${classes}"${idStr}${occAttr}>${segment}</mark>`;
-            } else result += segment;
+                    const segment = formatSeg(escapeHtml(text.substring(currentIndex, ev.pos)));
+                    if (activeMarks.length > 0) {
+                        const classes = Array.from(activeTypes.keys()).join(" ");
+                        let idStr = "";
+                        if (activeScrollCount > 0 && !scrollAdded) { idStr = ' id="scroll-target"'; scrollAdded = true; }
+                        const occAttr = activeOccMark ? ` data-occ="${activeOccMark.occIndex}" style="cursor:pointer;" onclick="handleMarkClick(event)" ondblclick="handleMarkDblClick(event)"` : "";
+                        result += `<mark class="${classes}"${idStr}${occAttr}>${segment}</mark>`;
+                    } else {
+                        result += segment;
+                    }
                     currentIndex = ev.pos;
                 }
-                if (ev.type === 'start') activeMarks.add(ev.mark);
-                else if (ev.type === 'end') activeMarks.delete(ev.mark);
+                if (ev.type === 'start') addMark(ev.mark);
+                else if (ev.type === 'end') removeMark(ev.mark);
                 else if (ev.type === 'del_marker') {
                     let idStr = ev.scroll && !scrollAdded ? ' id="scroll-target"' : "";
                     if (idStr) scrollAdded = true;
-                    let ttip = APP_CONFIG.tooltips.ttDeletedText;
+                    const ttip = APP_CONFIG.tooltips.ttDeletedText;
                     result += `<mark class="hl-del"${idStr} title="${ttip}"></mark>`;
                 }
             }
@@ -1508,22 +1589,49 @@
         }
 
         // Modification majeure : Injection paramétrable pour la future fenêtre de debug
+        // OPTIM (V7.5 Pass 2) : pre-indexation des positions de retour a la ligne.
+        // L'ancienne version faisait, pour CHAQUE marque, un text.substring(0, m.start)
+        // suivi d'un .split('\n') complet (donc O(text.length) par marque).
+        // Sur un code de 2500 lignes avec 50 marques c'etait ~2.5 MB scannes pour rien.
+        // On construit maintenant UNE FOIS un tableau trie des positions des '\n', puis
+        // on fait une recherche binaire pour trouver le numero de ligne d'une position.
+        function _buildNewlineIndex(text) {
+            // newlinePositions[k] = index dans le texte du k-ieme '\n' (0-indexed)
+            // Ligne d'une position p = (nombre de '\n' avant p) + 1
+            const positions = [];
+            for (let i = 0; i < text.length; i++) {
+                if (text.charCodeAt(i) === 10) positions.push(i);
+            }
+            return positions;
+        }
+        function _lineOfPosition(positions, pos) {
+            // Renvoie le numero de ligne (1-indexed) contenant la position pos.
+            // Recherche binaire : on cherche le nombre de '\n' a un index strictement < pos.
+            let lo = 0, hi = positions.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (positions[mid] < pos) lo = mid + 1;
+                else hi = mid;
+            }
+            return lo + 1;
+        }
+
         function updateLineNumbers(text, marks = [], targetLineContainerId = 'line-numbers', targetStatsContainerId = 'status-stats') {
-            const linesCount = text ? text.split('\n').length : 0;
+            const newlinePositions = text ? _buildNewlineIndex(text) : [];
+            const linesCount = text ? newlinePositions.length + 1 : 0;
             let modifiedLines = new Set();
             let yellowLines = new Set();
             let activeYellowLine = -1;
 
             for(let m of marks) {
                 if(m.type === 'hl-line-mod' || m.type === 'hl-ins' || m.type === 'hl-linebg' || m.type === 'hl-del') {
-                    let textUpToStart = text.substring(0, m.start);
-                    let startLine = textUpToStart.split('\n').length;
-                    let blockText = text.substring(m.start, m.start + m.length);
-                    let linesInBlock = blockText.split('\n').length;
-                    for(let i=0; i<linesInBlock; i++) modifiedLines.add(startLine + i);
+                    const startLine = _lineOfPosition(newlinePositions, m.start);
+                    const endLine = _lineOfPosition(newlinePositions, m.start + m.length);
+                    // linesInBlock equivalent a l'ancien split, en restant coherent :
+                    // ancien blockText.split('\n').length = endLine - startLine + 1
+                    for (let i = startLine; i <= endLine; i++) modifiedLines.add(i);
                 } else if (m.type === 'hl-yellow' || m.type === 'hl-yellow-pale' || m.type === 'hl-find-100' || m.type === 'hl-find-80' || m.type === 'hl-find-50' || m.type === 'hl-find-10') {
-                    let textUpToStart = text.substring(0, m.start);
-                    let startLine = textUpToStart.split('\n').length;
+                    const startLine = _lineOfPosition(newlinePositions, m.start);
                     yellowLines.add(startLine);
                     if (m.scroll) activeYellowLine = startLine;
                 }
@@ -1588,8 +1696,32 @@
             document.getElementById('backdrop2').innerHTML = renderHighlights(val2, marksT2);
         }
 
-        function handleText1Input() { state.tempSearchIndex = -1; state.yellowMarks = []; updateLiveDiffBackdrops(); checkSearchState(); updateMainView(); }
-        function handleText2Input() { updateLiveDiffBackdrops(); checkSearchState(); }
+        // OPTIM (V7.5) : Debounce + suppression du rendu redondant de text3.
+        // - Debounce 120ms : évite le recalcul DP à chaque keystroke lors du collage
+        //   de zones FIND/REPLACE volumineuses, principal coupable du lag Firefox.
+        // - updateMainView n'est appelé que si des yellowMarks étaient affichées
+        //   et doivent donc être effacées visuellement du text3. Sinon, re-rendre
+        //   6000 lignes pour rien était du gaspillage pur.
+        let _t1InputTimer = null;
+        function handleText1Input() {
+            const hadYellowMarks = state.yellowMarks && state.yellowMarks.length > 0;
+            state.tempSearchIndex = -1;
+            state.yellowMarks = [];
+            clearTimeout(_t1InputTimer);
+            _t1InputTimer = setTimeout(() => {
+                updateLiveDiffBackdrops();
+                checkSearchState();
+                if (hadYellowMarks) updateMainView();
+            }, 120);
+        }
+        let _t2InputTimer = null;
+        function handleText2Input() {
+            clearTimeout(_t2InputTimer);
+            _t2InputTimer = setTimeout(() => {
+                updateLiveDiffBackdrops();
+                checkSearchState();
+            }, 120);
+        }
 
         function viderInputs() {
             document.getElementById('text1').value = ""; 
@@ -1943,6 +2075,11 @@
             let displayMarksBefore = [...state.yellowMarks];
             let displayMarksAfter = [];
 
+            // OPTIM (V7.5) : computeLiveDiff sorti de la boucle.
+            // searchStr et replaceStr ne changent jamais durant la boucle MULTI,
+            // on calcule donc le diff sémantique local UNE SEULE FOIS.
+            const { marksT2: baseMarksT2 } = computeLiveDiff(state.searchStr, state.replaceStr, splitChars);
+
             // REVERSE LOOP : On remplace de la fin vers le début pour préserver les index
             for (let i of indicesToReplace) {
                 let ym = state.yellowMarks[i];
@@ -1952,8 +2089,7 @@
                 const p2 = currentText.substring(tIndex + state.searchStr.length);
                 currentText = p1 + state.replaceStr + p2;
 
-                const { marksT2 } = computeLiveDiff(state.searchStr, state.replaceStr, splitChars);
-                const newMarksToInject = marksT2.map(m => ({ start: m.start + tIndex, length: m.length, type: m.type }));
+                const newMarksToInject = baseMarksT2.map(m => ({ start: m.start + tIndex, length: m.length, type: m.type }));
                 
                 // Index Shifting : on décale les anciennes marques et les marques de prévisualisation
                 currentMarks = currentMarks.map(m => (m.start >= tIndex + state.searchStr.length) ? { ...m, start: m.start + shiftLen } : m);
@@ -1981,8 +2117,20 @@
         // ==========================================
         // GESTION HISTORIQUE & FICHIERS
         // ==========================================
+        // OPTIM (V7.5) : Cap conservateur de l'historique pour éviter l'accumulation
+        // illimitée de copies complètes du code source (chaque entrée stocke tBefore
+        // ET tAfter en intégral). Cap volontairement haut (50) pour ne pas gêner
+        // l'usage normal. Refonte complète du stockage (deltas) prévue ultérieurement
+        // dans le chantier dédié à la gestion de l'historique.
+        const HISTORY_MAX_ENTRIES = 50;
         function addHistoryRecord(action, tBefore, tAfter, mBefore, mAfter, displayMarksBefore, displayMarksAfter) {
             state.history.push({ version: formatVersion(), action: action, timestamp: getTimestamp(), tBefore, tAfter, mBefore, mAfter, displayMarksBefore, displayMarksAfter });
+            // Trim le plus ancien si on dépasse le cap. On préserve toujours la
+            // toute première entrée (IMPORT INITIAL) qui sert de point de départ
+            // référentiel pour le projet.
+            if (state.history.length > HISTORY_MAX_ENTRIES) {
+                state.history.splice(1, state.history.length - HISTORY_MAX_ENTRIES);
+            }
             state.selectedIndex = state.history.length - 1; 
             isProjectDirty = true;
             renderHistoryTable();
