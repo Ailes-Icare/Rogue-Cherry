@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === COMPORTEMENT GLOBAL === */
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  overflow: hidden;
+}
+
+/* === BACKDROP & OVERLAY CALQUES SYNCHRONISÉS === */
+.backdrop-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  color: #d4d4d4;
+  background-color: #1e1e1e;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre;
+  padding: 10px 10px 25px 10px;
+  font-family: 'Consolas', monospace;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.overlay-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  color: transparent !important;
+  background: transparent !important;
+  caret-color: white;
+  z-index: 2;
+  resize: none;
+  margin: 0;
+  outline: none;
+  border: none;
+  white-space: pre;
+  padding: 10px 10px 25px 10px;
+  font-family: 'Consolas', monospace;
+  font-size: 10px;
+  line-height: 14px;
+  overflow: auto;
+}
+
+/* === RENDU SÉCURISÉ POUR FIREFOX (ANTI-LAG) === */
+.code-safe-render {
+  -webkit-user-modify: read-only;
+  -moz-user-modify: read-only;
+  -webkit-text-fill-color: inherit;
+}
+
+/* === MARQUEURS DE SURLIGNAGE CHIRURGICAUX === */
+mark {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 2px;
+}
+
+.hl-find-100 {
+  background-color: #00FF7F !important;
+  color: #000 !important;
+  font-weight: bold;
+}
+
+.hl-find-80 {
+  background-color: #FFD700 !important;
+  color: #000 !important;
+  font-weight: bold;
+}
+
+.hl-find-50 {
+  background-color: #FF8C00 !important;
+  color: #000 !important;
+  font-weight: bold;
+}
+
+.hl-find-10 {
+  background-color: #FF4500 !important;
+  color: #FFF !important;
+  font-weight: bold;
+}
+
+.hl-linebg {
+  background-color: rgba(198, 142, 255, 0.35);
+}
+
+.hl-yellow {
+  background-color: #FFD700 !important;
+  color: #000 !important;
+  font-weight: bold;
+}
+
+.hl-yellow-pale {
+  background-color: rgba(255, 215, 0, 0.25) !important;
+  color: inherit !important;
+  border-bottom: 1px dashed #FFD700;
+}
+
+.hl-line-mod {
+  background-color: #59466D !important;
+  color: white !important;
+}
+
+.hl-word-mod {
+  background-color: #9E67BA !important;
+  color: white !important;
+}
+
+.hl-ins {
+  background-color: #FF007F !important;
+  color: white !important;
+}
+
+.hl-del-txt {
+  color: #888 !important;
+  text-decoration: line-through !important;
+  background: transparent !important;
+}
+
+.hl-del {
+  background: transparent !important;
+  user-select: none;
+}
+
+.hl-del::after {
+  content: '[✖]';
+  color: #FF0000;
+  font-weight: bold;
+  font-size: 0.9em;
+  user-select: none;
+  margin: 0 1px;
+}
+
+/* === RENDU DES CARACTÈRES INVISIBLES === */
+.hc-space, .hc-tab {
+  position: relative;
+}
+
+.hc-space::after {
+  content: '·';
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #555555;
+  font-weight: bold;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hc-tab::after {
+  content: '→';
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #555555;
+  font-weight: bold;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hc-nl {
+  display: inline-block;
+  width: 0;
+  position: relative;
+}
+
+.hc-nl::after {
+  content: '↵';
+  position: absolute;
+  left: 0;
+  color: #555555;
+  font-weight: bold;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Gouttière */
+.gutter-mod-item {
+  background-color: #00FF7F !important;
+  color: #000 !important;
+  font-weight: bold;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Style de scrollbars premium */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

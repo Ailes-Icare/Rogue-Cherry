@@ -160,26 +160,49 @@ En un clic, Rogue Cherry extrait les occurrences sélectionnées accompagnées d
 
 ---
 
-## 7. DÉPLOIEMENT & LÉGENDE
+## 7. DÉPLOIEMENT & BUILD SINGLE-FILE (V8.0 REACT) 🛰️
 
-### 7.1. Déploiement Rapide
+Depuis sa version V8.0, Rogue Cherry est passé à une architecture **React 18 + Vite + Tailwind CSS** modulaire et de très haute performance pour résoudre définitivement les fuites de mémoire.
 
-- Téléchargez le fichier `index.html`.
+Par conséquent, l'ouverture directe du fichier source `index.html` (1 Ko) par double-clic n'est plus autorisée par la sécurité CORS des navigateurs (qui bloquent le chargement de modules ES locaux via le protocole `file://`).
 
-- Double-cliquez.
+Deux modes d'utilisation s'offrent à vous :
 
-- Vous êtes opérationnel. Aucune installation requise.
+### 7.1. Mode Développeur (Modulaire / Rapide)
+Idéal si vous souhaitez faire évoluer ou modifier le code source :
+1. Téléchargez et installez **Node.js** (recommandé LTS) pour disposer de la commande `npm`.
+2. Ouvrez une console dans le dossier du projet et installez les dépendances :
+   ```bash
+   npm install
+   ```
+3. Démarrez le serveur de développement local :
+   ```bash
+   npm run dev
+   ```
+4. Ouvrez l'adresse fournie par Vite (ex: `http://localhost:5173`) dans votre navigateur.
 
-### 7.2. Charte Visuelle
+### 7.2. Mode Production : Fichier HTML Unique Auto-Contenu (S.O.P. Standard) 🍒
+Conformément au cahier des charges initial, **Rogue Cherry peut être compilé en un seul fichier HTML autonome de ~250 Ko**, léger, auto-contenu et transportable (contenant la logique React, les styles Tailwind et les utilitaires d'invisibles inlinés) !
+
+Pour générer ce fichier unique :
+1. Exécutez la commande de build suivante depuis votre terminal :
+   ```bash
+   npm run build
+   ```
+2. Un unique fichier HTML autonome est généré dans le dossier :
+   `dist/index.html`
+3. Vous pouvez copier, renommer ce fichier (ex: `rogue-cherry-V8.html`) et le déplacer n'importe où.
+4. **Double-cliquez dessus :** il s'ouvre directement dans n'importe quel navigateur (sans aucun serveur local requis, sans connexion internet, sans Node), exactement comme l'ancienne version, mais avec le moteur V8 ultra-performant et sans aucune fuite de mémoire !
+
+---
+
+## 8. CHARTE VISUELLE
 
 L'interface de Rogue Cherry est codée pour projeter sa fonction :
 
 - **Deep Charcoal (#1E1E1E) :** Le socle terminal.
-
 - **Rouge Cerise (#D16969) :** L'état brut, le danger, le code non traité.
-
 - **Jaune Électrique (#FFD700) :** Le radar, la cible identifiée (FIND).
-
 - **Electric Purple (#9E67BA) :** L'injection réussie, le code muté (REPLACE).
 
 > **Note de la Direction Artistique :** L'UI utilise Segoe UI pour la navigation, mais exige strictement Consolas (Monospace) pour les zones de texte afin de garantir l'alignement mathématique parfait des calques de "Diffing".

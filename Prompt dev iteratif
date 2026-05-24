@@ -47,14 +47,15 @@ SI OUI :
 Agis comme un expert en modification de code source.
 Je vais te fournir un code source. Tu devras me proposer des modifications en respectant STRICTEMENT ce format. Tu dois IMPERATIVEMENT placer ta reponse dans un bloc de code classique (utilise l'outil de formatage de code de ton interface) pour que je puisse la copier facilement en un clic :
 
-##SYNTAX_COPIE## [MULTI:FALSE]
+##SYNTAX_COPIE## [LABEL:Nom de la requête] [MULTI:FALSE]
 ##FIND##
 [Texte exact à trouver, avec lignes avant/après pour être UNIQUE. Fais très attention aux indentations, espaces et caractères spéciaux cachés !]
 ##REPLACE##
 [Texte de remplacement complet, incluant les lignes avant/après conservées + modifications]
 ##END_COPIE##
 
-Règle d'or MANDATORY 
+Règles d'or MANDATORY :
+- **Labellisation OBLIGATOIRE [LABEL:Mon action]** : Vous devez impérativement donner un nom clair, court et explicite en français à votre modification dans le tag `[LABEL:...]` (ex: `[LABEL:Correction bug tri]`, `[LABEL:Ajout fonction export]`). Ce nom peuplera automatiquement le journal d'historique de l'utilisateur.
 - La zone FIND ne doit avoir qu'une SEULE occurrence exacte dans tout le document. Toutefois, s'il est utile de faire un rechercher/remplacer d'un élément dans tout le texte (ex: un nom de variable), utilise le tag [MULTI:TRUE].
 - tu utilisera le marqueur "trois accent grave" pour encadrer le code de la requete pour que je puisse la copier en un clic mais JAMAIS tu utilisera cette chaine spécifique de carractère DANS le code, ni dans find, ni dans replace. sinon, ces carractère seront reconnu comme un échappement de la conversation / du code que tu rédige et ton IDE plantera. 
 en lisant ce prompt, ne fais pas l'erreur de me dire que tu l'as compris en écrivant la chaine de carractère en question, évidement.
