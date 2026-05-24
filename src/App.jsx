@@ -9,6 +9,7 @@ import Splitter from './components/Splitter.jsx';
 import { useHistoryStore } from './hooks/useHistoryStore.js';
 import { parseSyntaxRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
 import { applyDeltaOnText } from './hooks/useHistoryStore.js';
+import { computeLiveDiff } from './utils/diffEngine.js';
 
 export default function App() {
   // 1. Instanciation du store d'historique compressé Delta-Encoding
@@ -41,6 +42,49 @@ export default function App() {
   // Zoom de police principal
   const [fontSize, setFontSize] = useState(14);
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Importation générique depuis fichier
+  const processImportFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target.result;
+      if (store.history.length > 0) {
+        if (!confirm("Attention : L'importation d'un nouveau fichier va réinitialiser tout le projet. Continuer ?")) {
+          return;
+        }
+      }
+      store.resetStore();
+      store.pushSnapshot(content, "IMPORT INITIAL");
+      
+      const safeName = file.name.replace(/\.[^/.]+$/, "");
+      store.setProjectName(safeName);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processImportFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleOpenFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        processImportFile(e.target.files[0]);
+      }
+    };
+    input.click();
+  };
+
   // --- RECHERCHE ET LOCALISATION DES OCCURRENCES DANS LE CODE ACTIF ---
   const occurrences = useMemo(() => {
     if (!store.currentText || !findText) return [];
@@ -72,6 +116,79 @@ export default function App() {
       };
     });
   }, [findText, occurrences, occurrencesCount, multiMode, multiIndices, activeOccIndex]);
+
+  // --- RECONSTRUCTION DES MARQUEURS HISTORIQUES (DRAFTSURGE) ---
+  const historyMarks = useMemo(() => {
+    if (store.selectedIndex <= 0) return [];
+    const rec = store.history[store.selectedIndex];
+    if (rec.type !== 'replace') return [];
+
+    // On calcule les marques relatives de remplacement
+    const { marksT2: baseMarksT2 } = computeLiveDiff(rec.findStr || "", rec.replaceStr || "", rec.splitChars);
+
+    // Pour obtenir leurs positions absolues dans le currentText, il faut 
+    // rejouer virtuellement le remplacement sur le texte de la version N-1.
+    const textBefore = store.rebuildTextAt(store.selectedIndex - 1);
+    if (!textBefore) return [];
+    if (!rec.findStr) return []; // PREVENT INFINITE LOOP
+
+    let indices = [];
+    let idx = textBefore.indexOf(rec.findStr);
+    while (idx !== -1) {
+      indices.push(idx);
+      idx = textBefore.indexOf(rec.findStr, idx + Math.max(1, rec.findStr.length)); // SAFE ADVANCE
+    }
+
+    let indicesToReplace = [];
+    if (rec.multiMode && rec.multiIndices && rec.multiIndices.length > 0) {
+      indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Reverse order
+    } else {
+      for (let i = indices.length - 1; i >= 0; i--) indicesToReplace.push(i);
+    }
+
+    // Calcul des décalages pour mapper les baseMarksT2 dans currentText
+    let finalMarks = [];
+    let shiftLen = (rec.replaceStr.length - rec.findStr.length);
+    
+    // On simule l'application depuis la fin, comme dans applyDeltaOnText,
+    // mais ici on s'intéresse à l'emplacement final du replaceStr inséré.
+    // L'emplacement final d'une cible k (dans le texte T-after) correspond 
+    // à son emplacement de départ tIndex + le shift généré par TOUS les 
+    // remplacements PRECEDANT k dans le texte.
+    // Puisqu'on itère de la fin vers le début, la position relative d'un 
+    // bloc par rapport au début du texte T-before n'a PAS encore été altérée 
+    // par les remplacements situés après lui. 
+    // Donc son tIndex de départ est toujours correct dans T-before.
+    // Mais dans T-after, sa position finale est :
+    // tIndex + (nombre de remplacements AVANT lui) * shiftLen
+    
+    for (let i = 0; i < indicesToReplace.length; i++) {
+        let occIndex = indicesToReplace[i]; // ex: 3
+        let tIndex = indices[occIndex]; // index dans T-before
+        
+        // Combien de cibles réelles sont placées AVANT occIndex ?
+        let replacementsBefore = 0;
+        for (let j = 0; j < indicesToReplace.length; j++) {
+            if (indicesToReplace[j] < occIndex) replacementsBefore++;
+        }
+        
+        let finalPos = tIndex + (replacementsBefore * shiftLen);
+
+        // On projette baseMarksT2
+        let mapped = baseMarksT2.map(m => ({
+            start: m.start + finalPos,
+            length: m.length,
+            type: m.type
+        }));
+        finalMarks.push(...mapped);
+    }
+
+    return finalMarks;
+  }, [store.history, store.selectedIndex]);
+
+  const allMarks = useMemo(() => {
+    return [...activeMarks, ...historyMarks];
+  }, [activeMarks, historyMarks]);
 
   // Synchronisation des indices multiMode lors d'une nouvelle recherche
   useEffect(() => {
@@ -287,6 +404,15 @@ export default function App() {
     alert(label ? `Opération "${label}" appliquée avec succès !` : "Requête déboguée appliquée avec succès !");
   };
 
+  // Copie de la requête depuis la modale sans appliquer
+  const handleAcceptAndCopy = ({ findText: f, replaceText: r, multiMode: m, multiIndices: idxs }) => {
+    setFindText(f);
+    setReplaceText(r);
+    setMultiMode(m);
+    setMultiIndices(idxs);
+    alert("Les textes ont été copiés dans les champs FIND et REPLACE. Vous pouvez les vérifier et appliquer manuellement.");
+  };
+
   // Exportation du projet au format JSON
   const handleExportProject = () => {
     if (store.history.length === 0) {
@@ -360,8 +486,22 @@ export default function App() {
   };
 
   return (
-    <div className="w-screen h-screen flex bg-bg-dark overflow-hidden font-segoe select-none">
+    <div 
+      className="w-screen h-screen flex bg-bg-dark overflow-hidden font-segoe select-none relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       
+      {/* Overlay Drag & Drop */}
+      {isDragging && (
+        <div className="absolute inset-0 z-[2000] bg-primary-blue bg-opacity-20 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-primary-blue">
+          <div className="text-4xl font-bold text-white pointer-events-none drop-shadow-md bg-black/50 px-10 py-5 rounded-lg border border-border-dark">
+            Relâchez le fichier pour l'importer 📥
+          </div>
+        </div>
+      )}
+
       {/* 1. PANNEAU GAUCHE */}
       <SidebarLeft
         findText={findText}
@@ -409,6 +549,17 @@ export default function App() {
 
           {/* Boutons d'Action Clés */}
           <div className="flex gap-2 items-stretch h-[70px]">
+            <button
+              onClick={handleOpenFile}
+              className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#20b2aa] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
+              title="Ouvrir un fichier"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <path stroke="#20b2aa" strokeWidth="2" d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span className="text-[#20b2aa] font-extrabold leading-none mt-0.5">OUVRIR</span>
+            </button>
+
             <button
               onClick={handleImportMainCode}
               className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
@@ -479,7 +630,7 @@ export default function App() {
         <CodeEditor
           text={store.currentText}
           onTextChange={handleSaveFreeEdit}
-          marks={activeMarks}
+          marks={allMarks}
           activeOccIndex={activeOccIndex}
           isEditable={isEditable}
           onToggleEditable={handleToggleEditable}
@@ -528,6 +679,7 @@ export default function App() {
         initialRawText={debuggerRawText}
         sourceText={store.currentText}
         onApply={handleApplyDebuggerRequest}
+        onAcceptAndCopy={handleAcceptAndCopy}
         syntaxConfig={syntaxConfig}
       />
 

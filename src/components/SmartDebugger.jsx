@@ -66,6 +66,7 @@ export default function SmartDebugger({
   initialRawText,
   sourceText,
   onApply,
+  onAcceptAndCopy,
   syntaxConfig
 }) {
   const [rawText, setRawText] = useState(initialRawText || "");
@@ -219,6 +220,19 @@ export default function SmartDebugger({
   const handleValidateAndApply = () => {
     if (parsedRequest && parsedRequest.isValid) {
       onApply({
+        findText: parsedRequest.findText,
+        replaceText: parsedRequest.replaceText,
+        label: parsedRequest.label,
+        multiMode: parsedRequest.multiMode,
+        multiIndices: parsedRequest.multiIndices
+      });
+      onClose();
+    }
+  };
+
+  const handleValidateAndCopy = () => {
+    if (parsedRequest && parsedRequest.isValid) {
+      onAcceptAndCopy({
         findText: parsedRequest.findText,
         replaceText: parsedRequest.replaceText,
         label: parsedRequest.label,
@@ -448,6 +462,18 @@ export default function SmartDebugger({
             className="bg-disabled-dark hover:bg-border-dark text-white px-5 py-2.5 rounded font-bold text-xs shadow transition"
           >
             ANNULER
+          </button>
+          <button 
+            disabled={!parsedRequest.isValid}
+            onClick={handleValidateAndCopy}
+            className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
+              parsedRequest.isValid 
+                ? 'bg-[#333] hover:bg-[#444] text-white border border-[#555] cursor-pointer' 
+                : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
+            }`}
+            title="Copier les textes dans les champs à gauche sans les appliquer immédiatement"
+          >
+            VALIDER & COPIER LA REQUÊTE
           </button>
           <button 
             disabled={!parsedRequest.isValid}
