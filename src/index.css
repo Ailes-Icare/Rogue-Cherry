@@ -134,6 +134,7 @@ mark {
 .hl-del {
   background: transparent !important;
   user-select: none;
+  position: relative; /* Permet à la croix de flotter sans pousser le texte */
 }
 
 .hl-del::after {
@@ -142,7 +143,11 @@ mark {
   font-weight: bold;
   font-size: 0.9em;
   user-select: none;
-  margin: 0 1px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, 0);
+  pointer-events: none;
 }
 
 /* === RENDU DES CARACTÈRES INVISIBLES === */

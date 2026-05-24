@@ -163,6 +163,7 @@ export default function SidebarRight({
           <span>OPEN</span>
         </button>
         <button
+          type="button"
           onClick={onResetProject}
           className="flex-1 bg-cherry-red hover:bg-cherry-red-hover text-xs font-bold border border-cherry-red flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 text-white"
           title="Vider et réinitialiser tout le projet"
@@ -236,6 +237,7 @@ export default function SidebarRight({
           <span className="text-[10px] text-[#aaa] font-bold">Détails (AVANT / APRÈS)</span>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => setIsSyncScroll(!isSyncScroll)}
               className={`w-8 h-7 flex items-center justify-center rounded border transition text-base ${
                 isSyncScroll
@@ -247,6 +249,7 @@ export default function SidebarRight({
               {isSyncScroll ? '🔗' : '🔓'}
             </button>
             <button
+              type="button"
               onClick={() => setShowMiniViews(!showMiniViews)}
               className="bg-bg-panel hover:bg-bg-dark border border-border-dark px-3 py-1 rounded text-[11px] font-bold text-[#d4d4d4]"
             >
@@ -296,6 +299,7 @@ export default function SidebarRight({
       {/* 5. Pile de boutons temporels */}
       <div className="flex gap-2 h-14 flex-shrink-0 mt-1 select-none">
         <button
+          type="button"
           disabled={selectedIndex <= 0}
           onClick={() => onSelectIndex(selectedIndex - 1)}
           className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-xs rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -304,6 +308,7 @@ export default function SidebarRight({
           ◀ Préc.
         </button>
         <button
+          type="button"
           disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
           onClick={handleBranchClick}
           className="flex-[2] bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-[11px] rounded transition duration-150 flex justify-center items-center gap-1.5 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-center leading-tight"

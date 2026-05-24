@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { getFullTimestamp, normalizeText } from '../utils/helpers.js';
+import { DEFAULT_VERSION_CONFIG, parseVersionStringToRanks, incrementRank, formatVersionString } from '../utils/versionEngine.js';
 
 /**
  * Applique un delta unitaire sur un texte.
@@ -90,6 +91,7 @@ export function useHistoryStore() {
   const [projectName, setProjectName] = useState("");
   const [history, setHistory] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [versionConfig, setVersionConfig] = useState(DEFAULT_VERSION_CONFIG);
 
   // Mémoïsation pour éviter de recalculer le texte complet à chaque re-rendu de l'application
   const currentText = useMemo(() => {
@@ -117,17 +119,19 @@ export function useHistoryStore() {
   const pushSnapshot = (rawText, actionName = "IMPORT INITIAL", customVersion = null) => {
     const timestamp = getFullTimestamp();
     const normalizedRawText = normalizeText(rawText);
-    let nextVer = "V1.0.0";
+    
+    // Soit une version custom (au tout premier import), soit on tente d'incrémenter le rang Majeur
+    let nextVer = customVersion || "V1.0.0";
 
-    if (history.length > 0) {
+    if (history.length > 0 && !customVersion) {
       const lastRec = history[history.length - 1];
-      const match = lastRec.version.match(/V(\d+)\.(\d+)\.(\d+)/);
-      if (match) {
-        const x = parseInt(match[1], 10);
-        const y = parseInt(match[2], 10);
-        // Si version custom n'est pas passée, on incrémente le Majeur par défaut pour un snapshot manuel
-        nextVer = customVersion || `V${x + 1}.0.0`;
-      }
+      const currentRanks = parseVersionStringToRanks(lastRec.version, versionConfig.ranks);
+      // Incrémenter par défaut le premier rang numérique qu'on trouve pour un nouveau snapshot (Majeur)
+      let majorIndex = versionConfig.ranks.findIndex(r => r.type === 'numeric' || r.type === 'alpha');
+      if (majorIndex === -1) majorIndex = 0;
+      
+      const nextRanks = incrementRank(currentRanks, majorIndex);
+      nextVer = formatVersionString(nextRanks);
     }
 
     const record = {
@@ -156,15 +160,10 @@ export function useHistoryStore() {
     // Déduction du nom d'action (Label)
     const actionName = label ? label : `Opération Z${history.filter(h => h.type === "replace").length + 1}`;
 
-    // Calcul de la version incrémentale V X.Y.Z (Z+1)
-    let nextVer = "V1.0.1";
-    const match = lastRec.version.match(/V(\d+)\.(\d+)\.(\d+)/);
-    if (match) {
-      const x = parseInt(match[1], 10);
-      const y = parseInt(match[2], 10);
-      const z = parseInt(match[3], 10);
-      nextVer = `V${x}.${y}.${z + 1}`;
-    }
+    // Calcul de la version incrémentale via le moteur dynamique
+    const currentRanks = parseVersionStringToRanks(lastRec.version, versionConfig.ranks);
+    const nextRanks = incrementRank(currentRanks, versionConfig.autoIncrementIndex);
+    const nextVer = formatVersionString(nextRanks);
 
     const record = {
       type: "replace",
@@ -191,70 +190,45 @@ export function useHistoryStore() {
   /**
    * Crée une ramification / embranchement à partir de l'index sélectionné dans l'historique.
    * 
-   * @param {string} branchType - "M" (Majeur), "m" (Mineur) ou "0" (Retour arrière)
+   * @param {number} targetRankIndex - L'index du rang à incrémenter (ou -1 pour annuler le futur sans saut)
    */
-  const createNewBranch = (branchType) => {
+  const createNewBranch = (targetRankIndex) => {
     if (selectedIndex === -1 || !history[selectedIndex]) return;
 
-    const currentTextCopy = currentText;
-    const lastRec = history[selectedIndex];
-    const match = lastRec.version.match(/V(\d+)\.(\d+)\.(\d+)/);
-    if (!match) return;
-
-    const x = parseInt(match[1], 10);
-    const y = parseInt(match[2], 10);
-    const timestamp = getFullTimestamp();
-
-    let nextVer = "";
-    let actionName = "";
-
-    if (branchType === "M") {
-      // Majeur : VX+1.0.0
-      nextVer = `V${x + 1}.0.0`;
-      actionName = `BRANCHE MAJEURE (depuis ${lastRec.version})`;
-      
-      // Nettoyage de l'historique futur
-      const newHistory = history.slice(0, selectedIndex + 1);
-      
-      // On force la création d'un nouveau Snapshot pour fixer le nouvel embranchement majeur !
-      const record = {
-        type: "snapshot",
-        version: nextVer,
-        action: actionName,
-        timestamp,
-        rawText: currentTextCopy
-      };
-      
-      const updatedHistory = [...newHistory, record];
-      setHistory(updatedHistory);
-      setSelectedIndex(updatedHistory.length - 1);
-    } 
-    else if (branchType === "m") {
-      // Mineur : VX.Y+1.0
-      nextVer = `V${x}.${y + 1}.0`;
-      actionName = `BRANCHE MINEURE (depuis ${lastRec.version})`;
-      
-      const newHistory = history.slice(0, selectedIndex + 1);
-      
-      // On force également un snapshot pour fixer la branche mineure
-      const record = {
-        type: "snapshot",
-        version: nextVer,
-        action: actionName,
-        timestamp,
-        rawText: currentTextCopy
-      };
-      
-      const updatedHistory = [...newHistory, record];
-      setHistory(updatedHistory);
-      setSelectedIndex(updatedHistory.length - 1);
-    } 
-    else if (branchType === "0") {
+    if (targetRankIndex === -1) {
       // Pur retour en arrière (annulation complète du futur)
       const cleanHistory = history.slice(0, selectedIndex + 1);
       setHistory(cleanHistory);
       setSelectedIndex(cleanHistory.length - 1);
+      return;
     }
+
+    const currentTextCopy = currentText;
+    const lastRec = history[selectedIndex];
+    const timestamp = getFullTimestamp();
+
+    // Calcul de la version dynamique
+    const currentRanks = parseVersionStringToRanks(lastRec.version, versionConfig.ranks);
+    const nextRanks = incrementRank(currentRanks, targetRankIndex);
+    const nextVer = formatVersionString(nextRanks);
+
+    const actionName = `SAUT DE VERSION (depuis ${lastRec.version})`;
+
+    // Nettoyage de l'historique futur
+    const newHistory = history.slice(0, selectedIndex + 1);
+    
+    // On force la création d'un nouveau Snapshot pour fixer le nouvel embranchement majeur !
+    const record = {
+      type: "snapshot",
+      version: nextVer,
+      action: actionName,
+      timestamp,
+      rawText: currentTextCopy
+    };
+    
+    const updatedHistory = [...newHistory, record];
+    setHistory(updatedHistory);
+    setSelectedIndex(updatedHistory.length - 1);
   };
 
   /**
@@ -270,10 +244,13 @@ export function useHistoryStore() {
     projectName,
     setProjectName,
     history,
+    setHistory,
     selectedIndex,
     setSelectedIndex,
     currentText,
     currentVersion,
+    versionConfig,
+    setVersionConfig,
     importProject,
     pushSnapshot,
     pushReplace,

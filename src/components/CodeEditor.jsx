@@ -7,30 +7,56 @@ import { escapeHtml, normalizeText } from '../utils/helpers.js';
 function renderLineContent(text, lineMarks) {
   if (!lineMarks || lineMarks.length === 0) return text;
   
-  // Tri des marqueurs locaux pour traitement séquentiel
-  const sorted = [...lineMarks].sort((a, b) => a.start - b.start);
-  const elements = [];
-  let lastIdx = 0;
+  const chars = Array.from(text).map(c => ({ char: c, classes: new Set() }));
+  const zeroMarks = {};
   
-  sorted.forEach((mark, index) => {
-    // Texte avant le marqueur
-    if (mark.start > lastIdx) {
-      elements.push(text.substring(lastIdx, mark.start));
+  lineMarks.forEach(mark => {
+    if (mark.length === 0) {
+      if (!zeroMarks[mark.start]) zeroMarks[mark.start] = new Set();
+      zeroMarks[mark.start].add(mark.type);
+    } else {
+      for (let i = mark.start; i < mark.start + mark.length && i < chars.length; i++) {
+        chars[i].classes.add(mark.type);
+      }
     }
-    // Texte surligné
-    const highlighted = text.substring(mark.start, mark.start + mark.length);
-    elements.push(
-      <mark key={`${index}-${mark.start}`} className={mark.type}>
-        {highlighted}
-      </mark>
-    );
-    lastIdx = mark.start + mark.length;
   });
-  
-  // Fin de ligne
-  if (lastIdx < text.length) {
-    elements.push(text.substring(lastIdx));
+
+  const elements = [];
+  let currentClasses = "";
+  let currentText = "";
+  let elementIndex = 0;
+
+  const pushCurrent = () => {
+    if (currentText) {
+      if (currentClasses) {
+        elements.push(<mark key={`chunk-${elementIndex++}`} className={currentClasses}>{currentText}</mark>);
+      } else {
+        elements.push(currentText);
+      }
+      currentText = "";
+    }
+  };
+
+  for (let i = 0; i <= chars.length; i++) {
+    if (zeroMarks[i]) {
+      pushCurrent();
+      const zClasses = Array.from(zeroMarks[i]).join(" ");
+      elements.push(<span key={`zero-${elementIndex++}`} className={zClasses}></span>);
+    }
+
+    if (i < chars.length) {
+      const charData = chars[i];
+      const classesStr = Array.from(charData.classes).sort().join(" ");
+      
+      if (classesStr !== currentClasses) {
+        pushCurrent();
+        currentClasses = classesStr;
+      }
+      currentText += charData.char;
+    }
   }
+  
+  pushCurrent();
   
   return elements;
 }

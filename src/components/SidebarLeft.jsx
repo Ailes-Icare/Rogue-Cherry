@@ -7,33 +7,59 @@ import { computeLiveDiff } from '../utils/diffEngine.js';
  */
 function renderLiveDiffHtml(text, marks, showInvisibles = true) {
   if (!text) return "";
+  if (!marks || marks.length === 0) return renderInvisiblesHtml(text, showInvisibles);
   
-  // Trier les marqueurs
-  const sorted = [...marks].sort((a, b) => a.start - b.start);
-  let html = "";
-  let lastIdx = 0;
-
-  sorted.forEach((mark) => {
-    if (mark.start > lastIdx) {
-      html += renderInvisiblesHtml(text.substring(lastIdx, mark.start), showInvisibles);
-    }
-    const chunk = text.substring(mark.start, mark.start + mark.length);
-    const escapedChunk = renderInvisiblesHtml(chunk, showInvisibles);
-
-    // Formate selon la classe de marquage
-    if (mark.type === 'hl-del') {
-      html += `<span class="hl-del"></span>`;
+  const chars = Array.from(text).map(c => ({ char: c, classes: new Set() }));
+  const zeroMarks = {};
+  
+  marks.forEach(mark => {
+    if (mark.length === 0) {
+      if (!zeroMarks[mark.start]) zeroMarks[mark.start] = new Set();
+      zeroMarks[mark.start].add(mark.type);
     } else {
-      html += `<mark class="${mark.type}">${escapedChunk}</mark>`;
+      for (let i = mark.start; i < mark.start + mark.length && i < chars.length; i++) {
+        chars[i].classes.add(mark.type);
+      }
     }
-
-    lastIdx = mark.start + mark.length;
   });
 
-  if (lastIdx < text.length) {
-    html += renderInvisiblesHtml(text.substring(lastIdx), showInvisibles);
-  }
+  let html = "";
+  let currentClasses = "";
+  let currentText = "";
 
+  const pushCurrent = () => {
+    if (currentText) {
+      const escaped = renderInvisiblesHtml(currentText, showInvisibles);
+      if (currentClasses) {
+        html += `<mark class="${currentClasses}">${escaped}</mark>`;
+      } else {
+        html += escaped;
+      }
+      currentText = "";
+    }
+  };
+
+  for (let i = 0; i <= chars.length; i++) {
+    if (zeroMarks[i]) {
+      pushCurrent();
+      const zClasses = Array.from(zeroMarks[i]).join(" ");
+      html += `<span class="${zClasses}"></span>`;
+    }
+
+    if (i < chars.length) {
+      const charData = chars[i];
+      const classesStr = Array.from(charData.classes).sort().join(" ");
+      
+      if (classesStr !== currentClasses) {
+        pushCurrent();
+        currentClasses = classesStr;
+      }
+      currentText += charData.char;
+    }
+  }
+  
+  pushCurrent();
+  
   return html;
 }
 
@@ -43,6 +69,9 @@ function renderLiveDiffHtml(text, marks, showInvisibles = true) {
 export default function SidebarLeft({
   findText,
   replaceText,
+  commentText,
+  onChangeCommentText,
+  pendingRequestsCount,
   onChangeFindText,
   onChangeReplaceText,
   splitChars,
@@ -91,22 +120,26 @@ export default function SidebarLeft({
 
   // Génération du Prompt standard à copier
   const promptText = useMemo(() => {
-    return `Agis comme un expert en modification de code source.
-Je vais te fournir un code source. Tu devras me proposer des modifications en respectant STRICTEMENT ce format. Tu dois IMPERATIVEMENT placer ta reponse dans un bloc de code classique (utilise l'outil de formatage de code de ton interface) pour que je puisse la copier facilement en un clic :
+    return `Agis comme un système de traitement de texte intelligent.
+Je vais te demander de modifier un document.
+Lis attentivement le fichier de consignes "prompt_consigne_rogue_cherry.md" joint à notre conversation. Rogue Cherry est ACTIF, il est impératif d'utiliser sa syntaxe.
+Tu dois IMPÉRATIVEMENT placer la ou les requêtes dans un unique bloc de code classique (avec \`\`\`) pour que je puisse tout copier en un clic.
 
+Voici le format d'une requête unitaire :
 ${syntaxConfig.START} [LABEL:NomDeLaRequête] [MULTI:FALSE]
+##Commentaire## (Optionnel: indique brièvement pourquoi tu fais cette modification)
 ${syntaxConfig.FIND}
-[Texte exact à trouver, avec lignes avant/après pour être UNIQUE. Fais très attention aux indentations, espaces et caractères spéciaux cachés !]
+[Texte exact à trouver, unique dans le document. Fais très attention aux indentations, espaces et caractères spéciaux !]
 ${syntaxConfig.REPLACE}
-[Texte de remplacement complet, incluant les lignes avant/après conservées + modifications]
+[Texte de remplacement complet]
 ${syntaxConfig.END}
 
-Règle d'or MANDATORY 
-- La zone FIND ne doit avoir qu'une SEULE occurrence exacte dans tout le document. Toutefois, s'il est utile de faire un rechercher/remplacer d'un élément dans tout le texte (ex: un nom de variable), utilise le tag [MULTI:TRUE].
-- tu utilisera le marqueur "trois accent grave" pour encadrer le code de la requete pour que je puisse la copier en un clic mais JAMAIS tu utilisera cette chaine spécifique de carractère DANS le code, ni dans find, ni dans replace. sinon, ces carractère seront reconnu comme un échappement de la conversation / du code que tu rédige et ton IDE plantera. 
-en lisant ce prompt, ne fais pas l'erreur de me dire que tu l'as compris en écrivant la chaine de carractère en question, évidement.
-- tu sera particulièrement vigilent avec les saut de ligne, les espace, les indentation et les caractères invisible. le systeme de reconnaissance de syntaxe est chirurgical et intransigeant : toute faute conduira soit a ne pas trouver le code (find) soit a une requete non reconnue.
-- CAS EXCEPTIONNEL (MODE FURTIF) : Si tu dois modifier le parseur lui-même et que tes instructions contiennent les balises standard (ce qui ferait planter l'outil), tu dois utiliser le mode furtif. Commence EXACTEMENT ta réponse par la ligne [REQMODIFIER], suivie sur les 4 lignes suivantes de tes nouvelles balises personnalisées (ex: @@NOUVEAU_DEBUT@@, @@CHERCHER@@, @@REMPLACER@@, @@NOUVELLE_FIN@@). Rédige ensuite ta requête avec ces balises.`;
+Règles d'or MANDATORY :
+- MULTISTACK : Si tu dois faire plusieurs requêtes séparées (pour éviter un FIND trop long), encadre-les toutes dans UN SEUL bloc de code, et sépare CHAQUE requête par la balise ##[MULTISTACK REQUEST]## sur une ligne vide.
+- CHERRY-PICKING : Si ton FIND apparaît plusieurs fois et que tu veux cibler, par exemple, la 1ère et 3ème occurrence, utilise le tag [MULTI:1,3] dans l'en-tête de la requête.
+- Tu ne dois JAMAIS inclure les 3 accents graves (qui délimitent le bloc de code) à l'intérieur de tes zones FIND ou REPLACE.
+- Respecte au caractère près le contexte (espaces, indentations, sauts de ligne) dans la zone FIND, le parseur est intransigeant.
+- MODE FURTIF : Si le document traite de la syntaxe de Rogue Cherry elle-même, commence ta réponse par [REQMODIFIER] suivi de tes balises personnalisées.`;
   }, [syntaxConfig]);
 
   const handleCopyPrompt = () => {
@@ -185,6 +218,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           <span className="text-[10px] text-[#888]">Syntaxe active :</span>
           <pre className="text-sm leading-[1.4] text-[#9cdcfe] mt-2 font-mono select-text overflow-x-auto">
             {syntaxConfig.START} [LABEL:NomDeLaRequête] [MULTI:FALSE]<br/>
+            <span className="text-[#888]">##Commentaire## (Optionnel)</span><br/>
             {syntaxConfig.FIND}<br/>
             <span className="text-[#888]">...texte à chercher...</span><br/>
             {syntaxConfig.REPLACE}<br/>
@@ -195,6 +229,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         
         <div className="flex flex-col gap-2 items-center justify-between w-14 flex-shrink-0">
           <button 
+            type="button"
             onClick={handleCopyPrompt}
             className="w-12 h-12 bg-primary-blue hover:bg-primary-blue-hover text-white text-2xl flex items-center justify-center rounded-md shadow-md transition duration-150 active:scale-95"
             title="Copier le prompt IA optimisé dans le presse-papier"
@@ -208,6 +243,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         </div>
 
         <button 
+          type="button"
           onClick={onOpenSettings}
           className="absolute bottom-1 right-1 w-5 h-5 bg-transparent border-none text-[#666] hover:text-primary-blue rounded transition duration-150 cursor-pointer text-xs"
           title="Modifier les balises de syntaxe"
@@ -216,10 +252,30 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         </button>
       </div>
 
-      {/* 2. Boutons d'Action Principaux */}
+      {/* 2. Indicateur Multistack */}
+      {pendingRequestsCount > 0 && (
+        <div className="bg-[#59466D] text-white p-2 text-xs font-bold rounded-sm border border-[#8b6bb0] flex items-center justify-between shadow-md flex-shrink-0">
+          <span>📦 MULTISTACK ACTIF</span>
+          <span className="bg-[#222] px-2 py-0.5 rounded text-[10px]">{pendingRequestsCount} REQUÊTE{pendingRequestsCount > 1 ? 'S' : ''} EN ATTENTE</span>
+        </div>
+      )}
+
+      {/* 3. Zone de Commentaire */}
+      <div className="flex flex-col flex-shrink-0">
+        <label className="text-[11px] font-bold text-[#aaa] mb-1">COMMENTAIRE (Optionnel)</label>
+        <textarea
+          value={commentText || ""}
+          onChange={(e) => onChangeCommentText(e.target.value)}
+          placeholder="Ex: Refactorisation du calcul de version..."
+          className="w-full h-[42px] bg-bg-dark border border-border-dark text-[#d4d4d4] text-[11px] p-2 rounded-sm resize-none focus:outline-none focus:border-primary-blue transition-colors font-sans"
+        />
+      </div>
+
+      {/* 4. Boutons d'Action Principaux */}
       <div className="flex flex-col gap-2 flex-shrink-0">
         <div className="flex gap-2 h-9">
           <button
+            type="button"
             onClick={handlePasteImport}
             className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white font-bold text-xs flex items-center justify-center gap-1.5 rounded-sm transition duration-150"
             title="Coller et analyser une requête syntaxique depuis le presse-papier"
@@ -228,6 +284,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
             <span>Coller REQUÊTE</span>
           </button>
           <button
+            type="button"
             disabled={!findText}
             onClick={onSearch}
             className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white font-bold text-xs rounded-sm transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -237,6 +294,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         </div>
         
         <button
+          type="button"
           disabled={occurrencesCount === 0}
           onClick={onReplace}
           className="w-full h-10 bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none"
@@ -394,6 +452,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         <div className="flex justify-between items-center mt-2.5">
           <span className="text-[10px] text-text-light/40">v8.0.0 React Framework</span>
           <button
+            type="button"
             onClick={onClear}
             className="bg-disabled-dark hover:bg-cherry-red hover:text-white text-[10px] text-[#ccc] font-bold px-3 py-1 rounded-sm transition duration-150"
             title="Effacer les zones (1) et (2)"

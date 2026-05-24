@@ -210,6 +210,16 @@ export function computeLiveDiff(str1, str2, splitChars = false) {
         uiRows.push({ state: 1, raw1: ecart1[p1].raw, raw2: null }); p1++;
       } else if (p2 < ecart2.length && ecart2[p2].state !== 3) {
         uiRows.push({ state: 2, raw1: null, raw2: ecart2[p2].raw }); p2++;
+      } else {
+        // SAFE FALLBACK : Empêche la boucle infinie si deux lignes sont 'state=3' 
+        // mais qu'elles ne sont pas linkées l'une à l'autre à ce moment précis.
+        if (p1 < ecart1.length) {
+          uiRows.push({ state: 1, raw1: ecart1[p1].raw, raw2: null }); p1++;
+        } else if (p2 < ecart2.length) {
+          uiRows.push({ state: 2, raw1: null, raw2: ecart2[p2].raw }); p2++;
+        } else {
+          p1++; p2++; // Securité absolue
+        }
       }
     }
   };

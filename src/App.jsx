@@ -5,10 +5,9 @@ import SidebarRight from './components/SidebarRight.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import SmartDebugger from './components/SmartDebugger.jsx';
 import Splitter from './components/Splitter.jsx';
-
-import { useHistoryStore } from './hooks/useHistoryStore.js';
-import { parseSyntaxRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
-import { applyDeltaOnText } from './hooks/useHistoryStore.js';
+import VersionTagModal from './components/VersionTagModal.jsx';
+import { useHistoryStore, applyDeltaOnText, rebuildTextAt } from './hooks/useHistoryStore.js';
+import { parseSyntaxRequest, splitMultistackRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
 import { computeLiveDiff } from './utils/diffEngine.js';
 
 export default function App() {
@@ -22,6 +21,10 @@ export default function App() {
   const [multiMode, setMultiMode] = useState(false);
   const [multiIndices, setMultiIndices] = useState([]);
   const [activeOccIndex, setActiveOccIndex] = useState(-1);
+  const [commentText, setCommentText] = useState("");
+  
+  // File d'attente pour le Multistack
+  const [pendingRequests, setPendingRequests] = useState([]);
 
   // Largeurs dynamiques des panneaux latéraux
   const [leftWidth, setLeftWidth] = useState(320);
@@ -31,6 +34,11 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDebuggerOpen, setIsDebuggerOpen] = useState(false);
   const [debuggerRawText, setDebuggerRawText] = useState("");
+  
+  // Modale de Versioning Dynamique
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
+  const [isVersionModalInitMode, setIsVersionModalInitMode] = useState(false);
+  const [initialTextPayload, setInitialTextPayload] = useState(null);
 
   // Configuration de syntaxe dynamique
   const [syntaxConfig, setSyntaxConfig] = useState(DEFAULT_SYNTAX);
@@ -44,7 +52,7 @@ export default function App() {
 
   const [isDragging, setIsDragging] = useState(false);
 
-  // Importation générique depuis fichier
+  // Importation générique depuis fichier (Interceptée pour le versioning)
   const processImportFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -55,11 +63,15 @@ export default function App() {
           return;
         }
       }
-      store.resetStore();
-      store.pushSnapshot(content, "IMPORT INITIAL");
       
       const safeName = file.name.replace(/\.[^/.]+$/, "");
+      store.resetStore();
+      setInitialTextPayload(content);
       store.setProjectName(safeName);
+      
+      // On ouvre la modale pour forcer l'initialisation de la V1.0.0 au format souhaité
+      setIsVersionModalInitMode(true);
+      setIsVersionModalOpen(true);
     };
     reader.readAsText(file);
   };
@@ -128,7 +140,7 @@ export default function App() {
 
     // Pour obtenir leurs positions absolues dans le currentText, il faut 
     // rejouer virtuellement le remplacement sur le texte de la version N-1.
-    const textBefore = store.rebuildTextAt(store.selectedIndex - 1);
+    const textBefore = rebuildTextAt(store.history, store.selectedIndex - 1);
     if (!textBefore) return [];
     if (!rec.findStr) return []; // PREVENT INFINITE LOOP
 
@@ -143,7 +155,7 @@ export default function App() {
     if (rec.multiMode && rec.multiIndices && rec.multiIndices.length > 0) {
       indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Reverse order
     } else {
-      for (let i = indices.length - 1; i >= 0; i--) indicesToReplace.push(i);
+      if (indices.length > 0) indicesToReplace = [0]; // En mode unitaire, seul le TOUT PREMIER est remplacé
     }
 
     // Calcul des décalages pour mapper les baseMarksT2 dans currentText
@@ -232,13 +244,17 @@ export default function App() {
             return;
           }
         }
+        // Au lieu d'importer directement, on ouvre la modale d'initialisation !
         store.resetStore();
-        store.pushSnapshot(clipText, "IMPORT INITIAL");
+        setInitialTextPayload(clipText);
         
         // Nom de projet auto par défaut s'il est vide
         if (!store.projectName) {
           store.setProjectName("Projet_Cherry");
         }
+
+        setIsVersionModalInitMode(true);
+        setIsVersionModalOpen(true);
       })
       .catch(() => alert("Impossible de lire le presse-papier."));
   };
@@ -252,6 +268,45 @@ export default function App() {
     navigator.clipboard.writeText(store.currentText)
       .then(() => alert("Code source copié dans le presse-papier !"))
       .catch(() => alert("Échec de la copie."));
+  };
+
+  // Enregistrer Sous
+  const handleSaveAs = async () => {
+    if (!store.currentText) return;
+    const defaultName = `${store.projectName || 'Projet'}_${store.currentVersion}.txt`;
+    
+    // File System Access API support
+    try {
+      if ('showSaveFilePicker' in window) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: defaultName,
+          types: [{
+            description: 'Text Files',
+            accept: {'text/plain': ['.txt', '.js', '.jsx', '.html', '.css', '.md', '.json', '.py']}
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(store.currentText);
+        await writable.close();
+        alert("Fichier enregistré avec succès !");
+      } else {
+        // Fallback pour les navigateurs non compatibles
+        const blob = new Blob([store.currentText], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = defaultName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error(err);
+        alert("Erreur lors de l'enregistrement du fichier.");
+      }
+    }
   };
 
   // Clic sur cadenas pour édition libre
@@ -326,49 +381,93 @@ export default function App() {
       multiMode,
       multiIndices,
       splitChars,
-      null // Laisse le store déduire Z1, Z2...
+      commentText || null // Le commentaire devient le label !
     );
 
     // Nettoyage et reset
     setFindText("");
     setReplaceText("");
+    setCommentText("");
+
+    // Dépilement du Multistack
+    if (pendingRequests.length > 1) {
+      const nextReqs = pendingRequests.slice(1);
+      setPendingRequests(nextReqs);
+      loadRequestIntoUI(nextReqs[0]);
+    } else if (pendingRequests.length === 1) {
+      setPendingRequests([]);
+      alert("🎉 Toutes les requêtes de la pile Multistack ont été appliquées avec succès !");
+    }
+  };
+
+  // Chargement d'une requête spécifique dans l'UI (Sas de sécurité)
+  const loadRequestIntoUI = (parsed) => {
+    if (parsed.isValid) {
+      const testOccs = store.currentText.indexOf(parsed.findText);
+      if (testOccs === -1) {
+        alert("Une requête exige une ouverture automatique du Débogueur : Texte recherché introuvable.");
+        setDebuggerRawText(parsed.rawText);
+        setIsDebuggerOpen(true);
+      } else {
+        setFindText(parsed.findText);
+        setReplaceText(parsed.replaceText);
+        setMultiMode(parsed.multiMode);
+        setMultiIndices(parsed.multiIndices);
+        setCommentText(parsed.comment || "");
+      }
+    } else {
+      alert("Une requête exige une ouverture automatique du Débogueur : Erreur de syntaxe détectée.");
+      setDebuggerRawText(parsed.rawText);
+      setIsDebuggerOpen(true);
+    }
   };
 
   // Réception et traitement d'une requête syntaxique IA (Coller depuis presse-papier)
   const handleImportSyntaxRequest = (clipboardText) => {
-    const parsed = parseSyntaxRequest(clipboardText, syntaxConfig);
-    
-    if (parsed.isSyntax) {
-      if (parsed.isValid) {
-        // La requête est syntaxiquement valide.
-        // Testons si le texte FIND est présent dans le code source actuel !
-        const testOccs = store.currentText.indexOf(parsed.findText);
-        
-        if (testOccs === -1) {
-          // FIND introuvable : on ouvre le Débogueur pour correction
-          alert("Le texte recherché est introuvable. Ouverture automatique du Débogueur.");
-          setDebuggerRawText(clipboardText);
-          setIsDebuggerOpen(true);
-        } else {
-          // FIND trouvé avec succès !
-          setFindText(parsed.findText);
-          setReplaceText(parsed.replaceText);
-          setMultiMode(parsed.multiMode);
-          setMultiIndices(parsed.multiIndices);
-          
-          // Notification rapide
-          alert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.");
-        }
+    // 1. Découpage du bloc en requêtes distinctes (Multistack)
+    const requests = splitMultistackRequest(clipboardText);
+
+    if (requests.length > 1) {
+      // MODE MULTISTACK : On parse toutes les requêtes
+      const parsedRequests = requests.map(req => parseSyntaxRequest(req, syntaxConfig));
+      const validReqs = parsedRequests.filter(p => p.isSyntax);
+      
+      if (validReqs.length > 0) {
+        setPendingRequests(validReqs);
+        loadRequestIntoUI(validReqs[0]);
+        alert(`📦 MODE MULTISTACK : ${validReqs.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`);
       } else {
-        // Syntaxe brisée détectée : on ouvre le Débogueur pour la réparer
-        alert("Erreur syntaxique détectée dans la requête. Ouverture automatique du Débogueur.");
-        setDebuggerRawText(clipboardText);
-        setIsDebuggerOpen(true);
+        alert("Aucune requête syntaxique valide trouvée dans la pile Multistack.");
       }
     } else {
-      // Ce n'est pas une requête syntaxique : on l'importe simplement comme du texte FIND brut
-      setFindText(clipboardText);
-      alert("Texte brut importé dans la zone de recherche (FIND).");
+      // MODE UNITAIRE CLASSIQUE
+      const parsed = parseSyntaxRequest(clipboardText, syntaxConfig);
+      
+      if (parsed.isSyntax) {
+        if (parsed.isValid) {
+          const testOccs = store.currentText.indexOf(parsed.findText);
+          if (testOccs === -1) {
+            alert("Le texte recherché est introuvable. Ouverture automatique du Débogueur.");
+            setDebuggerRawText(clipboardText);
+            setIsDebuggerOpen(true);
+          } else {
+            setFindText(parsed.findText);
+            setReplaceText(parsed.replaceText);
+            setMultiMode(parsed.multiMode);
+            setMultiIndices(parsed.multiIndices);
+            setCommentText(parsed.comment || "");
+            alert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.");
+          }
+        } else {
+          alert("Erreur syntaxique détectée dans la requête. Ouverture automatique du Débogueur.");
+          setDebuggerRawText(clipboardText);
+          setIsDebuggerOpen(true);
+        }
+      } else {
+        // Fallback Texte Brut
+        setFindText(clipboardText);
+        alert("Texte brut importé dans la zone de recherche (FIND).");
+      }
     }
   };
 
@@ -401,6 +500,7 @@ export default function App() {
     // Nettoyage après application
     setFindText("");
     setReplaceText("");
+    setCommentText("");
     alert(label ? `Opération "${label}" appliquée avec succès !` : "Requête déboguée appliquée avec succès !");
   };
 
@@ -410,6 +510,7 @@ export default function App() {
     setReplaceText(r);
     setMultiMode(m);
     setMultiIndices(idxs);
+    setCommentText(""); // Le débogueur n'a pas encore de champ commentaire
     alert("Les textes ont été copiés dans les champs FIND et REPLACE. Vous pouvez les vérifier et appliquer manuellement.");
   };
 
@@ -426,7 +527,8 @@ export default function App() {
 
     const exportData = {
       projectName: store.projectName,
-      history: store.history
+      history: store.history,
+      versionConfig: store.versionConfig // Sauvegarde de la configuration !
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -460,6 +562,11 @@ export default function App() {
           if (store.history.length > 0 && !confirm("ATTENTION : L'importation d'un projet va écraser tout votre historique en cours. Continuer ?")) {
             return;
           }
+          
+          if (data.versionConfig) {
+            store.setVersionConfig(data.versionConfig);
+          }
+          
           store.importProject(data.projectName, data.history);
           alert(`Projet "${data.projectName}" importé avec succès !`);
         } catch (err) {
@@ -506,6 +613,9 @@ export default function App() {
       <SidebarLeft
         findText={findText}
         replaceText={replaceText}
+        commentText={commentText}
+        onChangeCommentText={setCommentText}
+        pendingRequestsCount={pendingRequests.length}
         onChangeFindText={setFindText}
         onChangeReplaceText={setReplaceText}
         splitChars={splitChars}
@@ -589,16 +699,29 @@ export default function App() {
             </button>
 
             <button
+              type="button"
+              onClick={handleSaveAs}
+              disabled={!store.currentText}
+              className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#ffd700] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Enregistrer le fichier sur votre disque (Save As)"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <path stroke="#ffd700" strokeWidth="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline stroke="#ffd700" strokeWidth="2" points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline stroke="#ffd700" strokeWidth="2" points="7 3 7 8 15 8"></polyline>
+              </svg>
+              <span className="text-[#ffd700] font-extrabold leading-none mt-0.5">SAUVER</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 if (store.selectedIndex === -1) return;
-                const opt = prompt("Entrez 'M' pour incrémenter une version majeure (VX.0.0) ou 'm' pour une version mineure (VX.Y.0) :");
-                if (opt === 'M' || opt === 'm') {
-                  store.createNewBranch(opt);
-                  alert("Point de version majeur/mineur fixé !");
-                }
+                setIsVersionModalInitMode(false);
+                setIsVersionModalOpen(true);
               }}
               className="px-3 bg-bg-panel-light border border-border-dark hover:border-[#20b2aa] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
-              title="Marquer une version Majeure ou Mineure"
+              title="Configurer les versions ou forcer un saut"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#20b2aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
@@ -682,6 +805,35 @@ export default function App() {
         onAcceptAndCopy={handleAcceptAndCopy}
         syntaxConfig={syntaxConfig}
       />
+
+      {isVersionModalOpen && (
+        <VersionTagModal
+          isOpen={isVersionModalOpen}
+          onClose={() => {
+            setIsVersionModalOpen(false);
+            if (isVersionModalInitMode) {
+              setInitialTextPayload(null); // Annulation de l'import
+            }
+          }}
+          initialConfig={store.versionConfig}
+          currentVersion={store.currentVersion}
+          isInitMode={isVersionModalInitMode}
+          projectName={store.projectName}
+          onChangeProjectName={store.setProjectName}
+          onSaveConfig={(config, initVersionStr) => {
+            store.setVersionConfig(config);
+            setIsVersionModalOpen(false);
+            if (isVersionModalInitMode && initialTextPayload !== null) {
+              store.pushSnapshot(initialTextPayload, "IMPORT INITIAL", initVersionStr);
+              setInitialTextPayload(null);
+            }
+          }}
+          onForceIncrement={(targetIndex) => {
+            store.createNewBranch(targetIndex);
+            setIsVersionModalOpen(false);
+          }}
+        />
+      )}
 
     </div>
   );

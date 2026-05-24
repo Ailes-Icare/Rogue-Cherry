@@ -19,6 +19,29 @@ const escapeRegExp = (string) => {
 };
 
 /**
+ * Découpe une chaîne contenant potentiellement plusieurs requêtes (Multistack)
+ * en un tableau de chaînes, chacune représentant une requête individuelle.
+ * 
+ * @param {string} rawInput - Le texte brut collé.
+ * @returns {string[]} Un tableau contenant les requêtes séparées.
+ */
+export function splitMultistackRequest(rawInput) {
+  if (!rawInput) return [];
+  let text = normalizeText(rawInput);
+  
+  // Si la balise Multistack est détectée
+  if (text.includes("##[MULTISTACK REQUEST]##")) {
+    text = text.replace("##[MULTISTACK REQUEST]##", "").trim();
+    // On sépare le texte à chaque fois qu'on rencontre soit un [REQMODIFIER], soit un START standard.
+    // L'expression régulière (?=...) permet de séparer sans consommer le délimiteur.
+    const parts = text.split(/(?=\[REQMODIFIER\]|##SYNTAX_COPIE##)/i);
+    return parts.map(p => p.trim()).filter(p => p.length > 0);
+  }
+  
+  return [rawInput];
+}
+
+/**
  * Analyse une requête IA brute et en extrait les métadonnées et segments de code.
  * Gère dynamiquement les configurations personnalisées de balises et le mode furtif [REQMODIFIER].
  * 
@@ -90,7 +113,7 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
     }
 
     // 2. Extraction du mode MULTI (occurrences multiples)
-    // Format attendu : [MULTI:TRUE] ou [MULTI:FALSE] ou [MULTI:1,2,5]
+    // Format attendu (Optionnel) : [MULTI:TRUE] ou [MULTI:FALSE] ou [MULTI:1,2,5]
     let isMulti = false;
     let indices = [];
     const multiMatch = headerContent.match(/\[MULTI:(TRUE|FALSE|\d+(?:,\d+)*)\]/i);
@@ -101,8 +124,18 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
         isMulti = true;
       } else if (mVal !== 'FALSE') {
         isMulti = true;
-        indices = mVal.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+        // On convertit les index de l'IA (base 1 : 1ère occurrence) en index JS (base 0)
+        indices = mVal.split(',').map(n => parseInt(n.trim(), 10) - 1).filter(n => !isNaN(n) && n >= 0);
       }
+    }
+
+    // 3. Extraction du COMMENTAIRE optionnel
+    // Format attendu : ##Commentaire## suivi du texte jusqu'à la balise FIND
+    let comment = null;
+    const commentMatch = headerContent.match(/(?:##|@@)Commentaire(?:##|@@)?[ \t]*\n([\s\S]*)$/i);
+    if (commentMatch) {
+      // On retire les espaces superflus mais on garde les sauts de ligne internes du commentaire
+      comment = commentMatch[1].trim();
     }
 
     return {
@@ -113,7 +146,9 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
       replaceText,
       multiMode: isMulti,
       multiIndices: indices,
-      label: label
+      label: label,
+      comment: comment,
+      rawText: rawInput
     };
   }
 
@@ -121,6 +156,7 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
     isSyntax: true, 
     isValid: false, 
     error: "Le format de la requête a été détecté, mais la structure interne ou les sauts de ligne sont incorrects.",
-    syntaxUsed: syntax
+    syntaxUsed: syntax,
+    rawText: rawInput
   };
 }

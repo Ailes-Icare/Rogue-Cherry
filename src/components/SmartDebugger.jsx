@@ -458,12 +458,14 @@ export default function SmartDebugger({
         {/* Footer de la Modale */}
         <div className="p-3.5 bg-bg-dark border-t border-border-dark flex justify-end gap-3 flex-shrink-0 select-none">
           <button 
+            type="button"
             onClick={onClose} 
             className="bg-disabled-dark hover:bg-border-dark text-white px-5 py-2.5 rounded font-bold text-xs shadow transition"
           >
             ANNULER
           </button>
           <button 
+            type="button"
             disabled={!parsedRequest.isValid}
             onClick={handleValidateAndCopy}
             className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
@@ -476,6 +478,7 @@ export default function SmartDebugger({
             VALIDER & COPIER LA REQUÊTE
           </button>
           <button 
+            type="button"
             disabled={!parsedRequest.isValid}
             onClick={handleValidateAndApply}
             className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
