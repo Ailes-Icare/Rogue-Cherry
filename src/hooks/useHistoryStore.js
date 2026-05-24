@@ -12,13 +12,78 @@ import { DEFAULT_VERSION_CONFIG, parseVersionStringToRanks, incrementRank, forma
  * @param {Array<number>} multiIndices - Indices des occurrences à modifier (cherry-picking).
  * @returns {string} Le texte modifié.
  */
-export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndices) {
+export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndices, ignoreSpaces = false) {
   if (!text) return "";
   if (!findStr) return text;
   
+  if (ignoreSpaces) {
+    const parts = findStr.split(/\s+/).filter(p => p.length > 0);
+    if (parts.length === 0) return text; // Sécurité si que des espaces
+
+    const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const regex = new RegExp(escapedParts.join('\\s+'), 'g');
+    
+    let match;
+    let newText = "";
+    let lastIndex = 0;
+    let occIndex = 0;
+    
+    while ((match = regex.exec(text)) !== null) {
+      const matchedOriginalStr = match[0];
+      let shouldReplace = false;
+      
+      if (multiMode) {
+        if (multiIndices && multiIndices.length > 0) {
+          shouldReplace = multiIndices.includes(occIndex);
+        } else {
+          shouldReplace = true;
+        }
+      } else {
+        shouldReplace = (occIndex === 0);
+      }
+      
+      if (shouldReplace) {
+        // SMART REPLACE : Analyse tokens
+        const replaceTokens = replaceStr.split(/(\s+)/);
+        const replaceNonWs = replaceTokens.filter(t => t.trim() !== '');
+        const findTokens = findStr.split(/(\s+)/);
+        const findNonWs = findTokens.filter(t => t.trim() !== '');
+        
+        let smartReplaced = replaceStr;
+        
+        if (findNonWs.length === replaceNonWs.length) {
+          const origTokens = matchedOriginalStr.split(/(\s+)/);
+          let origWsTokens = [];
+          for (let i = 1; i < origTokens.length; i += 2) {
+            origWsTokens.push(origTokens[i]);
+          }
+          
+          let hybridText = "";
+          for (let i = 0; i < replaceNonWs.length; i++) {
+            hybridText += replaceNonWs[i];
+            if (i < origWsTokens.length) {
+              hybridText += origWsTokens[i];
+            }
+          }
+          smartReplaced = hybridText;
+        }
+        
+        newText += text.substring(lastIndex, match.index) + smartReplaced;
+      } else {
+        newText += text.substring(lastIndex, match.index) + matchedOriginalStr;
+      }
+      
+      lastIndex = regex.lastIndex;
+      occIndex++;
+    }
+    
+    newText += text.substring(lastIndex);
+    return newText;
+  }
+  
+  // MOTEUR STRICT (Ancien comportement)
   if (multiMode) {
     if (multiIndices && multiIndices.length > 0) {
-      // Cherry-picking ciblé par indices d'occurrences
       const parts = text.split(findStr);
       let newText = parts[0];
       const occurrenceCount = parts.length - 1;
@@ -32,11 +97,9 @@ export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndi
       }
       return newText;
     } else {
-      // Remplacement global classique (toutes les occurrences)
       return text.replaceAll(findStr, replaceStr);
     }
   } else {
-    // Remplacement unitaire (première occurrence)
     return text.replace(findStr, replaceStr);
   }
 }
@@ -76,7 +139,8 @@ export function rebuildTextAt(history, targetIndex) {
         op.findStr,
         op.replaceStr,
         op.multiMode,
-        op.multiIndices
+        op.multiIndices,
+        op.ignoreSpaces
       );
     }
   }
@@ -151,7 +215,7 @@ export function useHistoryStore() {
   /**
    * Enregistre une Delta-Opération (Remplacement appliqué) dans l'historique.
    */
-  const pushReplace = (findStr, replaceStr, multiMode, multiIndices, splitChars, label) => {
+  const pushReplace = (findStr, replaceStr, multiMode, multiIndices, splitChars, label, ignoreSpaces = false) => {
     if (selectedIndex === -1) return null;
 
     const timestamp = getFullTimestamp();
@@ -174,7 +238,8 @@ export function useHistoryStore() {
       replaceStr,
       multiMode,
       multiIndices,
-      splitChars
+      splitChars,
+      ignoreSpaces
     };
 
     // Si on insère à un index intermédiaire (Time-Travel puis application d'une nouvelle branche),
@@ -254,6 +319,15 @@ export function useHistoryStore() {
     importProject,
     pushSnapshot,
     pushReplace,
+    editHistoryRecord: (index, actionName, comment) => {
+      setHistory(prev => {
+        const newHistory = [...prev];
+        if (newHistory[index]) {
+          newHistory[index] = { ...newHistory[index], action: actionName, comment };
+        }
+        return newHistory;
+      });
+    },
     createNewBranch,
     resetStore
   };

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Splitter from './Splitter.jsx';
 import { computeLiveDiff } from '../utils/diffEngine.js';
+import { useZoomable } from '../hooks/useZoomable.js';
 
 // Rendu des segments de texte avec les balises CSS
 function renderDiffSegment(text, marks) {
@@ -42,6 +43,8 @@ export default function SidebarRight({
   onLoadProject,
   onResetProject,
   onBranchOut,
+  onEditRecord,
+  onGoToRecord,
   splitChars,
   width,
   onResizeWidth
@@ -49,9 +52,8 @@ export default function SidebarRight({
   const [showMiniViews, setShowMiniViews] = useState(true);
   const [isSyncScroll, setIsSyncScroll] = useState(true);
   const [historyHeight, setHistoryHeight] = useState(250); // Hauteur par défaut en pixels pour la table d'historique
-
-  const beforeScrollRef = useRef(null);
-  const afterScrollRef = useRef(null);
+  const beforeScrollRef = useZoomable(10);
+  const afterScrollRef = useZoomable(10);
   const isSyncingRef = useRef(false);
 
   // Synchronisation du défilement bidirectionnel (Scroll-Sync) des mini-views
@@ -209,12 +211,25 @@ export default function SidebarRight({
                       : 'hover:bg-bg-panel text-text-light/90'
                   }`}
                 >
-                  <td className="p-2 font-mono text-[11px]">{rec.version}</td>
-                  <td className="p-2 truncate max-w-[120px]" title={rec.action}>
-                    {rec.action}
+                  <td className="p-2 font-mono text-[11px] align-top">{rec.version}</td>
+                  <td className="p-2 align-top">
+                    <div className="truncate max-w-[120px]" title={rec.action}>
+                      {rec.action}
+                    </div>
+                    {rec.comment && (
+                      <div className="text-[9px] text-[#888] italic truncate max-w-[120px] mt-0.5" title={rec.comment}>
+                        {rec.comment}
+                      </div>
+                    )}
                   </td>
-                  <td className="p-2 text-right pr-3 text-[#999] text-xs font-mono">
+                  <td className="p-2 text-right pr-3 text-[#999] text-xs font-mono align-top whitespace-nowrap">
                     {rec.timestamp ? rec.timestamp.split(' ')[1] : ''}
+                    {index === selectedIndex && rec.type !== 'snapshot' && (
+                       <div className="flex gap-2 justify-end mt-1 text-base">
+                           <button onClick={(e) => { e.stopPropagation(); onEditRecord(index); }} title="Éditer le label ou le commentaire" className="hover:text-primary-blue transition-colors">✏️</button>
+                           <button onClick={(e) => { e.stopPropagation(); onGoToRecord(); }} title="Aller à la modification ciblée" className="hover:text-primary-blue transition-colors">🎯</button>
+                       </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -267,7 +282,11 @@ export default function SidebarRight({
             <div className="bg-bg-panel px-2.5 py-0.5 text-[10px] text-[#888] font-bold border-b border-border-dark uppercase tracking-wider text-left">
               AVANT (FIND)
             </div>
-            <div className="flex-1 overflow-auto p-2 font-mono text-[10px] whitespace-pre text-left" ref={beforeScrollRef}>
+            <div 
+              className="flex-1 overflow-auto p-2 font-mono whitespace-pre text-left" 
+              ref={beforeScrollRef}
+              style={{ fontSize: 'var(--zoom-size, 10px)' }}
+            >
               {activeRecordDetails.type === 'none' ? (
                 <span className="text-[#555] italic">Aucune sélection</span>
               ) : activeRecordDetails.type === 'snapshot' ? (
@@ -283,7 +302,11 @@ export default function SidebarRight({
             <div className="bg-bg-panel px-2.5 py-0.5 text-[10px] text-[#888] font-bold border-b border-border-dark uppercase tracking-wider text-left">
               APRÈS (REPLACE)
             </div>
-            <div className="flex-1 overflow-auto p-2 font-mono text-[10px] whitespace-pre text-left" ref={afterScrollRef}>
+            <div 
+              className="flex-1 overflow-auto p-2 font-mono whitespace-pre text-left" 
+              ref={afterScrollRef}
+              style={{ fontSize: 'var(--zoom-size, 10px)' }}
+            >
               {activeRecordDetails.type === 'none' ? (
                 <span className="text-[#555] italic">Aucune sélection</span>
               ) : activeRecordDetails.type === 'snapshot' ? (

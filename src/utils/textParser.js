@@ -31,7 +31,8 @@ export function splitMultistackRequest(rawInput) {
   
   // Si la balise Multistack est détectée
   if (text.includes("##[MULTISTACK REQUEST]##")) {
-    text = text.replace("##[MULTISTACK REQUEST]##", "").trim();
+    // On retire TOUTES les balises de séparation (regex /gi pour tous les cas)
+    text = text.replace(/##\[MULTISTACK REQUEST\]##/gi, "").trim();
     // On sépare le texte à chaque fois qu'on rencontre soit un [REQMODIFIER], soit un START standard.
     // L'expression régulière (?=...) permet de séparer sans consommer le délimiteur.
     const parts = text.split(/(?=\[REQMODIFIER\]|##SYNTAX_COPIE##)/i);
@@ -129,7 +130,15 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
       }
     }
 
-    // 3. Extraction du COMMENTAIRE optionnel
+    // 3. Extraction du mode SMART (Conciliation des espaces)
+    // Format attendu (Optionnel) : [SMART:TRUE] ou [SMART:FALSE]
+    let isSmart = false;
+    const smartMatch = headerContent.match(/\[SMART:(TRUE|FALSE)\]/i);
+    if (smartMatch && smartMatch[1].toUpperCase() === 'TRUE') {
+      isSmart = true;
+    }
+
+    // 4. Extraction du COMMENTAIRE optionnel
     // Format attendu : ##Commentaire## suivi du texte jusqu'à la balise FIND
     let comment = null;
     const commentMatch = headerContent.match(/(?:##|@@)Commentaire(?:##|@@)?[ \t]*\n([\s\S]*)$/i);
@@ -146,6 +155,7 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
       replaceText,
       multiMode: isMulti,
       multiIndices: indices,
+      smartMode: isSmart,
       label: label,
       comment: comment,
       rawText: rawInput

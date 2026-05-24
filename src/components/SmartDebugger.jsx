@@ -3,6 +3,7 @@ import Splitter from './Splitter.jsx';
 import { parseSyntaxRequest } from '../utils/textParser.js';
 import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
 import { computeSearchHeatmap } from '../utils/diffEngine.js';
+import { useZoomable } from '../hooks/useZoomable.js';
 
 function renderSyntaxHighlightHtml(text, syntax, showInvisibles = true) {
   if (!text) return "";
@@ -82,7 +83,11 @@ export default function SmartDebugger({
   const replaceTextareaRef = useRef(null);
 
   // Référence pour le défilement du miroir
-  const mirrorScrollRef = useRef(null);
+  const zoomRefMirror = useZoomable(10); // Remplace mirrorScrollRef
+
+  const zoomRefRaw = useZoomable(14);
+  const zoomRefFind = useZoomable(14);
+  const zoomRefReplace = useZoomable(14);
 
   useEffect(() => {
     if (isOpen) {
@@ -127,8 +132,9 @@ export default function SmartDebugger({
   const handleFindChange = (val) => {
     if (!parsedRequest.isValid) return;
     const multiTag = parsedRequest.multiMode ? '[MULTI:TRUE]' : '[MULTI:FALSE]';
+    const smartTag = parsedRequest.smartMode ? '[SMART:TRUE]' : '[SMART:FALSE]';
     const labelTag = parsedRequest.label ? `[LABEL:${parsedRequest.label}]` : '';
-    const header = `${syntaxConfig.START} ${labelTag} ${multiTag}`.replace(/\s+/g, ' ').trim();
+    const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
     const newRaw = `${header}\n${syntaxConfig.FIND}\n${val}\n${syntaxConfig.REPLACE}\n${parsedRequest.replaceText || ''}\n${syntaxConfig.END}`;
     setRawText(newRaw);
   };
@@ -137,8 +143,9 @@ export default function SmartDebugger({
   const handleReplaceChange = (val) => {
     if (!parsedRequest.isValid) return;
     const multiTag = parsedRequest.multiMode ? '[MULTI:TRUE]' : '[MULTI:FALSE]';
+    const smartTag = parsedRequest.smartMode ? '[SMART:TRUE]' : '[SMART:FALSE]';
     const labelTag = parsedRequest.label ? `[LABEL:${parsedRequest.label}]` : '';
-    const header = `${syntaxConfig.START} ${labelTag} ${multiTag}`.replace(/\s+/g, ' ').trim();
+    const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
     const newRaw = `${header}\n${syntaxConfig.FIND}\n${parsedRequest.findText || ''}\n${syntaxConfig.REPLACE}\n${val}\n${syntaxConfig.END}`;
     setRawText(newRaw);
   };
@@ -197,12 +204,12 @@ export default function SmartDebugger({
 
   // Scroll automatique vers la meilleure occurrence trouvée
   useEffect(() => {
-    if (searchResult.marks.length > 0 && mirrorScrollRef.current) {
+    if (searchResult.marks.length > 0 && zoomRefMirror.current) {
       const firstMark = searchResult.marks[0];
       const prevText = sourceText.substring(0, firstMark.start);
       const lineIndex = prevText.split('\n').length - 1;
       
-      const mirrorContainer = mirrorScrollRef.current;
+      const mirrorContainer = zoomRefMirror.current;
       const targetLineNode = mirrorContainer.children[lineIndex];
       if (targetLineNode) {
         targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -224,7 +231,8 @@ export default function SmartDebugger({
         replaceText: parsedRequest.replaceText,
         label: parsedRequest.label,
         multiMode: parsedRequest.multiMode,
-        multiIndices: parsedRequest.multiIndices
+        multiIndices: parsedRequest.multiIndices,
+        smartMode: parsedRequest.smartMode
       });
       onClose();
     }
@@ -237,7 +245,8 @@ export default function SmartDebugger({
         replaceText: parsedRequest.replaceText,
         label: parsedRequest.label,
         multiMode: parsedRequest.multiMode,
-        multiIndices: parsedRequest.multiIndices
+        multiIndices: parsedRequest.multiIndices,
+        smartMode: parsedRequest.smartMode
       });
       onClose();
     }
@@ -308,10 +317,15 @@ export default function SmartDebugger({
             </div>
 
             {/* Zone Requête Brute - Double calque */}
-            <div className="h-[160px] border border-dashed border-primary-blue bg-bg-dark rounded-sm relative overflow-hidden flex-shrink-0">
+            <div 
+              ref={zoomRefRaw}
+              className="h-[160px] border border-dashed border-primary-blue bg-bg-dark rounded-sm relative overflow-hidden flex-shrink-0"
+              style={{ fontSize: 'var(--zoom-size, 14px)' }}
+            >
               <div 
                 ref={rawBackdropRef}
                 className="backdrop-layer select-none"
+                style={{ fontSize: 'inherit' }}
                 dangerouslySetInnerHTML={{ __html: rawBackdropHtml }}
               />
               <textarea
@@ -324,6 +338,7 @@ export default function SmartDebugger({
                 autoCorrect="off"
                 autoCapitalize="off"
                 className="overlay-layer text-left"
+                style={{ fontSize: 'inherit' }}
               />
             </div>
 
@@ -340,10 +355,15 @@ export default function SmartDebugger({
                 <span className="text-xxs text-[#aaa] font-bold uppercase">Zone FIND Décodée (Lecture Seule)</span>
                 <span className="text-[10px] font-mono text-[#FF8C00]">FIND</span>
               </div>
-              <div className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden">
+              <div 
+                ref={zoomRefFind}
+                className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
+                style={{ fontSize: 'var(--zoom-size, 14px)' }}
+              >
                 <div 
                   ref={findBackdropRef}
                   className="backdrop-layer select-none"
+                  style={{ fontSize: 'inherit' }}
                   dangerouslySetInnerHTML={{ __html: findBackdropHtml }}
                 />
                 <textarea
@@ -354,6 +374,7 @@ export default function SmartDebugger({
                   onScroll={handleScrollFind}
                   spellCheck="false"
                   className="overlay-layer text-left opacity-75 cursor-default"
+                  style={{ fontSize: 'inherit' }}
                 />
               </div>
             </div>
@@ -364,10 +385,15 @@ export default function SmartDebugger({
                 <span className="text-xxs text-[#aaa] font-bold uppercase">Zone REPLACE Décodée (Lecture Seule)</span>
                 <span className="text-[10px] font-mono text-[#9E67BA]">REPLACE</span>
               </div>
-              <div className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden">
+              <div 
+                ref={zoomRefReplace}
+                className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
+                style={{ fontSize: 'var(--zoom-size, 14px)' }}
+              >
                 <div 
                   ref={replaceBackdropRef}
                   className="backdrop-layer select-none"
+                  style={{ fontSize: 'inherit' }}
                   dangerouslySetInnerHTML={{ __html: replaceBackdropHtml }}
                 />
                 <textarea
@@ -378,6 +404,7 @@ export default function SmartDebugger({
                   onScroll={handleScrollReplace}
                   spellCheck="false"
                   className="overlay-layer text-left opacity-75 cursor-default"
+                  style={{ fontSize: 'inherit' }}
                 />
               </div>
             </div>
@@ -419,8 +446,9 @@ export default function SmartDebugger({
               </div>
               
               <div 
-                ref={mirrorScrollRef}
-                className="flex-1 overflow-auto py-2 font-consolas text-xxs leading-relaxed select-text select-none"
+                ref={zoomRefMirror}
+                className="flex-1 overflow-auto py-2 font-consolas leading-relaxed select-text select-none"
+                style={{ fontSize: 'var(--zoom-size, 10px)' }}
               >
                 {mirrorLineRecords.length === 0 ? (
                   <div className="p-4 text-center text-[#555] italic">Code source vide.</div>

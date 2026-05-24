@@ -21,6 +21,53 @@ export function getSimilarity(str1, str2) {
 }
 
 /**
+ * Extrait chirurgicalement la modification entre deux versions complètes d'un texte.
+ * Renvoie un `{ findStr, replaceStr }` qui est unique dans oldText pour recréer 
+ * un diff de recherche/remplacement parfait (utile pour le mode Cadenas).
+ */
+export function computeGhostDelta(oldText, newText) {
+  if (oldText === newText) return null;
+  
+  let start = 0;
+  while (start < oldText.length && start < newText.length && oldText[start] === newText[start]) {
+    start++;
+  }
+  
+  let oldEnd = oldText.length - 1;
+  let newEnd = newText.length - 1;
+  while (oldEnd >= start && newEnd >= start && oldText[oldEnd] === newText[newEnd]) {
+    oldEnd--;
+    newEnd--;
+  }
+  
+  let isUnique = false;
+  let contextStart = start;
+  let contextEnd = oldEnd;
+  let findStr, replaceStr;
+  
+  // Élargir le contexte jusqu'à ce que findStr soit UNIQUE dans le texte original
+  while (!isUnique) {
+    findStr = oldText.substring(contextStart, contextEnd + 1);
+    replaceStr = newText.substring(contextStart, newEnd + 1 + (contextEnd - oldEnd)); 
+    
+    // Test d'unicité
+    let firstOcc = oldText.indexOf(findStr);
+    let lastOcc = oldText.lastIndexOf(findStr);
+    
+    if (firstOcc === lastOcc) {
+      isUnique = true;
+    } else {
+      // Élargissement du contexte
+      if (contextStart > 0) contextStart--;
+      else if (contextEnd < oldText.length - 1) contextEnd++;
+      else isUnique = true; // On a pris tout le document
+    }
+  }
+  
+  return { findStr, replaceStr };
+}
+
+/**
  * Compare deux blocs de texte et extrait les marques de coloration (Diffing DraftSurge).
  * Utilise un LCS au niveau des lignes, puis effectue un LCS de caractères/mots intra-ligne.
  * 

@@ -12,10 +12,10 @@ Toutes tes requêtes doivent être encapsulées dans **un seul bloc de code Mark
 
 ## 2. Format d'une Requête Unitaire
 
-Voici la syntaxe exacte pour formuler une requête de modification. L'en-tête (LABEL, MULTI, SMART) est optionnel mais recommandé. Respecte chaque balise :
+Voici la syntaxe exacte pour formuler une requête de modification. Respecte chaque balise :
 
 ```text
-##SYNTAX_COPIE## [LABEL:Nom_Court_De_La_Modification] [MULTI:FALSE] [SMART:FALSE]
+##SYNTAX_COPIE## [LABEL:Nom_Court_De_La_Modification] [MULTI:FALSE]
 ##Commentaire## (Optionnel : Indique ici en une phrase courte la raison de ta modification)
 ##FIND##
 [Insère ici le texte EXACT à trouver dans le document. Il doit être absolument UNIQUE dans tout le document.]
@@ -24,7 +24,7 @@ Voici la syntaxe exacte pour formuler une requête de modification. L'en-tête (
 ##END##
 ```
 
-### Règle de la zone label (Optionnelle mais recommandée) : 
+### Règle de la zone label : 
 Le label est un nom court et unique qui permet d'identifier la requête. Il est composé de lettres, de chiffres et de tirets. Il est recommandé de mettre un préfixe pour identifier le type de modification. tu l'utilisera pour t'y repérer dans la pile de requêtes: par exemple, si tu es en train de d'appliquer une suite de modif appelé, dans le CdC "UX-2", "Refonte de la page d'accueil", tu pourras appeler chaque requête : "UX-2-1", "UX-2-2", etc. Si tu dois appliquer des modif sur plusieurs pages différentes, tu pourras appeler chaque requête : "UX-2-page-1", "UX-2-page-2", etc. Tu utilisera le même label pour désigner ce que tu fais a l'utilisateur dans la conversation, de sorte à ce qu'il puisse facilement associer dans l'historique une requete labélisé passé avec l'extrait de conversation qui en est à l'origine.
 
 
@@ -57,17 +57,12 @@ Nouveau Texte B
 ##END##
 ```
 
-### B. Smart Replace (Concilier les espaces)
-Si tu modifies du texte particulièrement sensible à l'indentation (comme des tableaux Markdown dont les tirets ont été décalés), tu peux ajouter la balise `[SMART:TRUE]` dans ton en-tête.
-Cela demande à Rogue Cherry d'ignorer les espaces et tabulations d'origine lors de la recherche, permettant de trouver le texte même si l'indentation a légèrement changé côté utilisateur.
-Si non précisé, cette option est considérée comme inactive `[SMART:FALSE]`. Cette fonctionnalité ne doit être activée que si tu es certain que des problèmes d'espacements vont empêcher le Find classique.
-
-### C. Cherry-Picking (Mode Multi ciblé)
+### B. Cherry-Picking (Mode Multi ciblé)
 Si la portion de texte de ta zone FIND apparaît plusieurs fois dans le document, mais que tu ne souhaites la remplacer qu'à des emplacements spécifiques, utilise le tag `[MULTI]` dans l'en-tête de ta requête.
 - `[MULTI:0,2]` : Remplacera **uniquement** la 1ère (index 0) et la 3ème occurrence (index 2) de la zone FIND.
 - `[MULTI:TRUE]` : Remplacera **absolument toutes** les occurrences trouvées.
 
-### D. Mode Furtif (Cas Exceptionnel)
+### C. Mode Furtif (Cas Exceptionnel)
 Si le document sur lequel tu travailles mentionne explicitement la syntaxe de Rogue Cherry (comme ce document actuel !), l'utilisation des balises classiques (comme `##FIND##`) créerait un conflit fatal. 
 Dans ce cas unique, tu dois **déclarer tes propres balises** en amont. 
 Commence ta réponse (avant même ta première requête) par la balise `[REQMODIFIER]`, puis définis 4 nouvelles balises inédites sur les 4 lignes suivantes (Début, Trouver, Remplacer, Fin). Utilise-les pour rédiger tes requêtes.

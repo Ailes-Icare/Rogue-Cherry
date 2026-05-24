@@ -70,7 +70,8 @@ const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine,
   return (
     <div 
       onClick={onClick}
-      className={`flex font-consolas text-sm line-height-1.5 hover:bg-bg-panel-light/35 cursor-text select-text transition-colors duration-75`}
+      className={`flex font-consolas line-height-1.5 hover:bg-bg-panel-light/35 cursor-text select-text transition-colors duration-75`}
+      style={{ fontSize: 'inherit' }}
     >
       {/* Numéro de ligne + Gouttière interactive */}
       <div 
@@ -109,11 +110,35 @@ export default function CodeEditor({
   isEditable = false, 
   onToggleEditable,
   fontSize = 14,
-  statusBarInfo = ""
+  setFontSize,
+  statusBarInfo = "",
+  scrollTargetIndex = null
 }) {
   const [localEditText, setLocalEditText] = useState(text);
   const containerRef = useRef(null);
   const textareaRef = useRef(null);
+  const editorWrapperRef = useRef(null);
+
+  // Écouteur natif pour le zoom de l'éditeur principal (évite l'erreur passive)
+  useEffect(() => {
+    const el = editorWrapperRef.current;
+    if (!el || !setFontSize) return;
+
+    const handleNativeWheel = (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.deltaY < 0) {
+          setFontSize(prev => Math.min(40, prev + 1));
+        } else {
+          setFontSize(prev => Math.max(8, prev - 1));
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleNativeWheel);
+  }, [setFontSize]);
 
   // Synchronisation du texte local avec le texte parent
   useEffect(() => {
@@ -201,6 +226,18 @@ export default function CodeEditor({
     }
   }, [activeOccIndex, marks, text]);
 
+  // Scroll ciblé arbitraire (ex: depuis l'historique)
+  useEffect(() => {
+    if (scrollTargetIndex !== null && containerRef.current) {
+      const prevText = text.substring(0, scrollTargetIndex);
+      const lineIndex = prevText.split('\n').length - 1;
+      const targetLineNode = containerRef.current.children[lineIndex];
+      if (targetLineNode) {
+        targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [scrollTargetIndex, text]);
+
   const handleTextareaChange = (e) => {
     setLocalEditText(normalizeText(e.target.value));
   };
@@ -245,7 +282,11 @@ export default function CodeEditor({
       </div>
 
       {/* Zone de Code Centrale */}
-      <div className="flex-1 relative overflow-auto font-consolas select-text" style={{ fontSize: `${fontSize}px` }}>
+      <div 
+        ref={editorWrapperRef}
+        className="flex-1 relative overflow-auto font-consolas select-text" 
+        style={{ fontSize: `${fontSize}px` }}
+      >
         {isEditable ? (
           // Mode Édition Libre : Textarea fluide anti-lag
           <textarea
@@ -256,8 +297,8 @@ export default function CodeEditor({
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-            className="w-full h-full p-3 bg-bg-dark text-text-light font-mono text-sm border-none outline-none resize-none overflow-auto"
-            style={{ fontSize: `${fontSize}px`, lineHeight: 1.5 }}
+            className="w-full h-full p-3 bg-bg-dark text-text-light font-mono border-none outline-none resize-none overflow-auto"
+            style={{ fontSize: 'inherit', lineHeight: 1.5 }}
           />
         ) : (
           // Mode Lecture Seule : Rendu mémoïsé par lignes ultra-performant

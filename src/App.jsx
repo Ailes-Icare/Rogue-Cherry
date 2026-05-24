@@ -8,7 +8,7 @@ import Splitter from './components/Splitter.jsx';
 import VersionTagModal from './components/VersionTagModal.jsx';
 import { useHistoryStore, applyDeltaOnText, rebuildTextAt } from './hooks/useHistoryStore.js';
 import { parseSyntaxRequest, splitMultistackRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
-import { computeLiveDiff } from './utils/diffEngine.js';
+import { computeLiveDiff, computeGhostDelta } from './utils/diffEngine.js';
 
 export default function App() {
   // 1. Instanciation du store d'historique compressé Delta-Encoding
@@ -18,6 +18,7 @@ export default function App() {
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [splitChars, setSplitChars] = useState(false);
+  const [ignoreSpaces, setIgnoreSpaces] = useState(false);
   const [multiMode, setMultiMode] = useState(false);
   const [multiIndices, setMultiIndices] = useState([]);
   const [activeOccIndex, setActiveOccIndex] = useState(-1);
@@ -42,6 +43,9 @@ export default function App() {
 
   // Configuration de syntaxe dynamique
   const [syntaxConfig, setSyntaxConfig] = useState(DEFAULT_SYNTAX);
+
+  // Cible de scroll pour l'historique
+  const [historyScrollTarget, setHistoryScrollTarget] = useState(null);
 
   // Mode édition libre (Cadenas)
   const [isEditable, setIsEditable] = useState(false);
@@ -100,14 +104,27 @@ export default function App() {
   // --- RECHERCHE ET LOCALISATION DES OCCURRENCES DANS LE CODE ACTIF ---
   const occurrences = useMemo(() => {
     if (!store.currentText || !findText) return [];
-    const indices = [];
-    let idx = store.currentText.indexOf(findText);
-    while (idx !== -1) {
-      indices.push(idx);
-      idx = store.currentText.indexOf(findText, idx + findText.length);
+    const results = [];
+    
+    if (ignoreSpaces) {
+      const parts = findText.split(/\s+/).filter(p => p.length > 0);
+      if (parts.length === 0) return []; // Évite les regex vides
+      const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      const regex = new RegExp(escapedParts.join('\\s+'), 'g');
+      
+      let match;
+      while ((match = regex.exec(store.currentText)) !== null) {
+        results.push({ start: match.index, length: match[0].length });
+      }
+    } else {
+      let idx = store.currentText.indexOf(findText);
+      while (idx !== -1) {
+        results.push({ start: idx, length: findText.length });
+        idx = store.currentText.indexOf(findText, idx + findText.length);
+      }
     }
-    return indices;
-  }, [store.currentText, findText]);
+    return results;
+  }, [store.currentText, findText, ignoreSpaces]);
 
   const occurrencesCount = occurrences.length;
 
@@ -115,12 +132,12 @@ export default function App() {
   const activeMarks = useMemo(() => {
     if (!findText || occurrencesCount === 0) return [];
     
-    return occurrences.map((start, occIndex) => {
+    return occurrences.map((occ, occIndex) => {
       // Si l'occurrence est sélectionnée ou ciblée
       const isSelected = multiMode ? multiIndices.includes(occIndex) : (occIndex === 0);
       return {
-        start,
-        length: findText.length,
+        start: occ.start,
+        length: occ.length,
         type: isSelected 
           ? (occIndex === activeOccIndex ? 'hl-yellow' : 'hl-yellow') 
           : 'hl-yellow-pale',
@@ -129,73 +146,96 @@ export default function App() {
     });
   }, [findText, occurrences, occurrencesCount, multiMode, multiIndices, activeOccIndex]);
 
-  // --- RECONSTRUCTION DES MARQUEURS HISTORIQUES (DRAFTSURGE) ---
+  // --- RECONSTRUCTION DES MARQUEURS HISTORIQUES ACCUMULÉS (DRAFTSURGE) ---
   const historyMarks = useMemo(() => {
     if (store.selectedIndex <= 0) return [];
-    const rec = store.history[store.selectedIndex];
-    if (rec.type !== 'replace') return [];
 
-    // On calcule les marques relatives de remplacement
-    const { marksT2: baseMarksT2 } = computeLiveDiff(rec.findStr || "", rec.replaceStr || "", rec.splitChars);
-
-    // Pour obtenir leurs positions absolues dans le currentText, il faut 
-    // rejouer virtuellement le remplacement sur le texte de la version N-1.
-    const textBefore = rebuildTextAt(store.history, store.selectedIndex - 1);
-    if (!textBefore) return [];
-    if (!rec.findStr) return []; // PREVENT INFINITE LOOP
-
-    let indices = [];
-    let idx = textBefore.indexOf(rec.findStr);
-    while (idx !== -1) {
-      indices.push(idx);
-      idx = textBefore.indexOf(rec.findStr, idx + Math.max(1, rec.findStr.length)); // SAFE ADVANCE
+    // On cherche le dernier snapshot avant l'index sélectionné
+    let snapshotIdx = -1;
+    for (let i = store.selectedIndex; i >= 0; i--) {
+      if (store.history[i].type === 'snapshot') {
+        snapshotIdx = i;
+        break;
+      }
     }
 
-    let indicesToReplace = [];
-    if (rec.multiMode && rec.multiIndices && rec.multiIndices.length > 0) {
-      indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Reverse order
-    } else {
-      if (indices.length > 0) indicesToReplace = [0]; // En mode unitaire, seul le TOUT PREMIER est remplacé
-    }
+    if (snapshotIdx === -1 || snapshotIdx === store.selectedIndex) return [];
 
-    // Calcul des décalages pour mapper les baseMarksT2 dans currentText
-    let finalMarks = [];
-    let shiftLen = (rec.replaceStr.length - rec.findStr.length);
-    
-    // On simule l'application depuis la fin, comme dans applyDeltaOnText,
-    // mais ici on s'intéresse à l'emplacement final du replaceStr inséré.
-    // L'emplacement final d'une cible k (dans le texte T-after) correspond 
-    // à son emplacement de départ tIndex + le shift généré par TOUS les 
-    // remplacements PRECEDANT k dans le texte.
-    // Puisqu'on itère de la fin vers le début, la position relative d'un 
-    // bloc par rapport au début du texte T-before n'a PAS encore été altérée 
-    // par les remplacements situés après lui. 
-    // Donc son tIndex de départ est toujours correct dans T-before.
-    // Mais dans T-after, sa position finale est :
-    // tIndex + (nombre de remplacements AVANT lui) * shiftLen
-    
-    for (let i = 0; i < indicesToReplace.length; i++) {
-        let occIndex = indicesToReplace[i]; // ex: 3
-        let tIndex = indices[occIndex]; // index dans T-before
-        
-        // Combien de cibles réelles sont placées AVANT occIndex ?
-        let replacementsBefore = 0;
-        for (let j = 0; j < indicesToReplace.length; j++) {
-            if (indicesToReplace[j] < occIndex) replacementsBefore++;
+    let allAccumulatedMarks = []; // Contiendra toutes les marques accumulées
+
+    // On rejoue les opérations depuis le snapshot jusqu'à l'index sélectionné
+    let virtualText = rebuildTextAt(store.history, snapshotIdx);
+
+    for (let hIndex = snapshotIdx + 1; hIndex <= store.selectedIndex; hIndex++) {
+      const rec = store.history[hIndex];
+      if (rec.type !== 'replace') {
+        if (rec.type === 'snapshot') {
+          // Si on croise un snapshot, on purge les marques
+          allAccumulatedMarks = [];
+          virtualText = rec.newText || "";
         }
-        
-        let finalPos = tIndex + (replacementsBefore * shiftLen);
+        continue;
+      }
 
-        // On projette baseMarksT2
+      if (!virtualText || !rec.findStr) continue;
+
+      let indices = [];
+      let idx = virtualText.indexOf(rec.findStr);
+      // La recherche stricte d'index est sûre car le Smart Replace enregistre
+      // le 'findStr' exact du code original, et non la requête IA.
+      while (idx !== -1) {
+        indices.push(idx);
+        idx = virtualText.indexOf(rec.findStr, idx + Math.max(1, rec.findStr.length));
+      }
+
+      let indicesToReplace = [];
+      if (rec.multiMode && rec.multiIndices && rec.multiIndices.length > 0) {
+        indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Ordre inverse crucial pour le décalage
+      } else {
+        if (indices.length > 0) indicesToReplace = [0];
+      }
+
+      const { marksT2: baseMarksT2 } = computeLiveDiff(rec.findStr, rec.replaceStr, rec.splitChars);
+      let shiftLen = (rec.replaceStr.length - rec.findStr.length);
+      
+      let nextVirtualText = virtualText;
+
+      // Pour chaque occurrence remplacée (traitée de la fin vers le début du texte)
+      for (let i = 0; i < indicesToReplace.length; i++) {
+        let occIndex = indicesToReplace[i];
+        let tIndex = indices[occIndex]; 
+        
+        // --- 1. Décalage des ANCIENNES marques accumulées ---
+        // Toutes les marques situées APRÈS tIndex doivent être décalées
+        allAccumulatedMarks = allAccumulatedMarks.map(m => {
+          if (m.start >= tIndex + rec.findStr.length) {
+            return { ...m, start: m.start + shiftLen };
+          } else if (m.start >= tIndex && m.start < tIndex + rec.findStr.length) {
+            // Une ancienne marque est écrasée par la nouvelle modification
+            return null;
+          }
+          return m;
+        }).filter(m => m !== null);
+
+        // --- 2. Ajout des NOUVELLES marques de cette opération ---
         let mapped = baseMarksT2.map(m => ({
-            start: m.start + finalPos,
-            length: m.length,
-            type: m.type
+          start: m.start + tIndex,
+          length: m.length,
+          type: m.type
         }));
-        finalMarks.push(...mapped);
+        allAccumulatedMarks.push(...mapped);
+
+        // --- 3. Application de l'opération sur le virtualText ---
+        nextVirtualText = 
+          nextVirtualText.substring(0, tIndex) + 
+          rec.replaceStr + 
+          nextVirtualText.substring(tIndex + rec.findStr.length);
+      }
+      
+      virtualText = nextVirtualText;
     }
 
-    return finalMarks;
+    return allAccumulatedMarks;
   }, [store.history, store.selectedIndex]);
 
   const allMarks = useMemo(() => {
@@ -327,15 +367,21 @@ export default function App() {
       return;
     }
     
-    // Génération automatique du delta fantôme : on remplace le texte d'origine par le nouveau texte
-    store.pushReplace(
-      textBeforeFreeEdit.current, 
-      newText, 
-      false, 
-      [], 
-      false, 
-      "Édition Libre"
-    );
+    // Génération automatique du delta fantôme ciblé
+    const delta = computeGhostDelta(textBeforeFreeEdit.current, newText);
+    
+    if (delta) {
+      store.pushReplace(
+        delta.findStr, 
+        delta.replaceStr, 
+        false, 
+        [], 
+        false, 
+        "Édition Libre",
+        false
+      );
+    }
+    
     setIsEditable(false);
   };
 
@@ -348,6 +394,28 @@ export default function App() {
       setIsDebuggerOpen(true);
     } else {
       setActiveOccIndex(0);
+    }
+  };
+
+  // Edition d'un enregistrement d'historique (Label/Commentaire)
+  const handleEditRecord = (index) => {
+    const rec = store.history[index];
+    const newLabel = prompt("Nouveau label (action) :", rec.action);
+    if (newLabel !== null) {
+      const newComment = prompt("Nouveau commentaire :", rec.comment || "");
+      if (newComment !== null) {
+        store.editHistoryRecord(index, newLabel, newComment);
+      }
+    }
+  };
+
+  // Centrage de l'écran sur une modification de l'historique
+  const handleGoToRecord = () => {
+    if (historyMarks && historyMarks.length > 0) {
+      // On prend la première marque générée par l'historique actif
+      setHistoryScrollTarget(historyMarks[0].start);
+    } else {
+      alert("Impossible de localiser cette modification dans le code actuel.");
     }
   };
 
@@ -365,15 +433,6 @@ export default function App() {
       return;
     }
 
-    // Calcul du nouveau texte via le diffEngine
-    const newText = applyDeltaOnText(
-      store.currentText,
-      findText,
-      replaceText,
-      multiMode,
-      multiIndices
-    );
-
     // Enregistrement après application réussie dans la pile d'historique
     store.pushReplace(
       findText,
@@ -381,7 +440,8 @@ export default function App() {
       multiMode,
       multiIndices,
       splitChars,
-      commentText || null // Le commentaire devient le label !
+      commentText || null, // Le commentaire devient le label !
+      ignoreSpaces
     );
 
     // Nettoyage et reset
@@ -472,12 +532,13 @@ export default function App() {
   };
 
   // Application de la requête réparée depuis la modale de Débogage
-  const handleApplyDebuggerRequest = ({ findText: f, replaceText: r, label, multiMode: m, multiIndices: idxs }) => {
+  const handleApplyDebuggerRequest = ({ findText: f, replaceText: r, label, multiMode: m, multiIndices: idxs, smartMode }) => {
     // 1. On charge la requête dans le formulaire gauche
     setFindText(f);
     setReplaceText(r);
     setMultiMode(m);
     setMultiIndices(idxs);
+    setIgnoreSpaces(smartMode || false);
 
     // 2. On applique directement le remplacement sur le code source !
     const newText = applyDeltaOnText(
@@ -485,7 +546,8 @@ export default function App() {
       f,
       r,
       m,
-      idxs
+      idxs,
+      smartMode || false
     );
 
     store.pushReplace(
@@ -494,7 +556,8 @@ export default function App() {
       m,
       idxs,
       splitChars,
-      label
+      label,
+      smartMode || false
     );
 
     // Nettoyage après application
@@ -505,11 +568,12 @@ export default function App() {
   };
 
   // Copie de la requête depuis la modale sans appliquer
-  const handleAcceptAndCopy = ({ findText: f, replaceText: r, multiMode: m, multiIndices: idxs }) => {
+  const handleAcceptAndCopy = ({ findText: f, replaceText: r, multiMode: m, multiIndices: idxs, smartMode }) => {
     setFindText(f);
     setReplaceText(r);
     setMultiMode(m);
     setMultiIndices(idxs);
+    setIgnoreSpaces(smartMode || false);
     setCommentText(""); // Le débogueur n'a pas encore de champ commentaire
     alert("Les textes ont été copiés dans les champs FIND et REPLACE. Vous pouvez les vérifier et appliquer manuellement.");
   };
@@ -617,9 +681,11 @@ export default function App() {
         onChangeCommentText={setCommentText}
         pendingRequestsCount={pendingRequests.length}
         onChangeFindText={setFindText}
-        onChangeReplaceText={setReplaceText}
+        onChangeReplaceText={(txt) => { setReplaceText(txt); setActiveOccIndex(-1); }}
         splitChars={splitChars}
         onChangeSplitChars={setSplitChars}
+        ignoreSpaces={ignoreSpaces}
+        onChangeIgnoreSpaces={setIgnoreSpaces}
         multiMode={multiMode}
         onChangeMultiMode={setMultiMode}
         multiIndices={multiIndices}
@@ -727,7 +793,7 @@ export default function App() {
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
-              <span className="text-[#20b2aa] font-extrabold leading-none mt-0.5">TAG VER</span>
+              <span className="text-[#20b2aa] font-extrabold leading-none mt-0.5">UP VER</span>
             </button>
 
             <div className="flex flex-col gap-1 w-10">
@@ -758,11 +824,13 @@ export default function App() {
           isEditable={isEditable}
           onToggleEditable={handleToggleEditable}
           fontSize={fontSize}
+          setFontSize={setFontSize}
           statusBarInfo={
             occurrencesCount > 0 
               ? `Occurrence ${activeOccIndex + 1}/${occurrencesCount} ciblée | Lignes: ${store.currentText.split('\n').length}`
               : `Lignes: ${store.currentText ? store.currentText.split('\n').length : 0} | Caractères: ${store.currentText ? store.currentText.length : 0}`
           }
+          scrollTargetIndex={historyScrollTarget}
         />
       </div>
 
@@ -772,7 +840,10 @@ export default function App() {
       <SidebarRight
         history={store.history}
         selectedIndex={store.selectedIndex}
-        onSelectIndex={store.setSelectedIndex}
+        onSelectIndex={(idx) => {
+          store.setSelectedIndex(idx);
+          setHistoryScrollTarget(null);
+        }}
         onSaveProject={handleExportProject}
         onLoadProject={handleTriggerImport}
         onResetProject={() => {
@@ -783,6 +854,8 @@ export default function App() {
           }
         }}
         onBranchOut={store.createNewBranch}
+        onEditRecord={handleEditRecord}
+        onGoToRecord={handleGoToRecord}
         splitChars={splitChars}
         width={rightWidth}
       />

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
 import { computeLiveDiff } from '../utils/diffEngine.js';
+import { useZoomable } from '../hooks/useZoomable.js';
 
 /**
  * Formate un texte et ses marqueurs en HTML sécurisé pour l'affichage de diffing dans le Backdrop.
@@ -76,6 +77,8 @@ export default function SidebarLeft({
   onChangeReplaceText,
   splitChars,
   onChangeSplitChars,
+  ignoreSpaces,
+  onChangeIgnoreSpaces,
   multiMode,
   onChangeMultiMode,
   multiIndices,
@@ -95,6 +98,9 @@ export default function SidebarLeft({
   const textarea1Ref = useRef(null);
   const backdrop2Ref = useRef(null);
   const textarea2Ref = useRef(null);
+
+  const zoomRef1 = useZoomable(14);
+  const zoomRef2 = useZoomable(14);
 
   // Synchronisation du défilement pour les deux calques FIND
   const handleScroll1 = () => {
@@ -125,18 +131,22 @@ Je vais te demander de modifier un document.
 Lis attentivement le fichier de consignes "prompt_consigne_rogue_cherry.md" joint à notre conversation. Rogue Cherry est ACTIF, il est impératif d'utiliser sa syntaxe.
 Tu dois IMPÉRATIVEMENT placer la ou les requêtes dans un unique bloc de code classique (avec \`\`\`) pour que je puisse tout copier en un clic.
 
-Voici le format d'une requête unitaire :
-${syntaxConfig.START} [LABEL:NomDeLaRequête] [MULTI:FALSE]
-##Commentaire## (Optionnel: indique brièvement pourquoi tu fais cette modification)
+Voici le format minimal d'une requête unitaire :
+${syntaxConfig.START}
+##Commentaire## (Optionnel : indique brièvement pourquoi tu fais cette modification)
 ${syntaxConfig.FIND}
 [Texte exact à trouver, unique dans le document. Fais très attention aux indentations, espaces et caractères spéciaux !]
 ${syntaxConfig.REPLACE}
 [Texte de remplacement complet]
 ${syntaxConfig.END}
 
+Paramètres Optionnels d'en-tête (à rajouter sur la même ligne que ${syntaxConfig.START}) :
+- [LABEL:nom-de-la-modif] : Identifiant court pour nommer ta requête dans l'historique. Fortement recommandé.
+- [MULTI:TRUE] ou [MULTI:1,3] : Active le remplacement multiple ou le cherry-picking.
+- [SMART:TRUE] : Demande l'activation du Smart Replace (Concilier les espaces) pour que le parseur ignore l'indentation d'origine (très utile pour l'édition de tableaux Markdown par exemple).
+
 Règles d'or MANDATORY :
 - MULTISTACK : Si tu dois faire plusieurs requêtes séparées (pour éviter un FIND trop long), encadre-les toutes dans UN SEUL bloc de code, et sépare CHAQUE requête par la balise ##[MULTISTACK REQUEST]## sur une ligne vide.
-- CHERRY-PICKING : Si ton FIND apparaît plusieurs fois et que tu veux cibler, par exemple, la 1ère et 3ème occurrence, utilise le tag [MULTI:1,3] dans l'en-tête de la requête.
 - Tu ne dois JAMAIS inclure les 3 accents graves (qui délimitent le bloc de code) à l'intérieur de tes zones FIND ou REPLACE.
 - Respecte au caractère près le contexte (espaces, indentations, sauts de ligne) dans la zone FIND, le parseur est intransigeant.
 - MODE FURTIF : Si le document traite de la syntaxe de Rogue Cherry elle-même, commence ta réponse par [REQMODIFIER] suivi de tes balises personnalisées.`;
@@ -217,7 +227,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           </div>
           <span className="text-[10px] text-[#888]">Syntaxe active :</span>
           <pre className="text-sm leading-[1.4] text-[#9cdcfe] mt-2 font-mono select-text overflow-x-auto">
-            {syntaxConfig.START} [LABEL:NomDeLaRequête] [MULTI:FALSE]<br/>
+            {syntaxConfig.START} <span className="text-[#888]">[LABEL:Opt] [MULTI:Opt] [SMART:Opt]</span><br/>
             <span className="text-[#888]">##Commentaire## (Optionnel)</span><br/>
             {syntaxConfig.FIND}<br/>
             <span className="text-[#888]">...texte à chercher...</span><br/>
@@ -227,18 +237,17 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           </pre>
         </div>
         
-        <div className="flex flex-col gap-2 items-center justify-between w-14 flex-shrink-0">
+        <div className="flex flex-col gap-1 items-center justify-start w-16 flex-shrink-0">
           <button 
             type="button"
             onClick={handleCopyPrompt}
-            className="w-12 h-12 bg-primary-blue hover:bg-primary-blue-hover text-white text-2xl flex items-center justify-center rounded-md shadow-md transition duration-150 active:scale-95"
+            className="w-full h-16 bg-primary-blue hover:bg-primary-blue-hover text-white text-3xl flex items-center justify-center rounded-md shadow-md transition duration-150 active:scale-95"
             title="Copier le prompt IA optimisé dans le presse-papier"
           >
             📋
           </button>
-          <div className="text-center flex flex-col justify-center select-none leading-none">
-            <span className="font-bold text-[10px] text-primary-blue">ASK TO</span>
-            <span className="font-black text-xl text-hl-yellow scale-y-110 tracking-tighter">AI</span>
+          <div className="text-center flex flex-col justify-center select-none leading-none mt-3">
+            <span className="font-black text-sm text-hl-yellow scale-y-[2.5] tracking-tight uppercase">Ask2AI</span>
           </div>
         </div>
 
@@ -309,10 +318,15 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           <span className="text-xxs text-[#aaa] font-bold uppercase">Texte à chercher (1)</span>
           <span className="text-[11px] font-bold text-white uppercase select-all tracking-wider">FIND</span>
         </div>
-        <div className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden">
+        <div 
+          ref={zoomRef1}
+          className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
+          style={{ fontSize: 'var(--zoom-size, 14px)' }}
+        >
           <div 
             ref={backdrop1Ref}
             className="backdrop-layer select-none"
+            style={{ fontSize: 'inherit' }}
             dangerouslySetInnerHTML={{ __html: findBackdropHtml }}
           />
           <textarea
@@ -326,6 +340,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
             autoCapitalize="off"
             placeholder="Entrez le texte à chercher..."
             className="overlay-layer text-left"
+            style={{ fontSize: 'inherit' }}
           />
         </div>
       </div>
@@ -336,10 +351,15 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           <span className="text-xxs text-[#aaa] font-bold uppercase">À remplacer par (2)</span>
           <span className="text-[11px] font-bold text-white uppercase select-all tracking-wider">REPLACE</span>
         </div>
-        <div className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden">
+        <div 
+          ref={zoomRef2}
+          className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
+          style={{ fontSize: 'var(--zoom-size, 14px)' }}
+        >
           <div 
             ref={backdrop2Ref}
             className="backdrop-layer select-none"
+            style={{ fontSize: 'inherit' }}
             dangerouslySetInnerHTML={{ __html: replaceBackdropHtml }}
           />
           <textarea
@@ -353,6 +373,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
             autoCapitalize="off"
             placeholder="Laissez vide pour supprimer..."
             className="overlay-layer text-left"
+            style={{ fontSize: 'inherit' }}
           />
         </div>
       </div>
@@ -371,6 +392,19 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
             />
             <label htmlFor="chk-split-chars" className="cursor-pointer select-none">
               Moteur strict (LCS fin)
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              id="chk-ignore-spaces" 
+              checked={ignoreSpaces}
+              onChange={(e) => onChangeIgnoreSpaces(e.target.checked)}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <label htmlFor="chk-ignore-spaces" className="cursor-pointer select-none font-bold text-white">
+              Concilier les espaces (Smart Replace)
             </label>
           </div>
 
