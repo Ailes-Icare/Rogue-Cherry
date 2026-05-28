@@ -1,6 +1,4 @@
-#VERSION 8 : derniers ajouts
-
-README / CONSIGNE :
+#README / CONSIGNE :
 - tu lira ce fichier dans l'ordre.
 - tu ne retirera jamais la "story" tel que je l'ai écrite. tu écrira toujours les infos lié au sujet d'un chapitre dans le chapitre, sans un sous chapitre a ta propre attention. tu y ajoutera le contexte, les elements supplémentaire necessaire pour clarifier une contradiction ou un element que j'aurais omis
 - si tu identifie de nouveaux points, tu les ajoutera dans la pile. soit dans le chapitre V8 si on le traitera en V8, soit en V99 ou ultérieur si c'est ultérieur.
@@ -16,95 +14,33 @@ les archives contiennent ce qui est deja validé et fait.
 
 quand je te dirais qu'on "versionne" (qu'on passe de la V8 a la V9 par exemple), duplique complètement tout le code source du projet dans un sous dossier "V8" dans ce dossier (Archives rules). mets y que le code source, pas les fichiers d'accompagnement.
 
+#MANDATORY, non négociable
+consignes : 
+1) n'est DONE que ce que j'ai validé et acté comme bon. pas avant !
+2) les story enregistré dans done DOIVENT contenir le texte d'origine tel que je l'avais écrit, comme je l'avais écrit, au mot pret, sans modification d'aucune sorte.
+cette partie ne pourra JAMAIS être modifiée. il est POSSIBLE qu'une story archivé soit modifié par un ajout récent qui contredis les elements, mais même ainsi, ma demande d'origine ne doit en aucun cas etre modifié.
+tu n'aura le droit que d'ajouter un chapitre directement a la suite pour informer que la story n° de story, plus récente, contreviens et contredis cette consigne et qu'il faut lire cette autre consigne pour avoir les réponses sur les contradictions.
+3) Il est tout à fait possible et probable que cette consigne initiale ne soit pas suffisante ou complète dans certains cas. Aussi, si je reprécise les choses, si je redonne une autre manière d'expliquer la story ou si je lève une ambiguïté dans notre conversation, je te demande — et c'est obligatoire — de faire un verbatim au mot près. Tu as toutefois une toute petite autorisation de manœuvre : celle d'extraire le texte de la conversation qui concerne le sujet en question.
+Pour chacun des blocs de phrases qui expliquent la story ou les fonctions attendues, je veux que tu rajoutes ces phrases à la suite de ma demande initiale. Tu peux les séparer dans un sous-chapitre en lui donnant un titre du type « Précision ultérieure : ».
+Il existe également des cas où des tâches n'auront pas été écrites à la main par moi dans la to-do liste et émergeront de nos discussions. Dans ce cas, tu procèdes au même exercice : extraire les phrases qui concernent l'émergence d'une nouvelle story et donc d'une nouvelle consigne, en faire un verbatim exact sans modification, et avec ce bloc de texte, initier un nouveau point de to-do list ainsi qu'un élément archivé correspondant. Lorsque tu fais cela, informe-moi et invite-moi à relire la pile to-do pour vérifier que ce que tu as écrit est bien conforme aux attendus. 
+fait le toutefois seulement dans le cas ou ce que je dis objective un point oublié, clarifie une contradiction, constitue un changement d'idée, et ne polue pas les archives avec des recherche de bug, ou des cas ou le problème est lié a un oubli ou une mécompréhenssion de ta part, m'obligeant a redire ce qui avait deja été explicité.
+
+#VERSION 8 : derniers ajouts
+
 ###Question A :
 le bandeau en bas en bleu affiche "mode normal". a quoi ca correspond ? quand est ce que ca change ?
 si moi meme je comprends pas, c'est que c'est pas adapté.
 préco : voir "ajout 5.2"
 
-##V8 - ultime debug : 
-### bouton export / sauver
-Actuellement, apres qu'on ai fait un "export" ou une "sauvegarde", les deux boutons deviennent grisé et NON CLIQUABLE. 
-je reprécise : le seul cas ou ces deux bouton sont NON CLIQUABLE c'est quand il n'y a aucun projet / texte de chargé.
-sinon, la bascule est juste "grisé ou non grisé" mais ils restent toutefois cliquable. 
 
-##V8 - ajout n°0 / 
-Fin du developpement des modale "up ver" et "new branch"
-sur l'onglet 3 (Changer de motif) <= TOUT L'AJOUT CONCERNE CET ONGLET EXCLUSIVEMENT
-- le "nom du projet" est grisé / désactivé.
-- toute la partie "structure des rangs" est dispo, mais tout les boutons incrémenté sont caché. les croix rouge fonctionnent, et il est possible de cocher un des rangs en "auto".
-- les valeurs dans les textbox sont mise un peu en valeur pour inciter l'utilisateur a les changer si il le souhaite.
-- un bouton "valider" apparait en bas a droite, a gauche de "annuler". il n'apparait qu'apres au moins une modification de l'utilisateur
-- le label de version précédent se fixe au chargement de la modale (en jaune) le label en bleu est représentatif de la prochaine version
-- un bouton apparait a droite de "STRUCTURE DES RANGS" : "remise à 0 du compteur". cela supprime les numérotation importé par les meme valeur qui seraient apparu si la modale avait été celle utilisé sur "import" (= reset des valeurs), et ce quelque soit le nombre et le type de rang.
-- un second bouton "RESET" permet de revenir au motif "par défaut" : 4 rang, pas de préfixe, V1.0.0
-- la numérotation marche ici comme pour un "import", et commence donc a 0 sur le rang réglé en "auto"
-CAS chargé sur "Up Ver" : 
-le bouton "valider" apparait seul et vaut validation des modifs. un item spécifique est généré pour l'historique, avec un label de changement de motif, un commentaire expliquant de quoi a quoi on passe. et la bonne valeur pour source, homogène avec le reste.
-(en plus du annuler)
-CAS chargé sur "NEW BRANCHE"
-les 4 boutons apparaissent. valider marche comme pour "up ver"
-par contre, pour les deux autres boutons, SI l'utilisateur avait commencé a modifier des trucs dans la modale, et qu'il clic ensuite sur un des deux boutons, alors un message d'erreur l'avertira que ca supprimera et remplacera ses modif, et que si il veut les concerver, il faut utiliser "valider".
 
-##V8 - ajout n°1 :
-le cadre "assistant format requete" se voit ajouter un petit bouton discret (qui ne pousse pas le reste) en haut a gauche, qui permet de "replier ou déplier" le cadre.
-par défaut, le cadre est déplié. toutefois, au chargement d'un "multistack", si la taille dispo pour le multistack est trop réduite pour afficher le tableau proprement, on repliera automatiquement ce cadre, qui se remettra a la fermeture du multistack.
-sauf dans le cas ou l'utilisateur lui meme avait deja "replié" avant, auquel cas cela reste replié.
 
-##V8 - ajout n°2 : 
-le bouton "New Branch" n'est pas très gracieux quand on le force a se réduire en taille (responsive). actuellement, la distance entre le logo et le texte est fixe (ce sont des espace).
-a la place, j'aimerais que le logo et le texte soit deux bloc distinct. la marge entre la gauche du texte, entre les deux element, et la droite du logo est la meme et dynamique. le texte se mettra sur une double ligne au besoin.
-le logo restera "grand" le plus longtemps possible, mais si la place fini par etre trop réduite, alors il est caché. si la place est trop réduite pour le texte, alors le logo réaparait et remplace le texte.
-
-##V8 - ajout n°3 : 
-le label "Commentaire (optionnel)" ainsi que le textbox associé sont actuellement au dessus des boutons de gestion des requete.
-met le plutot au dessous de la barre horizontale de redimmenssionnement, au dessus de "texte a chercher".
-ajoute un petit bouton pour "dérouler" et "enrouler" la textebox a coté du label. enroule le par défaut.
-il se déroulera automatiquement quand on recois une requette qui contient un commentaire et se réenroulera quand la requette aura été validé, SAUF si l'utilisateur l'avait préalablement déroulé de lui meme.
-
-##V8 - ajout n°4 : 
-[FENETRE PRINCIPALE] 
-actuellement, quand on rentre la moindre chose dans le textbox "search", écran noir
-index (2).html:46 ReferenceError: computeSearchHeatmap is not defined
-    at index (2).html:125:7117
-    at Object.Dc [as useMemo] (index (2).html:44:21375)
-    at re.useMemo (index (2).html:15:6223)
-    at Oh (index (2).html:125:7105)
-    at Ri (index (2).html:44:16998)
-    at Ao (index (2).html:46:3139)
-    at pd (index (2).html:46:44737)
-    at cd (index (2).html:46:39727)
-    at oh (index (2).html:46:39655)
-    at is (index (2).html:46:39508)
-zo @ index (2).html:46
-Wc.n.callback @ index (2).html:46
-_a @ index (2).html:44
-Xa @ index (2).html:46
-od @ index (2).html:46
-rh @ index (2).html:46
-ah @ index (2).html:46
-vn @ index (2).html:46
-Za @ index (2).html:46
-pn @ index (2).html:44
-Ln @ index (2).html:46
-$u @ index (2).html:43
-Hs @ index (2).html:43
-di @ index (2).html:43
-Qf @ index (2).html:43
-index (2).html:125 Uncaught ReferenceError: computeSearchHeatmap is not defined
-    at index (2).html:125:7117
-    at Object.Dc [as useMemo] (index (2).html:44:21375)
-    at re.useMemo (index (2).html:15:6223)
-    at Oh (index (2).html:125:7105)
-    at Ri (index (2).html:44:16998)
-    at Ao (index (2).html:46:3139)
-    at pd (index (2).html:46:44737)
-    at cd (index (2).html:46:39727)
-    at oh (index (2).html:46:39655)
-    at is (index (2).html:46:39508)
 
 ##V8 - ajout n°5 :
 Fonctionnement de la barre de recherche dans la fenetre principale.
 ###5.1 :
+NOTA : la suite a été écrite a un moment ou la textbox "recherche" faisait totalement planter le logiciel. il m'étais donc impossible de verrifier comment se comportait les fonctions que tu avais précédement codé. il est possible que tout ou partie soit deja fonctionnel, et que tu n'ai plus que des ajustement à faire pour t'aligner avec mes consignes.
+
 UI : élargir pour occuper toute la ligne jusqu'au label / bouton "mode de lecture"
 ajouter a gauche un bouton pour le "smart search". bouton avec deux état visuel (actif ou non; inactif par défaut, et redeviens systématiquement innactif quand le texte de recherche est vide depuis 30 secondes). 
 ajouter sur ce bouton un tool tip text pour expliquer ce qu'est le "smart" (gestion des espace ET de la casse). un clic permet de changer l'etat. texte du bouton : SMART + un logo. comme pour "ajout 2", gérer le responsive pour "cacher" l'icone, puis cacher le texte et mettre que l'icone si le bouton se réduit en taille.
@@ -172,9 +108,10 @@ si il est a "true", alors son "effet" ne s'applique pas au texte principal de la
 
 ##V8 - Ajout n°8 : 
 petit ajouts UI/UX
-###V8.1 : rename projet
+###8.1 : rename projet
 un double clic sur le label de titre du projet lance la modale "Up Ver" sur l'onglet 2 dédié au renommage.
-###V8.2 : MSGBOX
+###8.2 : MSGBOX
+####8.2.1 : création
 compte tenu du nombre de fois où on a a afficher des message d'alerte et des messages a choix multiple, il conviendra de creer une nouvelle modale standard qui remplacera celle par défaut.
 un peu organisé à la manière des "msgbox" / "inputbox"
 - un titre modifiable
@@ -187,12 +124,33 @@ un peu organisé à la manière des "msgbox" / "inputbox"
 - le label box est multiligne. on peu choisir si la modale s'allonge, ou si on affiche un "slidebar", ou si on met une limite (allonge puis slidebar)
 - on peu ajouter un "combo box" OU un "combobox a case à cocher"
 - on peu ajouter des boutons au dessous, choisir leur style, leur texte et position, ainsi que le tool tip text.
+####8.2.2 : application
 une fois généré, on remplacera toute les messagebox par defaut par celle la.
-###V8.3 : Modales improvement
+###8.3 : Modales improvement
 - ajouter la possibilité de pouvoir déplacer en drag&drop toutes les modales du projet. sauf la modale d'incrément / ligne, qui apparait toujours au dessus a gauche de la souris
-###V8.4 : 
+###8.4 : 
 ajouter une information de taille de fichier pour le projet (JSON)
 un simple label sous les boutons a droite suffira pour l'instant, et permettra de savoir où est ce qu'on en est.
+###8.5 :
+désormais, un double clic sur le textbox "a rechercher" ou "a remplacer" ouvre la modale de débug. le but est de pouvoir offrir a l'utilisateur un cadre différent pour bien lire la requete et surtout prendre connaissance du texte cherché et le texte remplacé dans une UI plus large pour controler qu'il est d'accord avec les proposition.
+###8.6 :
+simple amélioration UI / position des boutons.
+dans le cas ou le tableau en bas a gauche apparait avec "la liste des occurence", actuellement, sous ce tableau, apparait 3 boutons.
+ces trois boutons occupent une place inutile qui empiète sur le tableau, alors que les label associé aux ligne sont court, et donc que le tableau n'a pas besoin de beaucoup de largeur.
+en conséquence : déplace les trois boutons en position latérale du tableau et allonge le tableau vers le bas pour profiter de l'espace ainsi récupéré.
+###8.7 : 
+changement d'UI et d'UX en préparation de la V9.
+les trois boutons en haut a droite (save, open, reset) vont avoir une importance critique dans la V9. il faut deja les renommer plus explicitement : SAVE PROJECT, OPEN PROJECT. le RESET doit etre divisé en deux (les deux boutons occuperont la meme place). actuellement les deux ont un peu le meme fonctionnement. le bouton RESET ira tout a droite et restera. tool tip text "ferme tout les projet en cours et remet l'application vierge".
+assure toi que "reset" vide toute la mémoire autant que possible.
+le nouveau bouton sera baptisé "Fermer projet courant". pour l'instant il a le meme effet que le reset. mais en V9, il ne s'appliquera qu'au projet courant. c'est a dire a UN et un seul JSON.
+le bouton open et les deux boutons reset / fermer auront le meme comportement que respectivement le bouton "sauver" / "exporter" et le bouton "Up Ver".
+c'est a dire : si le logiciel est vierge, soit qu'il vient d'etre lancé, soit qu'il viens d'etre reset, les bouton save et les deux bouton reset sont grisé et non cliquable.
+quand un projet est ouvert (soit parce qu'on a utilisé OPEN PROJECT, soit parce qu'on a ouvert un fichier avec "ouvrir" ou "import", en somme un "init" est apparu dans l'historique), alors les deux boutons "reset" / "fermer" deviennent non grisé et cliquable. ils resteront ainsi jusqu'au prochain reset / fermeture. (meme fonctionnement que le bouton "up ver"). le bouton "save" deviens cliquable mais grisé.
+dès qu'une opération est ajouté dans l'historique, il deviens cliquable et non grisé. il redeviens grisé dès qu'une sauvegarde est effectué (SAVE PROJECT, pas "export" ou "sauver". pas confondre "fichier" (texte), et "projet" (JSON)).
+le JSON de projet doit avoir un nom de projet. 
+si un projet est lancé en ouvrant un fichier, alors le nom de projet deviens le nom de projet défini dans la Nodale d'import. si un proket est lancé en ouvrant un projet (json), alors le nom du projet est celui défini dans le JSON. 
+le nom de projet apparait dans le label de titre du projet, avec le numéro de version. mais on ajoutera aussi une mention du nom du projet (sans version) dans le label "HISTORIQUE DES VERSIONS", à la suite (ou à la ligne si la side bar est trop étroite).
+
 
 ##V8 - Ajout n°9 : 
 dans le bandeau bleu en bas, tout a droite, ajouter un bouton " a deux état sans texte mais avec une icone "espion" ou "loupe" ou quelque chose d'évocateur (la loupe étant deja utilisé pour la recherche, je suis pas fan)

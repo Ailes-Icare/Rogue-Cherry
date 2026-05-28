@@ -1287,6 +1287,13 @@ export default function App() {
             store.createNewBranch('M', freezeArchive);
             setIsVersionModalOpen(false);
           }}
+          onChangePattern={(configRanks, autoIndex, newProjectName, oldPatternPreview, freezeArchive) => {
+            if (newProjectName !== undefined) store.setProjectName(newProjectName);
+            const properConfig = { ranks: configRanks, autoIncrementIndex: autoIndex };
+            store.setVersionConfig(properConfig);
+            store.createNewBranch('changePattern', freezeArchive, "", "", properConfig, oldPatternPreview);
+            setIsVersionModalOpen(false);
+          }}
         />
       )}
 

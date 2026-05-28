@@ -110,6 +110,11 @@ export default function SidebarLeft({
 }) {
   const [showInvisibles, setShowInvisibles] = useState(true);
   const [topHeight, setTopHeight] = useState(window.innerHeight * 0.45);
+  const [isAssistantCollapsed, setIsAssistantCollapsed] = useState(false);
+  const [isAssistantCollapsedByUser, setIsAssistantCollapsedByUser] = useState(false);
+  const assistantRef = useRef(null);
+  const [isCommentBoxCollapsed, setIsCommentBoxCollapsed] = useState(false);
+  const [isCommentBoxCollapsedByUser, setIsCommentBoxCollapsedByUser] = useState(false);
 
   const backdrop1Ref = useRef(null);
   const textarea1Ref = useRef(null);
@@ -141,6 +146,71 @@ export default function SidebarLeft({
     handleScroll1();
     handleScroll2();
   }, [findText, replaceText, showInvisibles]);
+
+  // AUTO-COLLAPSE Assistant Format Requête
+  useEffect(() => {
+    if (!pendingRequests) return;
+    const count = pendingRequests.length;
+    if (count === 0) {
+      // Pas de multistack : Logique d'enroulement à l'approche du splitter
+      // Le repli se base sur le bas de l'Assistant quand il est ouvert (ou son estimation)
+      const assistantHeight = (assistantRef.current && !isAssistantCollapsed) 
+        ? assistantRef.current.offsetHeight 
+        : 220; // Estimation quand replié
+
+      // La distance entre le Splitter (topHeight) et le bas de l'assistant
+      // (En ajoutant 10px pour le padding top du conteneur p-2.5)
+      const assistantBottom = assistantHeight + 10;
+      const distanceToSplitter = topHeight - assistantBottom;
+
+      if (distanceToSplitter < 150) {
+        if (!isAssistantCollapsed) {
+          setIsAssistantCollapsed(true);
+        }
+      } else {
+        if (isAssistantCollapsed && !isAssistantCollapsedByUser) {
+          setIsAssistantCollapsed(false);
+        }
+      }
+      return;
+    }
+
+    // Hauteur d'une ligne = 30px. Titre = 30px.
+    const fullyVisibleLimit = count <= 10 ? 5 : 10;
+    const requiredMultistackHeight = 30 + (fullyVisibleLimit * 30);
+    
+    // Si l'assistant est déplié, il prend ~220px. Les boutons prennent 140px.
+    const spaceWithAssistant = topHeight - 140 - 220;
+    
+    if (spaceWithAssistant < requiredMultistackHeight) {
+      if (!isAssistantCollapsed) {
+        setIsAssistantCollapsed(true);
+      }
+    } else {
+      // Si on a assez de place ET que l'utilisateur n'avait pas forcé le repli, on redéplie
+      if (isAssistantCollapsed && !isAssistantCollapsedByUser) {
+        setIsAssistantCollapsed(false);
+      }
+    }
+  }, [pendingRequests, topHeight, isAssistantCollapsed, isAssistantCollapsedByUser]);
+
+  // AUTO-COLLAPSE de la zone Commentaire
+  useEffect(() => {
+    // Calcul de l'espace disponible pour la section inférieure scrollable
+    const bottomReserved = (multiMode && occurrencesCount > 0) ? 220 : 160;
+    const bottomScrollableHeight = window.innerHeight - topHeight - bottomReserved;
+    
+    // Espace nécessaire avec Commentaire déplié ~ 180px (40+40 texte, 60 comment, 40 paddings/gaps)
+    if (bottomScrollableHeight < 180) {
+      if (!isCommentBoxCollapsed) {
+        setIsCommentBoxCollapsed(true);
+      }
+    } else {
+      if (isCommentBoxCollapsed && !isCommentBoxCollapsedByUser) {
+        setIsCommentBoxCollapsed(false);
+      }
+    }
+  }, [topHeight, multiMode, occurrencesCount, isCommentBoxCollapsed, isCommentBoxCollapsedByUser]);
 
   useEffect(() => {
     if (activeOccIndex !== -1 && activeOccIndex !== undefined && cherryPickListRef.current) {
@@ -243,48 +313,102 @@ Règles d'or MANDATORY :
       {/* SECTION SUPÉRIEURE (Redimensionnable) */}
       <div 
         style={{ height: `${topHeight}px` }}
-        className="flex flex-col p-2.5 gap-2.5 overflow-y-auto"
+        className="flex flex-col flex-shrink-0 relative border-b border-border-dark overflow-hidden"
       >
-      <div className="bg-[#333] p-2.5 border border-dashed border-[#555] rounded-md relative flex gap-3 text-xs flex-shrink-0">
-        <div className="flex-1 min-w-0">
-          <div className="font-black text-primary-blue text-base mb-1 tracking-wide uppercase">
-            Assistant format requête
-          </div>
-          <span className="text-[10px] text-[#888]">Syntaxe active :</span>
-          <pre className="text-sm leading-[1.4] text-[#9cdcfe] mt-2 font-mono select-text overflow-x-auto">
-            {syntaxConfig.START} <span className="text-[#888]">[LABEL:Opt] [MULTI:Opt | NO] [SMART:Opt]</span><br/>
-            <span className="text-[#888]">##Commentaire## (Optionnel)</span><br/>
-            {syntaxConfig.FIND}<br/>
-            <span className="text-[#888]">...texte à chercher...</span><br/>
-            {syntaxConfig.REPLACE}<br/>
-            <span className="text-[#888]">...texte de remplacement...</span><br/>
-            {syntaxConfig.END}
-          </pre>
-        </div>
-        
-        <div className="flex flex-col gap-1 items-center justify-start w-16 flex-shrink-0">
-          <button 
-            type="button"
-            onClick={handleCopyPrompt}
-            className="w-full h-16 bg-primary-blue hover:bg-primary-blue-hover text-white text-3xl flex items-center justify-center rounded-md shadow-md transition duration-150 active:scale-95"
-            title="Copier le prompt IA optimisé dans le presse-papier"
-          >
-            📋
-          </button>
-          <div className="text-center flex flex-col justify-center select-none leading-none mt-3">
-            <span className="font-black text-sm text-hl-yellow scale-y-[2.5] tracking-tight uppercase">Ask2AI</span>
-          </div>
-        </div>
+        {/* Zone Scrollable Haut (Scrollbar désactivée) */}
+        <div className="flex flex-col p-2.5 gap-2.5 flex-1 min-h-0 overflow-hidden">
+        {!isAssistantCollapsed ? (
+          <div ref={assistantRef} className="bg-[#333] p-2.5 border border-dashed border-[#555] rounded-md relative flex gap-3 text-xs flex-shrink-0">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsAssistantCollapsed(true);
+                    setIsAssistantCollapsedByUser(true);
+                  }}
+                  className="text-xs text-primary-blue hover:text-white cursor-pointer bg-transparent border-none p-0 flex-shrink-0"
+                  title="Enrouler l'assistant"
+                >
+                  ▼
+                </button>
+                <div className="font-black text-primary-blue text-base tracking-wide uppercase leading-none">
+                  Assistant format requête
+                </div>
+              </div>
+              <span className="text-[10px] text-[#888]">Syntaxe active :</span>
+              <pre className="text-sm leading-[1.4] text-[#9cdcfe] mt-2 font-mono select-text overflow-x-auto">
+                {syntaxConfig.START} <span className="text-[#888]">[LABEL:Opt] [MULTI:Opt | NO] [SMART:Opt]</span><br/>
+                <span className="text-[#888]">##Commentaire## (Optionnel)</span><br/>
+                {syntaxConfig.FIND}<br/>
+                <span className="text-[#888]">...texte à chercher...</span><br/>
+                {syntaxConfig.REPLACE}<br/>
+                <span className="text-[#888]">...texte de remplacement...</span><br/>
+                {syntaxConfig.END}
+              </pre>
+            </div>
+            
+            <div className="flex flex-col gap-1 items-center justify-start w-16 flex-shrink-0">
+              <button 
+                type="button"
+                onClick={handleCopyPrompt}
+                className="w-full h-16 bg-primary-blue hover:bg-primary-blue-hover text-white text-3xl flex items-center justify-center rounded-md shadow-md transition duration-150 active:scale-95"
+                title="Copier le prompt IA optimisé dans le presse-papier"
+              >
+                📋
+              </button>
+              <div className="text-center flex flex-col justify-center select-none leading-none mt-3">
+                <span className="font-black text-sm text-hl-yellow scale-y-[2.5] tracking-tight uppercase">Ask2AI</span>
+              </div>
+            </div>
 
-        <button 
-          type="button"
-          onClick={onOpenSettings}
-          className="absolute bottom-1 right-1 w-5 h-5 bg-transparent border-none text-[#666] hover:text-primary-blue rounded transition duration-150 cursor-pointer text-xs"
-          title="Modifier les balises de syntaxe"
-        >
-          ⚙️
-        </button>
-      </div>
+            <button 
+              type="button"
+              onClick={onOpenSettings}
+              className="absolute bottom-1 right-1 w-5 h-5 bg-transparent border-none text-[#666] hover:text-primary-blue rounded transition duration-150 cursor-pointer text-xs"
+              title="Modifier les balises de syntaxe"
+            >
+              ⚙️
+            </button>
+          </div>
+        ) : (
+          <div className="bg-[#333] px-2.5 py-1.5 border border-dashed border-[#555] rounded-md flex items-center justify-between text-xs flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsAssistantCollapsed(false);
+                  setIsAssistantCollapsedByUser(false); // La préférence de repli est annulée
+                }}
+                className="text-xs text-primary-blue hover:text-white cursor-pointer bg-transparent border-none p-0 flex-shrink-0"
+                title="Dérouler l'assistant"
+              >
+                ▶
+              </button>
+              <div className="font-black text-primary-blue text-xs tracking-wide uppercase leading-none mt-0.5">
+                Assistant format requête
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={handleCopyPrompt}
+                className="w-6 h-6 bg-primary-blue hover:bg-primary-blue-hover text-white flex items-center justify-center rounded shadow-md transition duration-150 active:scale-95"
+                title="Copier le prompt IA optimisé dans le presse-papier"
+              >
+                📋
+              </button>
+              <button 
+                type="button"
+                onClick={onOpenSettings}
+                className="w-6 h-6 bg-transparent border-none text-[#999] hover:text-primary-blue rounded transition duration-150 cursor-pointer text-sm flex items-center justify-center"
+                title="Modifier les balises de syntaxe"
+              >
+                ⚙️
+              </button>
+            </div>
+          </div>
+        )}
 
       {/* 2. Tableau Multistack */}
       {pendingRequests && pendingRequests.length > 0 && (
@@ -353,25 +477,10 @@ Règles d'or MANDATORY :
         </div>
       )}
 
-      {/* 3. Zone de Commentaire */}
-      <div className="flex flex-col flex-shrink-0 mt-auto">
-        <div className="flex justify-between items-end mb-1">
-          <label className="text-[11px] font-bold text-[#aaa]">COMMENTAIRE (Optionnel)</label>
-          <span className={`text-[10px] font-bold transition-opacity ${currentLabel ? 'opacity-100' : 'opacity-0'}`}>
-            <span className="text-hl-yellow">REQ : </span>
-            <span className="text-white">{currentLabel}</span>
-          </span>
-        </div>
-        <textarea
-          value={commentText || ""}
-          onChange={(e) => onChangeCommentText(e.target.value)}
-          placeholder="Ex: Refactorisation du calcul de version..."
-          className="w-full h-[42px] bg-bg-dark border border-border-dark text-[#d4d4d4] text-[11px] p-2 rounded-sm resize-none focus:outline-none focus:border-primary-blue transition-colors font-sans"
-        />
-      </div>
+        </div> {/* Fin Zone Scrollable Haut */}
 
-      {/* 4. Boutons d'Action Principaux */}
-      <div className="flex flex-col gap-2 flex-shrink-0 mb-2">
+      {/* 4. Boutons d'Action Principaux (Fixes en bas de la zone supérieure) */}
+      <div className="flex flex-col gap-2 p-2.5 pt-0 flex-shrink-0 bg-bg-panel z-10">
         <div className="flex gap-2 h-9">
           <button
             type="button"
@@ -430,18 +539,64 @@ Règles d'or MANDATORY :
       <Splitter 
         direction="horizontal" 
         onResize={(clientY) => {
-          // Ajuste la hauteur de la zone supérieure selon la position de la souris
-          if (clientY > 100 && clientY < window.innerHeight - 150) {
+          const hasMultistack = pendingRequests && pendingRequests.length > 0;
+          const minTopHeight = hasMultistack ? 140 : 100;
+          
+          // On inclut les paddings/gaps (environ 20px) dans la butée pour ne pas pousser la zone sanctuarisée !
+          const bottomReserved = (multiMode && occurrencesCount > 0) ? 240 : 180;
+          const maxTopHeight = window.innerHeight - bottomReserved;
+
+          if (clientY > minTopHeight && clientY < maxTopHeight) {
             setTopHeight(clientY);
           }
         }} 
       />
 
       {/* SECTION INFÉRIEURE (Recherche et paramétrage) */}
-      <div className="flex flex-col p-2.5 gap-2.5 flex-1 min-h-0 overflow-y-auto">
-      
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Conteneur (Scrollbar désactivée pour éviter de pousser le Splitter) */}
+        <div className="flex flex-col p-2.5 gap-2.5 flex-1 min-h-0 overflow-hidden">
+
+        {/* 3. Commentaire (Optionnel) en mode Collapsible */}
+        <div className="flex flex-col flex-shrink">
+          <div className="flex justify-between items-center mb-1 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xxs text-[#aaa] font-bold uppercase">Commentaire (Optionnel)</span>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (isCommentBoxCollapsed) {
+                    setIsCommentBoxCollapsed(false);
+                    setIsCommentBoxCollapsedByUser(false); // Annule la préférence si déplié manuellement
+                  } else {
+                    setIsCommentBoxCollapsed(true);
+                    setIsCommentBoxCollapsedByUser(true);
+                  }
+                }}
+                className="text-xs text-primary-blue hover:text-white bg-transparent border-none cursor-pointer p-0"
+                title="Enrouler/Dérouler le commentaire"
+              >
+                {isCommentBoxCollapsed ? '▶' : '▼'}
+              </button>
+            </div>
+            <span className={`text-[10px] font-bold transition-opacity ${currentLabel ? 'opacity-100' : 'opacity-0'}`}>
+              <span className="text-hl-yellow">REQ : </span>
+              <span className="text-white">{currentLabel}</span>
+            </span>
+          </div>
+          {!isCommentBoxCollapsed && (
+            <textarea
+              value={commentText || ""}
+              onChange={(e) => onChangeCommentText(e.target.value)}
+              disabled={isCodeEmpty || isGlobalSearching}
+              placeholder={isCodeEmpty ? "" : "Ex: Refactorisation du calcul de version..."}
+              className="w-full min-h-[30px] p-2 bg-bg-dark border border-border-dark rounded-sm text-sm font-mono text-hl-yellow resize-none shrink"
+            />
+          )}
+        </div>
+
       {/* 5. Zone de Recherche (1) - Double calque Backdrop/Overlay */}
-      <div className="flex flex-col flex-1 min-h-[100px]">
+      <div className="flex flex-col flex-1 min-h-[60px] shrink">
         <div className="flex justify-between items-center mb-1 flex-shrink-0">
           <span className="text-xxs text-[#aaa] font-bold uppercase">Texte à chercher (1)</span>
           <div 
@@ -497,7 +652,7 @@ Règles d'or MANDATORY :
         </div>
         <div 
           ref={zoomRef1}
-          className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
+          className="flex-1 min-h-[40px] border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
           style={{ fontSize: 'var(--zoom-size, 14px)' }}
         >
           <div 
@@ -524,13 +679,13 @@ Règles d'or MANDATORY :
       </div>
 
       {/* 4. Zone de Remplacement (2) - Double calque Backdrop/Overlay */}
-      <div className="flex flex-col flex-1 min-h-[100px]">
+      <div className="flex flex-col flex-1 min-h-[60px] shrink">
         <div className="flex justify-between items-center mb-1 flex-shrink-0">
           <span className="text-xxs text-[#aaa] font-bold uppercase">À remplacer par (2)</span>
         </div>
         <div 
           ref={zoomRef2}
-          className="flex-1 border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
+          className="flex-1 min-h-[40px] border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
           style={{ fontSize: 'var(--zoom-size, 14px)' }}
         >
           <div 
@@ -556,8 +711,10 @@ Règles d'or MANDATORY :
         </div>
       </div>
 
-      {/* 5. Paramètres de validation et Cherry-Picking */}
-      <div className="flex flex-col gap-2 mt-2 flex-shrink-0">
+        </div> {/* Fin du conteneur scrollable de la zone inférieure */}
+
+      {/* 5. Paramètres de validation et Cherry-Picking (FIXÉ EN BAS) */}
+      <div className="flex flex-col gap-2 p-2.5 pt-2 border-t border-border-dark flex-shrink-0">
         <div className="flex flex-row gap-2">
           
           {/* Options de validation (Gauches) */}

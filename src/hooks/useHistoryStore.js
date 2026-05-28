@@ -383,7 +383,7 @@ export function useHistoryStore() {
    * @param {number|string} targetRankIndex - L'index du rang à incrémenter (ou 'rename', ou -1 pour annuler)
    * @param {boolean} freezeArchive - Si vrai, on appose le label "+ Save"
    */
-  const createNewBranch = (targetRankIndex, freezeArchive = false, oldProjectName = "", newProjectName = "", overrideConfigRanks = null) => {
+  const createNewBranch = (targetRankIndex, freezeArchive = false, oldProjectName = "", newProjectName = "", overrideConfigRanks = null, oldPatternPreview = "") => {
     if (selectedIndex === -1 || !history[selectedIndex]) return;
 
     if (targetRankIndex === -1) {
@@ -416,6 +416,14 @@ export function useHistoryStore() {
       }
       actionLabel = freezeArchive ? "CHGNAME + Save" : "CHGNAME";
       commentText = `Changement du nom — ${oldProjectName} vers ${newProjectName}`;
+    } else if (targetRankIndex === 'changePattern') {
+      // oldPatternPreview is passed in `oldPatternPreview` argument for this call
+      // overrideConfigRanks contains the NEW configuration objects (ranks and autoIncrementIndex) but here it's actually just `{ ranks: ..., autoIncrementIndex: ... }` from App.jsx or just `ranks`.
+      // Let's refine how it is passed from App.jsx: we passed `properConfig` which is an object.
+      nextRanks = JSON.parse(JSON.stringify(overrideConfigRanks.ranks));
+      const newPatternPreview = formatVersionString(nextRanks);
+      actionLabel = freezeArchive ? "MOTIF + Save" : "MOTIF";
+      commentText = `Changement de motif — ${oldPatternPreview} vers ${newPatternPreview}`;
     } else if (targetRankIndex === '0') {
       // Remettre à zéro : V1.0.0 (premier rang num/alpha à 1, les suivants à 0)
       nextRanks = JSON.parse(JSON.stringify(currentRanks));
@@ -443,7 +451,7 @@ export function useHistoryStore() {
     setStoreState(prev => {
       const isAtTip = prev.selectedIndex === prev.history.length - 1;
       
-      if (targetRankIndex !== 'rename') {
+      if (targetRankIndex !== 'rename' && targetRankIndex !== 'changePattern') {
         if (isAtTip) {
           actionLabel = freezeArchive ? "CHG VER + Save" : "CHG VER";
           commentText = `Changement de version (v${baseVersion} -> ${nextVer})`;

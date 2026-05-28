@@ -83,6 +83,20 @@ export default function SidebarRight({
   const afterScrollRef = useZoomable(10);
   const isSyncingRef = useRef(false);
 
+  const branchBtnRef = useRef(null);
+  const [branchBtnWidth, setBranchBtnWidth] = useState(120);
+
+  useEffect(() => {
+    if (!branchBtnRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setBranchBtnWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(branchBtnRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // Synchronisation du défilement bidirectionnel (Scroll-Sync) des mini-views
   useEffect(() => {
     const elBefore = beforeScrollRef.current;
@@ -321,14 +335,56 @@ export default function SidebarRight({
               Suiv. ▶
             </button>
             <button
+              ref={branchBtnRef}
               type="button"
               disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
               onClick={handleBranchClick}
-              className="flex-[1.5] bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded transition duration-150 flex justify-center items-center gap-1 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-center leading-tight px-1 overflow-hidden"
+              className={`flex-[1.5] min-w-0 bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold rounded transition duration-150 flex items-center justify-evenly shadow-md disabled:opacity-50 disabled:cursor-not-allowed leading-tight overflow-hidden`}
               title="Créer une nouvelle branche à partir de cette version"
             >
-              <span className="mr-1.5 whitespace-nowrap flex-shrink-0">New Branch</span>
-              <svg className="transform scale-y-[-1] flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+              {(() => {
+                const w = branchBtnWidth;
+                if (w >= 170) {
+                  return (
+                    <>
+                      <span className="whitespace-nowrap" style={{ fontSize: '18px' }}>New Branch</span>
+                      <svg className="transform scale-y-[-1] flex-shrink-0" width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                    </>
+                  );
+                } else if (w >= 110) {
+                  const fontSize = 14 + 4 * ((w - 110) / 60);
+                  return (
+                    <>
+                      <span className="whitespace-nowrap" style={{ fontSize: `${fontSize}px` }}>New Branch</span>
+                      <svg className="transform scale-y-[-1] flex-shrink-0" width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                    </>
+                  );
+                } else if (w >= 85) {
+                  return (
+                    <>
+                      <span className="whitespace-normal leading-none text-left" style={{ fontSize: '14px' }}>New<br/>Branch</span>
+                      <svg className="transform scale-y-[-1] flex-shrink-0" width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                    </>
+                  );
+                } else if (w >= 60) {
+                  const iconSize = 14 + 14 * ((w - 60) / 25);
+                  return (
+                    <>
+                      <span className="whitespace-normal leading-none text-left" style={{ fontSize: '14px' }}>New<br/>Branch</span>
+                      <svg className="transform scale-y-[-1] flex-shrink-0" width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                    </>
+                  );
+                } else if (w >= 40) {
+                  return (
+                    <span className="whitespace-normal leading-none text-center w-full" style={{ fontSize: '14px' }}>New<br/>Branch</span>
+                  );
+                } else {
+                  const iconSize = Math.max(14, Math.min(28, 14 + 14 * ((w - 20) / 20)));
+                  return (
+                    <svg className="transform scale-y-[-1] flex-shrink-0" width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                  );
+                }
+              })()}
             </button>
             
             <div className="w-px bg-[#444] mx-0.5"></div>

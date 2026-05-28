@@ -248,7 +248,7 @@ export default function VersionTagModal({
             )}
             
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold uppercase text-hl-yellow">Nom du projet {mode === 'init' ? '(Obligatoire)' : ''}</label>
+              <label className={`text-[10px] font-bold uppercase ${(mode !== 'init' && interactionMode === 'changePattern') ? 'text-[#888]' : 'text-hl-yellow'}`}>Nom du projet {mode === 'init' ? '(Obligatoire)' : ''}</label>
               <input
                 type="text"
                 autoFocus={mode === 'init'}
@@ -281,9 +281,9 @@ export default function VersionTagModal({
                   type="text"
                   autoFocus
                   value={localPrefix}
-                  disabled={interactionMode === 'increment' || interactionMode === 'changePattern'}
+                  disabled={interactionMode === 'increment'}
                   onChange={(e) => setLocalPrefix(e.target.value)}
-                  className={`bg-[#111] text-[#d4d4d4] text-sm border border-[#444] focus:border-primary-blue rounded w-full py-1.5 px-2 outline-none transition-all duration-300 ${(interactionMode === 'increment' || interactionMode === 'changePattern') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`bg-[#111] text-[#d4d4d4] text-sm border border-[#444] focus:border-primary-blue rounded w-full py-1.5 px-2 outline-none transition-all duration-300 ${interactionMode === 'increment' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   placeholder="Ex: ALPHA, BETA, RELEASE..."
                   spellCheck="false"
                 />
@@ -339,9 +339,9 @@ export default function VersionTagModal({
                     <input 
                       type="text" 
                       value={rank.separator} 
-                      disabled={isIncrementMode || isChangePatternMode}
+                      disabled={isIncrementMode}
                       onChange={(e) => handleRankChange(idx, 'separator', e.target.value)}
-                      className={`bg-[#222] text-white text-xs text-center border border-[#444] rounded w-full py-1 outline-none ${(isIncrementMode || isChangePatternMode) ? 'opacity-50 cursor-not-allowed' : 'focus:border-primary-blue'}`}
+                      className={`bg-[#222] text-white text-xs text-center border border-[#444] rounded w-full py-1 outline-none ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : 'focus:border-primary-blue'}`}
                     />
                   </div>
 
@@ -350,9 +350,9 @@ export default function VersionTagModal({
                     <span className="text-[10px] text-[#888] mb-1">Type</span>
                     <select 
                       value={rank.type} 
-                      disabled={isIncrementMode || isChangePatternMode}
+                      disabled={isIncrementMode}
                       onChange={(e) => handleRankChange(idx, 'type', e.target.value)}
-                      className={`bg-[#222] text-white text-xs border border-[#444] rounded w-full py-1 px-1 outline-none ${(isIncrementMode || isChangePatternMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`bg-[#222] text-white text-xs border border-[#444] rounded w-full py-1 px-1 outline-none ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <option value="fixed">Fixe (Texte)</option>
                       <option value="numeric">Numérique (1,2..)</option>
@@ -376,9 +376,9 @@ export default function VersionTagModal({
                   <div className="flex items-end gap-2 h-full pb-[2px]">
                     <button 
                       type="button"
-                      disabled={isIncrementMode || isChangePatternMode}
+                      disabled={isIncrementMode}
                       onClick={() => setAutoIndex(idx)}
-                      className={`text-[10px] px-2 py-1 rounded border font-bold transition ${isAutoLine ? ((isRenameMode || isChangePatternMode) ? 'bg-transparent text-[#aaa] border-[#444]' : 'bg-primary-blue text-white border-primary-blue') : 'bg-transparent text-[#aaa] border-[#444] hover:border-primary-blue'} ${(isIncrementMode || isChangePatternMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`text-[10px] px-2 py-1 rounded border font-bold transition ${isAutoLine ? (isRenameMode ? 'bg-transparent text-[#aaa] border-[#444]' : 'bg-primary-blue text-white border-primary-blue') : 'bg-transparent text-[#aaa] border-[#444] hover:border-primary-blue'} ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                       title="Ce rang s'incrémentera automatiquement à chaque modification"
                     >
                       {isAutoLine ? '✓ AUTO' : 'AUTO'}
