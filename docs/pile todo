@@ -1,0 +1,325 @@
+#VERSION 8 : derniers ajouts
+
+###Question A :
+le bandeau en bas en bleu affiche "mode normal". a quoi ca correspond ? quand est ce que ca change ?
+si moi meme je comprends pas, c'est que c'est pas adapté.
+préco : voir "ajout 5.2"
+
+##V8 - ultime debug : 
+### bouton export / sauver
+Actuellement, apres qu'on ai fait un "export" ou une "sauvegarde", les deux boutons deviennent grisé et NON CLIQUABLE. 
+je reprécise : le seul cas ou ces deux bouton sont NON CLIQUABLE c'est quand il n'y a aucun projet / texte de chargé.
+sinon, la bascule est juste "grisé ou non grisé" mais ils restent toutefois cliquable. 
+
+##V8 - ajout n°0 / 
+Fin du developpement des modale "up ver" et "new branch"
+sur l'onglet 3 (Changer de motif) <= TOUT L'AJOUT CONCERNE CET ONGLET EXCLUSIVEMENT
+- le "nom du projet" est grisé / désactivé.
+- toute la partie "structure des rangs" est dispo, mais tout les boutons incrémenté sont caché. les croix rouge fonctionnent, et il est possible de cocher un des rangs en "auto".
+- les valeurs dans les textbox sont mise un peu en valeur pour inciter l'utilisateur a les changer si il le souhaite.
+- un bouton "valider" apparait en bas a droite, a gauche de "annuler". il n'apparait qu'apres au moins une modification de l'utilisateur
+- le label de version précédent se fixe au chargement de la modale (en jaune) le label en bleu est représentatif de la prochaine version
+- un bouton apparait a droite de "STRUCTURE DES RANGS" : "remise à 0 du compteur". cela supprime les numérotation importé par les meme valeur qui seraient apparu si la modale avait été celle utilisé sur "import" (= reset des valeurs), et ce quelque soit le nombre et le type de rang.
+- un second bouton "RESET" permet de revenir au motif "par défaut" : 4 rang, pas de préfixe, V1.0.0
+- la numérotation marche ici comme pour un "import", et commence donc a 0 sur le rang réglé en "auto"
+CAS chargé sur "Up Ver" : 
+le bouton "valider" apparait seul et vaut validation des modifs. un item spécifique est généré pour l'historique, avec un label de changement de motif, un commentaire expliquant de quoi a quoi on passe. et la bonne valeur pour source, homogène avec le reste.
+(en plus du annuler)
+CAS chargé sur "NEW BRANCHE"
+les 4 boutons apparaissent. valider marche comme pour "up ver"
+par contre, pour les deux autres boutons, SI l'utilisateur avait commencé a modifier des trucs dans la modale, et qu'il clic ensuite sur un des deux boutons, alors un message d'erreur l'avertira que ca supprimera et remplacera ses modif, et que si il veut les concerver, il faut utiliser "valider".
+
+##V8 - ajout n°1 :
+le cadre "assistant format requete" se voit ajouter un petit bouton discret (qui ne pousse pas le reste) en haut a gauche, qui permet de "replier ou déplier" le cadre.
+par défaut, le cadre est déplié. toutefois, au chargement d'un "multistack", si la taille dispo pour le multistack est trop réduite pour afficher le tableau proprement, on repliera automatiquement ce cadre, qui se remettra a la fermeture du multistack.
+sauf dans le cas ou l'utilisateur lui meme avait deja "replié" avant, auquel cas cela reste replié.
+
+##V8 - ajout n°2 : 
+le bouton "New Branch" n'est pas très gracieux quand on le force a se réduire en taille (responsive). actuellement, la distance entre le logo et le texte est fixe (ce sont des espace).
+a la place, j'aimerais que le logo et le texte soit deux bloc distinct. la marge entre la gauche du texte, entre les deux element, et la droite du logo est la meme et dynamique. le texte se mettra sur une double ligne au besoin.
+le logo restera "grand" le plus longtemps possible, mais si la place fini par etre trop réduite, alors il est caché. si la place est trop réduite pour le texte, alors le logo réaparait et remplace le texte.
+
+##V8 - ajout n°3 : 
+le label "Commentaire (optionnel)" ainsi que le textbox associé sont actuellement au dessus des boutons de gestion des requete.
+met le plutot au dessous de la barre horizontale de redimmenssionnement, au dessus de "texte a chercher".
+ajoute un petit bouton pour "dérouler" et "enrouler" la textebox a coté du label. enroule le par défaut.
+il se déroulera automatiquement quand on recois une requette qui contient un commentaire et se réenroulera quand la requette aura été validé, SAUF si l'utilisateur l'avait préalablement déroulé de lui meme.
+
+##V8 - ajout n°4 : 
+[FENETRE PRINCIPALE] 
+actuellement, quand on rentre la moindre chose dans le textbox "search", écran noir
+index (2).html:46 ReferenceError: computeSearchHeatmap is not defined
+    at index (2).html:125:7117
+    at Object.Dc [as useMemo] (index (2).html:44:21375)
+    at re.useMemo (index (2).html:15:6223)
+    at Oh (index (2).html:125:7105)
+    at Ri (index (2).html:44:16998)
+    at Ao (index (2).html:46:3139)
+    at pd (index (2).html:46:44737)
+    at cd (index (2).html:46:39727)
+    at oh (index (2).html:46:39655)
+    at is (index (2).html:46:39508)
+zo @ index (2).html:46
+Wc.n.callback @ index (2).html:46
+_a @ index (2).html:44
+Xa @ index (2).html:46
+od @ index (2).html:46
+rh @ index (2).html:46
+ah @ index (2).html:46
+vn @ index (2).html:46
+Za @ index (2).html:46
+pn @ index (2).html:44
+Ln @ index (2).html:46
+$u @ index (2).html:43
+Hs @ index (2).html:43
+di @ index (2).html:43
+Qf @ index (2).html:43
+index (2).html:125 Uncaught ReferenceError: computeSearchHeatmap is not defined
+    at index (2).html:125:7117
+    at Object.Dc [as useMemo] (index (2).html:44:21375)
+    at re.useMemo (index (2).html:15:6223)
+    at Oh (index (2).html:125:7105)
+    at Ri (index (2).html:44:16998)
+    at Ao (index (2).html:46:3139)
+    at pd (index (2).html:46:44737)
+    at cd (index (2).html:46:39727)
+    at oh (index (2).html:46:39655)
+    at is (index (2).html:46:39508)
+
+##V8 - ajout n°5 :
+Fonctionnement de la barre de recherche dans la fenetre principale.
+###5.1 :
+UI : élargir pour occuper toute la ligne jusqu'au label / bouton "mode de lecture"
+ajouter a gauche un bouton pour le "smart search". bouton avec deux état visuel (actif ou non; inactif par défaut, et redeviens systématiquement innactif quand le texte de recherche est vide depuis 30 secondes). 
+ajouter sur ce bouton un tool tip text pour expliquer ce qu'est le "smart" (gestion des espace ET de la casse). un clic permet de changer l'etat. texte du bouton : SMART + un logo. comme pour "ajout 2", gérer le responsive pour "cacher" l'icone, puis cacher le texte et mettre que l'icone si le bouton se réduit en taille.
+- lorsque qu'un texte est écrit dans cette textbox, toute la side barre de gauche se désactive (grisé + non cliquable) ET la fonction "find" dynamique se désactive si elle était active. son état précédent est sauvegardé.
+- lorsque le textbox est vide, apres un délais de 2 seconde, réactiver la side barre de gauche et remettre la fonction "find" dynamique se remet dans l'état où elle avait été sauvegardé.
+la fonction smart de la case a cocher de gauche est totalement ignoré pour cette recherche
+la fonction smart du nouveau bouton pilote si la recherche est effectué avec une gestion intelligente de la casse et des espace ou non.
+UI / UX : la zone de texte est multiligne, et s'agrandit au fur et a mesure de l'ajout de texte / ligne. lorsqu'elle passe en multiligne, elle intègrera a gauche une numérotation de ligne, comme pour la zone de texte principale
+la premiere ligne n'aura pas de n°, recouvert par le logo "loupe" qui restera visible.
+lorsque la zone de texte atteint 25% de hauteur de l'interface totale, elle ne grandit plus, une barre de défilement apparait, et une barre horizontale de réglage apparait pour laisser l'utilisateur choisir ce qu'il préfère.
+comme pour la textbox principal, il faut ajouter une fonction "zoom dezoom" indépendante des autres textbox, et syncroniser le n° de ligne avec.
+normalement c'est intégré d'origine, mais il faut que si le texte dépasse en longueur le controleur, alors une barre de défillement horizontale pour la ligne apparait
+on utilisera l'algo qui a été developpé pour la modale de debug pour faire une recherche intelligente avec calcul de heatmap.
+
+###5.2 :
+####5.2.1 : 
+remplacer le "mode normal" en bas de la zone de texte, dans le bandeau bleu, par le "mode de lecture seule", et le bouton cadena. inverser l'ordre : le bouton a gauche, suivit du label.
+en mode d'édition, placer le label a gauche, puis les deux boutons (en somme dans le meme ordre que actuellement), mais toujours au meme endroit : dans le bandeau bleu en bas.
+####5.2.2 : 
+dans la zone dégagé en haut, placer le label "heatmap" (quand le textbox de recherche est vide, alors rien apparait dans cette zone. quand le texte est supprimé, les elements disparaissent au bout de 30 secondes)
+ce label heatmap marche en partie comme celui de la modale de debug (mais qui est pas parfait a ce stade, puisque retouché dans les ajouts suivant), tout en s'inspirant de ce qui "marche" pour le bouton "find" de la sidebar de gauche.
+
+actuellement le bouton "find" est remplacé par "1 / 3" avec deux bouton cliquable pour naviguer entre les occurences, si plusieurs occurence sont trouvé. et le texte principal se "déplace" sur l'occurence.
+la ligne est mise en valeur avec liseret rouge qui disparait de lui meme a la fin.
+
+####5.2.3 : 
+le label de heatmap affichera "Conformité heatmap : VALUE" avec la valeur subissant un dégradé de couleur fonction de la valeur (comme pour la modale de debug actuelle)
+par contre, SI plusieurs occurence sont trouvé, alors on doit ajouter juste apres : "- 1/106" et les deux fleches pour naviguer. le "106" etant le nombre d'occurence totale, c'est une valeur importante. met la dans une couleur différence ou en gras, voir les deux.
+
+####5.2.4 : 
+comportement des boutons : quand on "navigue" d'une occurence a l'autre, le texte principal de code doit se déplacer à la bonne ligne, et la ligne est mise en valeur avec un liseret rouge.
+quand la fonction search n'est plus utilisé, le lisert rouge disparait de lui meme au bout de 30 secondes.
+
+###5.3 : 
+ajout de fonctions utile sur ces boutons : 
+un double clic sur la valeur "1 / 103" affiche la meme mini modale que tu as deja réalisé pour aller directement à un n° de ligne quand on double clic sur la barre bleu.
+celle ci aura un petit ajout dont je parlerais en ajout 7
+la valeur entré à la main par l'utilisateur (par exemple 23) deviens la valeur valide : "23 / 100". l'utilisation des fleches sur cette mini modale permet de naviguer dans les occurences.
+pour implémenter convenablement cette fonction, lire "ajout 7"
+
+###5.4 : 
+il faut ajouter un bouton quelque part, peu encombrant mais visible et facile a identifier, qui permet de "copier le texte et supprimer le contenu du texte recherché".
+quand la heatmap atteint 100%, ajouter un liseret vert autour du textbox, et mettre en surbrillance (fond vert ?) ce bouton "copier et supprimer"
+cette surbrillance du texte ET du bouton sont annulé dès que la heatmap n'est plus égale a 100%
+
+##V8 - ajout n°6 :
+bouton "find" du "find actif" dans la sidebar de gauche.
+actuellement, un double clic active ou désactive la recherche dynamique.
+ajouter que quand de multiple occurence sont trouvé, ALORS un simple clic lance la modale de choix manuel (cf 5.3, et 7)
+
+##V8 - ajout n°7 :
+amélioration de la modale "choix de ligne" (qui apparait quand on double clic sur le bandeau bleu, initialement, et qui maintenant apparait aussi quand on double clic sur un label de listing d'occurence; cf 5.3 et 6)
+- un clic "long et continu" sur les fleche permet d'incrémenter plus vite. a partir de 0,5seconde, ca incrémente de 1 unité tout les 0,5 secondes. au bout de 2 seconde, tout les 0,1 seconde. au bout de 4 secondes, incrémenter 2 a 2. au bout de 6 secondes, incrémenter de 10 a 10.
+chaque incrément doit donner lieu a un déplacement du texte en conséquence. NOTA : les valeurs que j'ai donné peuvent etre trop ambitieuse pour le moteur, je te laisse me contredire si tu vois un problème, voir pourquoi pas creer un algo d'ajustement dynamique (?)
+- ajouter un attribut en entrée a l'ouverture de la modale.
+si absent : alors le n° entré = le n° de la ligne. et les n° possible sont compris entre 1 et le nombre total de ligne du texte principal. le n° affiché a l'utilisateur est strictement le n° de la ligne.
+si présent : c'est un tableau, qui pour chaque ligne du tableau, donne un numéro, qui est en fait le n° de la ligne du texte principal.
+ainsi, si la 12eme ligne du tableau contient "1026", cela signifie, pour l'ajout 5.3 et 6 que l'occurence 12 est à la ligne 1026.
+le numéro affiché pour l'utilisateur est le n° du TABLEAU, mais le texte se déplace non pas au n° de la ligne du tableau, mais a la valeur enregistré dans cette ligne (1026).
+les n° acceptable sont compris entre 1 et le nombre de ligne du tableau passé en paramètre.
+ceci devrais permettre d'universaliser cette modale, et de faire en sorte que naviguer d'une occurence a l'autre dans cette modale avec les flèches permet bien de directement naviguer dans le texte.
+il faut ajouter un second attribut optionnel "DEBUG" true / false.
+par défaut a false.
+si il est a "true", alors son "effet" ne s'applique pas au texte principal de la fenetre principal, mais au texte principal de la fenetre de debug.
+
+##V8 - Ajout n°8 : 
+petit ajouts UI/UX
+###V8.1 : rename projet
+un double clic sur le label de titre du projet lance la modale "Up Ver" sur l'onglet 2 dédié au renommage.
+###V8.2 : MSGBOX
+compte tenu du nombre de fois où on a a afficher des message d'alerte et des messages a choix multiple, il conviendra de creer une nouvelle modale standard qui remplacera celle par défaut.
+un peu organisé à la manière des "msgbox" / "inputbox"
+- un titre modifiable
+- la position par défaut (centré par défaut)
+- un attribut pour permettre ou non le déplacement (voir 8.3)
+- taille de la modale (optionnel sinon par défaut / dynamique fonction du contenu)
+- un icone dans le titre selectionnable parmis une collection (ou passable en attribut ?). optionnel
+- un icone affichable a gauche ou a droite, centré ou en haut, selectionnable parmis une collection (ou passable en attribut), avec une taille passable en attribut. optionnel, ou a gauche, ou a droite (autre attribut) 
+- un label box a coté de l'icone (a gauche si l'icone est a droite, ou vice versa, ou sur toute la largeur de la modale)
+- le label box est multiligne. on peu choisir si la modale s'allonge, ou si on affiche un "slidebar", ou si on met une limite (allonge puis slidebar)
+- on peu ajouter un "combo box" OU un "combobox a case à cocher"
+- on peu ajouter des boutons au dessous, choisir leur style, leur texte et position, ainsi que le tool tip text.
+une fois généré, on remplacera toute les messagebox par defaut par celle la.
+###V8.3 : Modales improvement
+- ajouter la possibilité de pouvoir déplacer en drag&drop toutes les modales du projet. sauf la modale d'incrément / ligne, qui apparait toujours au dessus a gauche de la souris
+###V8.4 : 
+ajouter une information de taille de fichier pour le projet (JSON)
+un simple label sous les boutons a droite suffira pour l'instant, et permettra de savoir où est ce qu'on en est.
+
+##V8 - Ajout n°9 : 
+dans le bandeau bleu en bas, tout a droite, ajouter un bouton " a deux état sans texte mais avec une icone "espion" ou "loupe" ou quelque chose d'évocateur (la loupe étant deja utilisé pour la recherche, je suis pas fan)
+met en tool tip text "affiche ou cache les carractère invisible dans le texte principal"
+implémente la fonction, identique a celle présente dans les textbox "requete", "find" et "replace" de la modale de debug, sur le texte principal.
+par défaut, cette fonction / bouton est désactivé.
+
+##V8 - ajout n°10 : 
+Amélioration UI / UX de la modale de debug
+Dans l'état, tout fonctionne, hormis 3 points UX
+###10.1 DEBUG / PRB UX.
+####10.1.1 
+actuellement, quand on rentre du texte dans le textbox de recherche, ca désactive uniquement le textbox "find". étends ca a TOUTE LA SIDEBAR DE GAUCHE. (le texte de requete, le texte de find, le bouton find dynamique, (qui doit se désactiver et se remettre dans son état précédent apres), le texte de remplacement, le bouton replace, et la case a cocher smart (qui va etre modifié ci après)
+quand le textbox de recherche est vierge, alors réactiver les elements. (le bouton find dynamique doit se remettre dans son état précédent, actif ou non)
+####10.0.2 
+le bouton/label de "find dynamique" quand il affiche d'avoir trouvé plusieurs occurence avec les "petite flèche" pour naviguer d'une occurence à l'autre, ces flèches ne permettent pas de naviguer dans le texte principal. 
+il n'y a pas de déplacement, ni de carré rouge, ni le petit icone bleu qui se déplace.
+de plus concernant ce bouton, il y a le meme bug qu'il y avait sur le "find dynamique" de la fenetre principal : les boutons sont très sensible, et de manière "ressenti comme aléatoire" pour l'utilisateur, les clic sur les boutons "fleche" sont confondu avec une désactivation du find dynamique.
+enfin, les deux fleches sont trop petite et trop proche l'une de l'autre, ca demande une précision chirurgicale de naviguer dessus.
+####10.1.3 
+quand on utilise la fonction "recherche" (la partie en haut a gauche qui désactive find), et que plusieurs occurence sont trouvé, les "petite flèche" pour naviguer d'une occurence à l'autre, ces flèches ne permettent pas de naviguer dans le texte principal. 
+il n'y a pas de déplacement, ni de carré rouge, ni le petit icone bleu qui se déplace.
+###10.2 AMELIORATION FONCTION RECHERCHE : 
+####10.2.1 
+pour la textbox de recherche, reproduire le comportement évoqué en 5.1
+####10.2.2 
+les fonctions de heatmap et les boutons actuel marchent très bien, toutefois, réorganise les différement en respectant les meme consignes (adapté évidement a la modale !) que 5.2.2, 5.2.3 et 5.2.4
+####10.2.3 
+implémente l'équivalent de 5.3 : un double clic sur la numérotation des occurence de "recherche" lance la minimodale de choix de n° de ligne (avec l'attribut debug a true)
+###10.3 AMELIORATION AUTRE : 
+####10.3.1 
+remplace la case à cocher "concillier les espaces (smart mode) par un bouton identique a celui "smart" défini en 5.1
+####10.3.2 
+place le en haut de la sidebar de gauche, sur la meme ligne que "REQUETE BRUTE" et la case a cocher "invisible", à gauche de cette case a cocher (soit au final : label "requete brute (...)", le bouton smart, la fonction "invisible"
+####10.3.3 
+implémente l'equivalent de 5.3 : un double clic sur la numérotation des occurence de "find" lance la minimodale de choix de n° de ligne (avec l'attribut debug a true)
+####10.3.4 
+transforme la case a cocher "invisible" par un bouton a deux état sans texte mais avec une icone "espion" ou "loupe" ou quelque chose d'évocateur (la loupe étant deja utilisé pour la recherche, je suis pas fan)
+met en tool tip text "affiche ou cache les carractère invisible dans les textbox requete, find, replace"
+par défaut cette fonction / bouton est désactivé
+####10.3.5 
+dans le bandeau au dessus du texte principal, ou se trouve le label "MIROIR DE PREVISUALISATION DU CODE SOURCE", ajoute, à droite, le meme icone que 10.3.4 et, comme pour l'ajout 9, ajoute la fonction pour cacher / afficher les caractère invisible dans la zone de texte principal de la modale de debug
+modifie le tool tip text : "Affiche ou cache les cara inivisble dans le texte principal"
+par défaut, cette fonction / bouton est désactivé.
+
+
+
+#AJOUTE ICI DES FEATURES SI ON EN IDENTIFIE D'AUTRES AVANT LA V9
+
+(...)
+
+-------------------------------------------------------------------------------------------
+
+#VERSION 9
+
+quand la version 8 sera totalement validé, archive la et sanctuarise la. 
+la version 9 interviens sur pas mal d'aspect du logiciel et pourrait tout a fait générer des régression.
+commence par lire l'intro, actuellement et visé pour te faire une idée du goal, puis applique les elements dans l'ordre, un par un.
+
+l'enjeux de la version 9 est de rajouter une capabilité "multi fichier"
+avec deux "rangs" : le multi fichier et le multi projet.
+
+##Actuellement : 
+un "projet" est le JSON qui contient tout l'historique des modifs et le contenu du fichier source (il n'a pas besoin des fichiers source)
+un "fichier" actuellement ne sert qu'à importer un état d'origine pour creer un projet. importer un fichier réunitialise le projet.
+
+##visé : 
+
+un "projet" pourra contenir non plus UN fichier, mais PLUSIEURS. l'historique est commun.
+chaque "fichier" interne doit avoir un nom unique (si il y a des doubles, alors on ajoutera un indicateur supplémentaire unique sur chacun)
+une fois qu'un projet est initié ou chargé, "importer" ou "ouvrir" un fichier ne fait plus un reset mais AJOUTE le fichier au projet
+dans ce cas, une minimodale d'information a 2 choix donne le choix a l'utilisateur de "lancer un nouveau projet" ou de "ajouter ce fichier".
+détaillons ce second cas :
+la modale d'import est chargé, dans un troisieme mode : la modale d'import deviens une modale UpVersion encore un tout petit peu différente : 
+sur cette modale, on permettra de cliquer sur "incrémenter" du rang "auto". et on ajoutera un bouton spécifique en bas a gauche : importer silentieusement (ne génère pas de changement de version)
+une ligne s'ajoute dans la pile d'historique du projet non plus pour l'import, mais "Add file".
+la source doit porter le nom du fichier (agrémenté ou non de son suffixe le rendant unique)
+la requete contiendra un nouvel attribut "File" pour savoir sur quel fichier elle est supposé s'appliquer. cet attribut est en réalité double : nom du projet / nom du fichier
+une ligne d'onglet est créé au dessous du trait horizontal, et au dessus de la zone de texte principal. un premier onglet apparait avec l'ancien fichier chargé (et son nom) et un second onglet est créé avec le nouveau fichier.
+il devient l'onglet "focus", mis en surbrillance, et le texte est chargé en zone principale.
+les sidebar gauche et droite ne sont pas modifié. le texte principal apparait sans colorisation (pour le nouveau fichier) mais si on change d'onglet, les colorisation existante sur les autres onglet seront chargé avec le texte.
+les onglets peuvent etre réorganisé
+une petite croix permet de les fermer, mais une modale apparait alors pour signifier : 
+"voulez vous supprimer le fichier du projet, ou simplement le fermer ?"
+trois choix : fermer, supprimer et expurger l'historique, supprimer le fichier sans suppression de l'historique.
+fermer ferme l'onglet, mais il se régénèrera automatiquement a la prochaine requette appelant le fichier
+supprimer et expurger supprime dans le json tout les points d'historique lié a ce fichier, l'import initial et tout backup intermédiaire.
+supprimer et conserver créé un point dans l'historique qui informe le projet qu'a partir de ce moment là, le fichier est considéré comme innexistant. il ne sera plus possible de lui assigner des requetes
+dans les trois cas, l'onglet est fermé.
+a partir du moment ou au moins un fichier est "fermé", un onglet "fictif" réduit apparaitra tout a gauche (et sera toujours visible) avec une "flèche vers le haut" apparait. un clic dessus fait apparaitre une combobox flotante qui liste tout les fichier fermé du projet pour le réouvrir.
+
+dans le cas ou un projet multifichier est ouvert mais que la requette n'a PAS de nom de fichier / dossier, la requette est en erreur
+si un second projet mono fichier est chargé, alors Rogue cherry bascule automatiquement sur ce second projet, averti l'utilisateur, et colle la requete dans ce projet.
+si aucun projet mono fichier est chargé, alors le message d'erreur est plus "agressif". une nouvelle modale s'ouvre pour assigner la requette à un fichier manuellement. (et elle est testé).
+si l'utilisateur valide un des fichier comme étant le bon, ca reconstruit la requette avec l'attribut et elle est réinjecté.
+c'est aussi vrai pour une sous requette d'une multistack (sachant que CHAQUE requette d'une multitack doit avoir cet attribut.
+
+par défaut, une requette sans cet attribut n'est apliquable QUE sur un projet mono fichier OU lancera systématiquement la nouvelle modale.
+
+une fois le fichier "identifié", la zone centrale (avec le texte principal) bascule sur l'onglet de ce fichier, et tout le reste de la requette se passe dans cet onglet là.
+une fois "validé", la requete est placé dans le tableau d'historique avec en "source" le nom du fichier.
+si on clic sur un element de l'historique, l'onglet de la "source" s'ouvre automatiquement (meme si il était fermé)
+si on clic sur un element d'une pile de requete multistack, l'onglet change pour se mettre directement sur le bon fichier / onglet.
+
+si a l'import d'un nouveau fichier, l'utilisateur clic plutot sur "creer un nouveau projet", alors, dans la sidebar de droite, au dessous des trois bouton, on créé un systeme d'onglet pour les PROJETS.
+passer d'un projet a l'autre reviens a changer de JSON, et donc de "set de fichier" dedans.
+
+de nouvelles fonctions seront utile : 
+fermer le projet (= un onglet projet)
+sauvegarder tout les projet
+
+les boutons "export" et "sauvegarder" a partir du moment ou il y a 2 fichier ou plus dans le projet, se divisent verticalement
+deux nouveaux boutons apparaissent sous les deux premier (divisé par deux en hauteur) avec écrit "TOUT" dessus.
+
+=> sauvegarder "TOUT" :
+un msgbox donne le choix entre "sauvegarder le JSON unique" et "sauvegarder chaque fichier"
+si "chaque fichier" : 
+permet de sauvegarder un a un tout les fichier dans leur dernier état avec comme nom par défaut le nom du fichier
+Nota : est il possible de sauvegarder, en plus du nom, l'arborescence du fichier ? cela permettrait de pointer directement le bon dossier, plutot que "mes téléchargement"
+si "JSON unique", lire la suite pour comprendre
+=> exporter "TOUT" permet de creer un nouveau type de requete : 
+un JSON simple qui contient tout les fjchier dans leur état final, avec en attribut le nom de chaque fichier / son arborescence, ainsi que son "nom source" (c'est a dire le nom avec l'éventuel suffixe)
+donc "enregistrer tout json" est en fait la meme chose, mais cela sauvegarde le fichier directement dans "mes telechargement" sous le nom "nom projet - version - allexport"
+le json contiendra un mini commentaire en début de fichier pour expliquer ce que c'est
+
+NOTA : cet export est idéal pour donner à une IA en entrée, avec la "consigne requete" pour qu'elle sache exactement le contenu des différents fichier et leur désignation, pour construire ensuite proprement les requetes.
+
+##ROADMAP : 
+
+###étape 1 : 
+compte tenu de ce cahier des charge initial, effectue si necessaire une refactorisation complète du code pour standardiser les elements sans rien retirer des fonctions.
+liste ci après les taches que tu pense etre utile pour cela et toute les notes qui te seront utile pour archive
+
+###étape 2 : 
+compte tenu de ce cahier des charges, défini ici une a une les étapes pour monter tout ca.
+commence par donner les grandes étapes clé avec un petit commentaire suffisant pour comprendre le contenu.
+
+puis on traitera chaque étape une par une, et quand on en fera une seule, tu commencera par définir toi meme la granularité du projet et les sous étapes / cahier des charges.
+tu notera dedans les éléments important / consigne qui émergerait de nos discussion et des ajustement
+et tu validera les étapes sans jamais les supprimer au fur et a mesure ou je te dirais qu'on est bon.
+une étape bonne deviens une étape archivé ici, non modifiable sans mon accord, qui pourra etre relue pour que tu n'oublie pas les "consigne" que je t'ai donné, afin que la progression ne produise pas de régression.
+
+###étape 3 : 
+alimente la roadmap qu'on transformera progressivement en avancant en cdc, puis en consigne valide / rules.
+
+
