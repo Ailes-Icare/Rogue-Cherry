@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Splitter from './Splitter.jsx';
 import { parseSyntaxRequest } from '../utils/textParser.js';
 import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
-import { computeSearchHeatmap } from '../utils/diffEngine.js';
+import { computeSearchHeatmap, computeLiveDiff } from '../utils/diffEngine.js';
 import { useZoomable } from '../hooks/useZoomable.js';
+import { applyDeltaOnText } from '../hooks/useHistoryStore.js';
 
 function renderSyntaxHighlightHtml(text, syntax, showInvisibles = true) {
   if (!text) return "";
@@ -73,6 +74,14 @@ export default function SmartDebugger({
   const [rawText, setRawText] = useState(initialRawText || "");
   const [showInvisibles, setShowInvisibles] = useState(true);
   const [leftWidthPercent, setLeftWidthPercent] = useState(40); // Pourcentage de largeur de la colonne gauche
+
+  // Nouveaux états V8
+  const [isFindActive, setIsFindActive] = useState(true);
+  const [isReplaceActive, setIsReplaceActive] = useState(false);
+  const [searchBarText, setSearchBarText] = useState("");
+  const [isSearchSmartMode, setIsSearchSmartMode] = useState(false);
+  const [searchOccIndex, setSearchOccIndex] = useState(0);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
   // Références de synchronisation de défilement des double-calques
   const rawBackdropRef = useRef(null);
@@ -150,17 +159,69 @@ export default function SmartDebugger({
     setRawText(newRaw);
   };
 
-  // Recherche live dichotomique heatmap par rapport à la zone FIND extraite
+  // Bascule du Smart Mode depuis la Checkbox
+  const handleSmartChange = (checked) => {
+    if (!parsedRequest.isValid) return;
+    const multiTag = parsedRequest.multiMode ? '[MULTI:TRUE]' : '[MULTI:FALSE]';
+    const smartTag = checked ? '[SMART:TRUE]' : '[SMART:FALSE]';
+    const labelTag = parsedRequest.label ? `[LABEL:${parsedRequest.label}]` : '';
+    const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
+    const newRaw = `${header}\n${syntaxConfig.FIND}\n${parsedRequest.findText || ''}\n${syntaxConfig.REPLACE}\n${parsedRequest.replaceText || ''}\n${syntaxConfig.END}`;
+    setRawText(newRaw);
+  };
+
+  // Recherche live dichotomique heatmap par rapport à la zone FIND extraite ou barre de recherche
+  const activeSearchText = searchBarText || (parsedRequest && parsedRequest.isValid ? parsedRequest.findText : "");
+  const activeSmartMode = searchBarText ? isSearchSmartMode : ((parsedRequest && parsedRequest.isValid) ? parsedRequest.smartMode : false);
+
   const searchResult = useMemo(() => {
-    const findStr = (parsedRequest && parsedRequest.isValid) ? parsedRequest.findText : "";
-    return computeSearchHeatmap(sourceText, findStr);
-  }, [sourceText, parsedRequest]);
+    const res = computeSearchHeatmap(sourceText, activeSearchText, activeSmartMode);
+    // Si la recherche n'est pas forcée par la barre, et que le bouton Find est désactivé, 
+    // on purge les marques visuelles mais on conserve le ratio pour les boutons de validation
+    if (!searchBarText && !isFindActive) {
+      res.marks = [];
+    }
+    return res;
+  }, [sourceText, activeSearchText, activeSmartMode, searchBarText, isFindActive]);
+
+  // Fix bounds pour searchOccIndex
+  useEffect(() => {
+    if (searchResult.marks.length > 0) {
+      if (searchOccIndex >= searchResult.marks.length) setSearchOccIndex(searchResult.marks.length - 1);
+    } else {
+      setSearchOccIndex(0);
+    }
+  }, [searchResult.marks.length, searchOccIndex]);
+
+  // Si Replace est actif, on précalcule le texte de remplacement
+  const displayedSourceText = useMemo(() => {
+    if (!searchBarText && isReplaceActive && parsedRequest.isValid && searchResult.foundRatio === 1) {
+      return applyDeltaOnText(
+        sourceText,
+        parsedRequest.findText,
+        parsedRequest.replaceText,
+        parsedRequest.multiMode,
+        parsedRequest.multiIndices,
+        parsedRequest.smartMode
+      );
+    }
+    return sourceText;
+  }, [searchBarText, isReplaceActive, parsedRequest, searchResult.foundRatio, sourceText]);
+
+  // Si Replace est actif, on calcule les marques de diff pour le miroir
+  const mirrorMarks = useMemo(() => {
+    if (!searchBarText && isReplaceActive && parsedRequest.isValid && searchResult.foundRatio === 1) {
+      const { marksT2 } = computeLiveDiff(sourceText, displayedSourceText, false);
+      return marksT2;
+    }
+    return searchResult.marks;
+  }, [searchBarText, isReplaceActive, parsedRequest, searchResult.foundRatio, sourceText, displayedSourceText, searchResult.marks]);
 
   // Précalcule les lignes pour le miroir de code source droit
   const mirrorLineRecords = useMemo(() => {
-    if (!sourceText) return [];
-    const lines = sourceText.split('\n');
-    const marks = searchResult.marks;
+    if (!displayedSourceText) return [];
+    const lines = displayedSourceText.split('\n');
+    const marks = mirrorMarks;
     let absoluteOffset = 0;
     
     return lines.map((lineText, i) => {
@@ -205,8 +266,9 @@ export default function SmartDebugger({
   // Scroll automatique vers la meilleure occurrence trouvée
   useEffect(() => {
     if (searchResult.marks.length > 0 && zoomRefMirror.current) {
-      const firstMark = searchResult.marks[0];
-      const prevText = sourceText.substring(0, firstMark.start);
+      const safeIndex = Math.min(searchOccIndex, searchResult.marks.length - 1);
+      const targetMark = searchResult.marks[safeIndex];
+      const prevText = displayedSourceText.substring(0, targetMark.start);
       const lineIndex = prevText.split('\n').length - 1;
       
       const mirrorContainer = zoomRefMirror.current;
@@ -215,7 +277,7 @@ export default function SmartDebugger({
         targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
-  }, [searchResult, sourceText]);
+  }, [searchResult, displayedSourceText, searchOccIndex]);
 
   if (!isOpen) return null;
 
@@ -232,7 +294,8 @@ export default function SmartDebugger({
         label: parsedRequest.label,
         multiMode: parsedRequest.multiMode,
         multiIndices: parsedRequest.multiIndices,
-        smartMode: parsedRequest.smartMode
+        smartMode: parsedRequest.smartMode,
+        comment: parsedRequest.comment
       });
       onClose();
     }
@@ -246,7 +309,8 @@ export default function SmartDebugger({
         label: parsedRequest.label,
         multiMode: parsedRequest.multiMode,
         multiIndices: parsedRequest.multiIndices,
-        smartMode: parsedRequest.smartMode
+        smartMode: parsedRequest.smartMode,
+        comment: parsedRequest.comment
       });
       onClose();
     }
@@ -352,8 +416,45 @@ export default function SmartDebugger({
             {/* Zone FIND extraite */}
             <div className="flex-1 flex flex-col min-h-[80px]">
               <div className="flex justify-between items-center mb-1 flex-shrink-0 select-none">
-                <span className="text-xxs text-[#aaa] font-bold uppercase">Zone FIND Décodée (Lecture Seule)</span>
-                <span className="text-[10px] font-mono text-[#FF8C00]">FIND</span>
+                <span className={`text-xxs font-bold uppercase ${isReplaceActive ? 'text-[#aaa]/50' : 'text-[#aaa]'}`}>Zone FIND Décodée (Lecture Seule)</span>
+                <div className="flex items-center gap-1">
+                  <div 
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold transition-colors select-none flex items-center gap-1.5 ${
+                       searchBarText
+                         ? 'bg-[#331111] text-[#883333] cursor-not-allowed border border-[#552222]'
+                         : isReplaceActive 
+                            ? 'bg-[#FF8C00]/20 text-[#FF8C00]/50 cursor-not-allowed'
+                            : (parsedRequest.isValid && searchResult.foundRatio === 1)
+                                ? (isFindActive ? 'bg-[#00FF7F] text-black shadow-[0_0_8px_rgba(0,255,127,0.6)] cursor-pointer' : 'bg-[#555] text-[#00FF7F] cursor-pointer')
+                                : (isFindActive ? 'bg-[#FF8C00] text-black cursor-pointer' : 'bg-[#555] text-[#FF8C00] cursor-pointer')
+                    }`}
+                    title={searchBarText ? 'Désactivé (Search globale active)' : isReplaceActive ? 'Désactivé (Replace actif)' : 'Double-clic pour activer/désactiver le scan de heatmap'}
+                    onDoubleClick={() => !searchBarText && !isReplaceActive && setIsFindActive(!isFindActive)}
+                  >
+                    <span>
+                      {searchBarText || isReplaceActive 
+                        ? 'FIND' 
+                        : (parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1)
+                            ? `FIND (${searchResult.marks.length}) : Occ ${searchOccIndex + 1}/${searchResult.marks.length} ; réf. ${searchOccIndex}`
+                            : (parsedRequest.isValid && searchResult.foundRatio === 1)
+                                ? `FIND (${searchResult.marks.length})`
+                                : 'FIND'}
+                    </span>
+                    {!searchBarText && !isReplaceActive && parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1 && (
+                      <span className="flex items-center gap-0.5 ml-1 border-l border-black/30 pl-1">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.max(0, searchOccIndex - 1)); }}
+                          className="hover:opacity-70 leading-none text-[9px]"
+                          title="La référence est l'index base-0 de l'occurrence (occurrence 1 = réf. 0). Utilisez cette valeur dans [MULTI:1,3] pour cibler des occurrences spécifiques via le Cherry-Picking."
+                        >▲</button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.min(searchResult.marks.length - 1, searchOccIndex + 1)); }}
+                          className="hover:opacity-70 leading-none text-[9px]"
+                        >▼</button>
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <div 
                 ref={zoomRefFind}
@@ -373,8 +474,8 @@ export default function SmartDebugger({
                   readOnly={!parsedRequest.isValid}
                   onScroll={handleScrollFind}
                   spellCheck="false"
-                  className="overlay-layer text-left opacity-75 cursor-default"
-                  style={{ fontSize: 'inherit' }}
+                  className={`overlay-layer text-left ${searchBarText || isReplaceActive ? 'opacity-30 cursor-not-allowed' : 'opacity-75 cursor-default'}`}
+                  style={{ fontSize: 'inherit', backgroundColor: searchBarText ? '#331111' : 'transparent' }}
                 />
               </div>
             </div>
@@ -383,7 +484,19 @@ export default function SmartDebugger({
             <div className="flex-1 flex flex-col min-h-[80px]">
               <div className="flex justify-between items-center mb-1 flex-shrink-0 select-none">
                 <span className="text-xxs text-[#aaa] font-bold uppercase">Zone REPLACE Décodée (Lecture Seule)</span>
-                <span className="text-[10px] font-mono text-[#9E67BA]">REPLACE</span>
+                <div 
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold transition-colors select-none ${
+                    (parsedRequest.isValid && searchResult.foundRatio === 1)
+                      ? (isReplaceActive ? 'bg-[#00FF7F] text-black shadow-[0_0_8px_rgba(0,255,127,0.6)] cursor-pointer' : 'bg-[#555] text-[#00FF7F] cursor-pointer')
+                      : 'bg-[#555] text-[#9E67BA]/40 cursor-not-allowed'
+                  }`}
+                  title={!(parsedRequest.isValid && searchResult.foundRatio === 1) ? "Requis: Find à 100%" : "Double-clic pour activer/désactiver la prévisualisation"}
+                  onDoubleClick={() => {
+                    if (parsedRequest.isValid && searchResult.foundRatio === 1) setIsReplaceActive(!isReplaceActive);
+                  }}
+                >
+                  REPLACE
+                </div>
               </div>
               <div 
                 ref={zoomRefReplace}
@@ -417,10 +530,63 @@ export default function SmartDebugger({
           {/* Colonne Droite (Miroir Code Source et Heatmap) */}
           <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
             
+            {/* Nouvelle Barre de Recherche globale */}
+            <div className={`bg-bg-panel border rounded-sm flex flex-col overflow-hidden transition-colors ${searchBarText ? 'border-[#FFD700]' : 'border-border-dark'}`}>
+              <div className="flex items-center gap-2 p-1.5 border-b border-border-dark bg-bg-dark">
+                <span className="text-primary-blue ml-1">🔍</span>
+                <textarea
+                  value={searchBarText}
+                  onChange={(e) => setSearchBarText(e.target.value)}
+                  placeholder="Recherche dynamique (désactive FIND...)"
+                  className="flex-1 bg-transparent text-white text-xs outline-none resize-none transition-all"
+                  style={{ height: searchBarText && isSearchExpanded ? '80px' : '20px' }}
+                  spellCheck="false"
+                />
+                {searchBarText && (
+                  <button
+                    onClick={() => setIsSearchExpanded(!isSearchExpanded)}
+                    className="text-[10px] text-[#aaa] hover:text-white transition"
+                    title={isSearchExpanded ? 'Réduire la zone de recherche' : 'Agrandir la zone de recherche'}
+                  >{isSearchExpanded ? '▲' : '▼'}</button>
+                )}
+              </div>
+              {searchBarText && (
+                <div className="flex justify-between items-center px-2 py-1 bg-bg-dark text-xs text-[#ccc]">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isSearchSmartMode}
+                      onChange={(e) => setIsSearchSmartMode(e.target.checked)}
+                      className="cursor-pointer"
+                    />
+                    Smart Mode
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[#FFD700]">
+                      {searchResult.marks.length > 0 ? `${searchOccIndex + 1}/${searchResult.marks.length}` : '0/0'}
+                    </span>
+                    <button 
+                      onClick={() => setSearchOccIndex(Math.max(0, searchOccIndex - 1))}
+                      disabled={searchResult.marks.length === 0}
+                      className="hover:text-white disabled:opacity-50"
+                    >
+                      ▲
+                    </button>
+                    <button 
+                      onClick={() => setSearchOccIndex(Math.min(searchResult.marks.length - 1, searchOccIndex + 1))}
+                      disabled={searchResult.marks.length === 0}
+                      className="hover:text-white disabled:opacity-50"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Barre de conformité Heatmap */}
             <div className="bg-[#1e1e1e] p-2 border border-border-dark flex justify-between items-center rounded-sm flex-shrink-0 select-none">
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-primary-blue text-sm">🔍</span>
                 <span className="text-white font-bold uppercase tracking-wider">Conformité Heatmap :</span>
                 <span className={`font-black ${
                   searchResult.foundRatio === 1.0 
@@ -483,6 +649,20 @@ export default function SmartDebugger({
 
         </div>
 
+        {/* Option Smart Replace et Footer */}
+        <div className="flex justify-between items-center bg-bg-dark border-t border-border-dark px-4 py-2">
+          <label className="flex items-center gap-2 cursor-pointer text-xs text-[#ccc] font-medium">
+            <input 
+              type="checkbox" 
+              checked={parsedRequest.isValid ? parsedRequest.smartMode : false}
+              onChange={(e) => handleSmartChange(e.target.checked)}
+              disabled={!parsedRequest.isValid}
+              className="w-4 h-4 cursor-pointer"
+            />
+            Concilier les espaces (Smart Mode)
+          </label>
+        </div>
+
         {/* Footer de la Modale */}
         <div className="p-3.5 bg-bg-dark border-t border-border-dark flex justify-end gap-3 flex-shrink-0 select-none">
           <button 
@@ -507,10 +687,10 @@ export default function SmartDebugger({
           </button>
           <button 
             type="button"
-            disabled={!parsedRequest.isValid}
+            disabled={!parsedRequest.isValid || searchResult.foundRatio < 1}
             onClick={handleValidateAndApply}
             className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
-              parsedRequest.isValid 
+              parsedRequest.isValid && searchResult.foundRatio === 1
                 ? 'bg-primary-blue hover:bg-primary-blue-hover text-white cursor-pointer' 
                 : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
             }`}

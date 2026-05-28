@@ -25,43 +25,140 @@ export function getSimilarity(str1, str2) {
  * Renvoie un `{ findStr, replaceStr }` qui est unique dans oldText pour recréer 
  * un diff de recherche/remplacement parfait (utile pour le mode Cadenas).
  */
+/**
+ * Calcule un ou plusieurs deltas (find/replace) entre deux versions de texte.
+ * Sépare en plusieurs requêtes si les modifications sont éloignées de plus de GAP_THRESHOLD lignes.
+ * 
+ * @param {string} oldText - Texte avant modification.
+ * @param {string} newText - Texte après modification.
+ * @returns {Array<{findStr: string, replaceStr: string}>|null} Tableau de deltas, ou null si identiques.
+ */
 export function computeGhostDelta(oldText, newText) {
   if (oldText === newText) return null;
   
-  let start = 0;
-  while (start < oldText.length && start < newText.length && oldText[start] === newText[start]) {
-    start++;
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+  
+  // --- Étape 1 : Identifier TOUTES les lignes modifiées ---
+  // On ne peut comparer ligne-par-ligne QUE si le nombre de lignes est identique.
+  // Si le nombre de lignes diffère, on tombe dans le cas d'un seul gros delta global.
+  
+  if (oldLines.length !== newLines.length) {
+    // Cas spécial : ajout ou suppression de lignes → un seul delta global
+    // Cas spécial : ajout ou suppression de lignes → un seul delta global
+    const result = _buildSingleDelta(oldLines, newLines, oldText);
+    return [result];
   }
   
-  let oldEnd = oldText.length - 1;
-  let newEnd = newText.length - 1;
-  while (oldEnd >= start && newEnd >= start && oldText[oldEnd] === newText[newEnd]) {
-    oldEnd--;
-    newEnd--;
+  // Même nombre de lignes : on peut identifier précisément chaque ligne modifiée
+  const changedLineIndices = [];
+  for (let i = 0; i < oldLines.length; i++) {
+    if (oldLines[i] !== newLines[i]) {
+      changedLineIndices.push(i);
+    }
   }
   
-  let isUnique = false;
-  let contextStart = start;
-  let contextEnd = oldEnd;
-  let findStr, replaceStr;
   
-  // Élargir le contexte jusqu'à ce que findStr soit UNIQUE dans le texte original
-  while (!isUnique) {
-    findStr = oldText.substring(contextStart, contextEnd + 1);
-    replaceStr = newText.substring(contextStart, newEnd + 1 + (contextEnd - oldEnd)); 
+  if (changedLineIndices.length === 0) return null;
+  
+  // --- Étape 2 : Regrouper les modifications proches ---
+  const GAP_THRESHOLD = 8;
+  const CONTEXT_LINES = 2;
+  const groups = []; // Chaque groupe = { startLine, endLine } (indices des lignes modifiées)
+  
+  let currentGroup = { start: changedLineIndices[0], end: changedLineIndices[0] };
+  
+  for (let i = 1; i < changedLineIndices.length; i++) {
+    const gap = changedLineIndices[i] - currentGroup.end;
+    if (gap <= GAP_THRESHOLD) {
+      // Proche du groupe actuel → on l'intègre
+      currentGroup.end = changedLineIndices[i];
+    } else {
+      // Trop éloigné → nouveau groupe
+      groups.push({ ...currentGroup });
+      currentGroup = { start: changedLineIndices[i], end: changedLineIndices[i] };
+    }
+  }
+  groups.push(currentGroup);
+  
+  // --- Étape 3 : Construire un delta par groupe ---
+  const deltas = [];
+  
+  for (const group of groups) {
+    const ctxStart = Math.max(0, group.start - CONTEXT_LINES);
+    const ctxEnd = Math.min(oldLines.length - 1, group.end + CONTEXT_LINES);
     
-    // Test d'unicité
+    let findStr = oldLines.slice(ctxStart, ctxEnd + 1).join('\n');
+    let replaceStr = newLines.slice(ctxStart, ctxEnd + 1).join('\n');
+    
+    // Vérification d'unicité de findStr dans oldText
+    let expandStart = ctxStart;
+    let expandEnd = ctxEnd;
+    
     let firstOcc = oldText.indexOf(findStr);
     let lastOcc = oldText.lastIndexOf(findStr);
     
-    if (firstOcc === lastOcc) {
-      isUnique = true;
-    } else {
-      // Élargissement du contexte
-      if (contextStart > 0) contextStart--;
-      else if (contextEnd < oldText.length - 1) contextEnd++;
-      else isUnique = true; // On a pris tout le document
+    while (firstOcc !== lastOcc && (expandStart > 0 || expandEnd < oldLines.length - 1)) {
+      if (expandStart > 0) {
+        expandStart--;
+      } else {
+        expandEnd = Math.min(oldLines.length - 1, expandEnd + 1);
+      }
+      
+      findStr = oldLines.slice(expandStart, expandEnd + 1).join('\n');
+      replaceStr = newLines.slice(expandStart, expandEnd + 1).join('\n');
+      
+      firstOcc = oldText.indexOf(findStr);
+      lastOcc = oldText.lastIndexOf(findStr);
     }
+    
+    deltas.push({ findStr, replaceStr });
+  }
+  
+  return deltas;
+}
+
+/**
+ * Construit un delta unique quand le nombre de lignes diffère entre old et new.
+ */
+function _buildSingleDelta(oldLines, newLines, oldText) {
+  let firstDiff = 0;
+  while (firstDiff < oldLines.length && firstDiff < newLines.length && oldLines[firstDiff] === newLines[firstDiff]) {
+    firstDiff++;
+  }
+  
+  let oldLastDiff = oldLines.length - 1;
+  let newLastDiff = newLines.length - 1;
+  while (oldLastDiff >= firstDiff && newLastDiff >= firstDiff && oldLines[oldLastDiff] === newLines[newLastDiff]) {
+    oldLastDiff--;
+    newLastDiff--;
+  }
+  
+  const CONTEXT_LINES = 2;
+  let ctxStart = Math.max(0, firstDiff - CONTEXT_LINES);
+  let ctxEndOld = Math.min(oldLines.length - 1, oldLastDiff + CONTEXT_LINES);
+  let ctxEndNew = Math.min(newLines.length - 1, newLastDiff + CONTEXT_LINES);
+  
+  let findStr = oldLines.slice(ctxStart, ctxEndOld + 1).join('\n');
+  let replaceStr = newLines.slice(ctxStart, ctxEndNew + 1).join('\n');
+  
+  // Unicité
+  let firstOcc = oldText.indexOf(findStr);
+  let lastOcc = oldText.lastIndexOf(findStr);
+  
+  while (firstOcc !== lastOcc && (ctxStart > 0 || ctxEndOld < oldLines.length - 1)) {
+    if (ctxStart > 0) ctxStart--;
+    else ctxEndOld = Math.min(oldLines.length - 1, ctxEndOld + 1);
+    
+    // Ajuster ctxEndNew symétriquement pour les lignes de contexte APRÈS la zone de diff
+    ctxEndNew = newLastDiff + (ctxEndOld - oldLastDiff);
+    ctxEndNew = Math.min(newLines.length - 1, ctxEndNew);
+    
+    findStr = oldLines.slice(ctxStart, ctxEndOld + 1).join('\n');
+    replaceStr = newLines.slice(ctxStart, ctxEndNew + 1).join('\n');
+    
+    firstOcc = oldText.indexOf(findStr);
+    lastOcc = oldText.lastIndexOf(findStr);
   }
   
   return { findStr, replaceStr };
@@ -332,10 +429,34 @@ export function computeLiveDiff(str1, str2, splitChars = false) {
  * @param {string} searchStr - La chaîne de recherche saisie par l'utilisateur.
  * @returns {Object} `{ foundRatio: number, marks: Array }`
  */
-export function computeSearchHeatmap(sourceText, searchStr) {
+export function computeSearchHeatmap(sourceText, searchStr, ignoreSpaces = false) {
   if (!sourceText || !searchStr) return { foundRatio: 0, marks: [] };
 
   const marks = [];
+  
+  if (ignoreSpaces) {
+    // Si ignoreSpaces est true, on fait une recherche regex similaire à applyDeltaOnText
+    // pour trouver les occurrences qui matchent malgré les différences d'espaces.
+    const parts = searchStr.split(/\s+/).filter(p => p.length > 0);
+    if (parts.length > 0) {
+      const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      const regex = new RegExp(escapedParts.join('\\s+'), 'gi');
+      
+      let match;
+      while ((match = regex.exec(sourceText)) !== null) {
+        marks.push({
+          start: match.index,
+          length: match[0].length,
+          type: 'hl-yellow', // Trouvé via SmartMode (considéré comme 100%)
+          scroll: false,
+          occIndex: marks.length
+        });
+      }
+      
+      return { foundRatio: marks.length > 0 ? 1.0 : 0, marks };
+    }
+  }
+
   const L = searchStr.length;
   let low = 1, high = L;
   let bestSub = "";

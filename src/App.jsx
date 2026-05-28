@@ -6,6 +6,7 @@ import SettingsModal from './components/SettingsModal.jsx';
 import SmartDebugger from './components/SmartDebugger.jsx';
 import Splitter from './components/Splitter.jsx';
 import VersionTagModal from './components/VersionTagModal.jsx';
+import EditRecordModal from './components/EditRecordModal.jsx';
 import { useHistoryStore, applyDeltaOnText, rebuildTextAt } from './hooks/useHistoryStore.js';
 import { parseSyntaxRequest, splitMultistackRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
 import { computeLiveDiff, computeGhostDelta } from './utils/diffEngine.js';
@@ -21,15 +22,28 @@ export default function App() {
   const [ignoreSpaces, setIgnoreSpaces] = useState(false);
   const [multiMode, setMultiMode] = useState(false);
   const [multiIndices, setMultiIndices] = useState([]);
+  const skipMultiResetRef = useRef(false);
   const [activeOccIndex, setActiveOccIndex] = useState(-1);
   const [commentText, setCommentText] = useState("");
+  const [currentLabel, setCurrentLabel] = useState("");
+  
+  // NOUVEAU: États actifs pour les zones FIND / REPLACE globales
+  const [isFindActive, setIsFindActive] = useState(true);
+  const [isReplaceActive, setIsReplaceActive] = useState(false);
+  
+  // NOUVEAU: Recherche globale (V8)
+  const [globalSearchBarText, setGlobalSearchBarText] = useState("");
+  const [globalSearchSmartMode, setGlobalSearchSmartMode] = useState(false);
+  const [globalSearchOccIndex, setGlobalSearchOccIndex] = useState(0);
+  const isGlobalSearching = globalSearchBarText.trim().length > 0;
   
   // File d'attente pour le Multistack
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [activeStackIndex, setActiveStackIndex] = useState(-1);
 
   // Largeurs dynamiques des panneaux latéraux
-  const [leftWidth, setLeftWidth] = useState(320);
-  const [rightWidth, setRightWidth] = useState(350);
+  const [leftWidth, setLeftWidth] = useState(() => Math.max(300, Math.floor(window.innerWidth * 0.25)));
+  const [rightWidth, setRightWidth] = useState(() => Math.max(300, Math.floor(window.innerWidth * 0.25)));
 
   // États d'affichages des modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -40,12 +54,21 @@ export default function App() {
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
   const [isVersionModalInitMode, setIsVersionModalInitMode] = useState(false);
   const [initialTextPayload, setInitialTextPayload] = useState(null);
+  const [initialTextSource, setInitialTextSource] = useState(null);
 
   // Configuration de syntaxe dynamique
   const [syntaxConfig, setSyntaxConfig] = useState(DEFAULT_SYNTAX);
 
+  // Modale d'édition d'enregistrement
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editModalIndex, setEditModalIndex] = useState(-1);
+  const [editModalRecord, setEditModalRecord] = useState(null);
+
   // Cible de scroll pour l'historique
   const [historyScrollTarget, setHistoryScrollTarget] = useState(null);
+
+  // Moteur d'exécution automatique
+  const [isPlayingStack, setIsPlayingStack] = useState(false);
 
   // Mode édition libre (Cadenas)
   const [isEditable, setIsEditable] = useState(false);
@@ -71,6 +94,7 @@ export default function App() {
       const safeName = file.name.replace(/\.[^/.]+$/, "");
       store.resetStore();
       setInitialTextPayload(content);
+      setInitialTextSource({ label: "file init", source: `file : ${file.name}` });
       store.setProjectName(safeName);
       
       // On ouvre la modale pour forcer l'initialisation de la V1.0.0 au format souhaité
@@ -110,7 +134,7 @@ export default function App() {
       const parts = findText.split(/\s+/).filter(p => p.length > 0);
       if (parts.length === 0) return []; // Évite les regex vides
       const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-      const regex = new RegExp(escapedParts.join('\\s+'), 'g');
+      const regex = new RegExp(escapedParts.join('\\s+'), 'gi');
       
       let match;
       while ((match = regex.exec(store.currentText)) !== null) {
@@ -130,6 +154,7 @@ export default function App() {
 
   // Génération des marqueurs de surbrillance pour l'éditeur principal
   const activeMarks = useMemo(() => {
+    if (!isFindActive) return [];
     if (!findText || occurrencesCount === 0) return [];
     
     return occurrences.map((occ, occIndex) => {
@@ -189,8 +214,13 @@ export default function App() {
       }
 
       let indicesToReplace = [];
-      if (rec.multiMode && rec.multiIndices && rec.multiIndices.length > 0) {
-        indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Ordre inverse crucial pour le décalage
+      if (rec.multiMode) {
+        if (rec.multiIndices && rec.multiIndices.length > 0) {
+          indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Ordre inverse crucial pour le décalage
+        } else {
+          // Si mode multi actif SANS ciblage spécifique, c'est un Replace All.
+          indicesToReplace = indices.map((_, idx) => idx).sort((a, b) => b - a);
+        }
       } else {
         if (indices.length > 0) indicesToReplace = [0];
       }
@@ -238,12 +268,46 @@ export default function App() {
     return allAccumulatedMarks;
   }, [store.history, store.selectedIndex]);
 
+  // === ETAT DU PROJET (Clean/Dirty) ===
+  const isProjectClean = useMemo(() => {
+    if (!store.history || store.selectedIndex < 0) return true;
+    const currentRec = store.history[store.selectedIndex];
+    if (currentRec.action === "Export Presse-papier" || currentRec.action === "Sauvegarde" || currentRec.type === "snapshot" || currentRec.action === "Export JSON") {
+      return true;
+    }
+    return false;
+  }, [store.history, store.selectedIndex]);
+
+  // Précalcule le texte avec remplacement appliqué si REPLACE est actif
+  const previewData = useMemo(() => {
+    if (!isGlobalSearching && isReplaceActive && occurrencesCount > 0) {
+      const previewText = applyDeltaOnText(
+        store.currentText,
+        findText,
+        replaceText,
+        multiMode,
+        multiIndices,
+        ignoreSpaces
+      );
+      const { marksT2 } = computeLiveDiff(store.currentText, previewText, splitChars);
+      return { text: previewText, marks: marksT2 };
+    }
+    return null;
+  }, [store.currentText, isGlobalSearching, isReplaceActive, findText, replaceText, occurrencesCount, multiMode, multiIndices, ignoreSpaces, splitChars]);
+
   const allMarks = useMemo(() => {
+    if (previewData) {
+      return previewData.marks; // Replace preview remplace les marqueurs normaux et d'historique
+    }
     return [...activeMarks, ...historyMarks];
-  }, [activeMarks, historyMarks]);
+  }, [activeMarks, historyMarks, previewData]);
 
   // Synchronisation des indices multiMode lors d'une nouvelle recherche
   useEffect(() => {
+    if (skipMultiResetRef.current) {
+      skipMultiResetRef.current = false;
+      return;
+    }
     if (multiMode) {
       const allIndices = [];
       for (let i = 0; i < occurrencesCount; i++) {
@@ -269,6 +333,20 @@ export default function App() {
     return () => window.removeEventListener('wheel', handleGlobalWheel);
   }, []);
 
+  // --- RECHERCHE GLOBALE ---
+  const globalSearchResult = useMemo(() => {
+    if (!globalSearchBarText) return { marks: [], foundRatio: 0 };
+    return computeSearchHeatmap(store.currentText, globalSearchBarText, globalSearchSmartMode);
+  }, [store.currentText, globalSearchBarText, globalSearchSmartMode]);
+
+  useEffect(() => {
+    if (globalSearchResult.marks.length > 0) {
+      if (globalSearchOccIndex >= globalSearchResult.marks.length) setGlobalSearchOccIndex(globalSearchResult.marks.length - 1);
+    } else {
+      setGlobalSearchOccIndex(0);
+    }
+  }, [globalSearchResult, globalSearchOccIndex]);
+
   // --- GESTIONNAIRES D'ACTIONS ---
 
   // Importation directe du Code source
@@ -287,11 +365,8 @@ export default function App() {
         // Au lieu d'importer directement, on ouvre la modale d'initialisation !
         store.resetStore();
         setInitialTextPayload(clipText);
-        
-        // Nom de projet auto par défaut s'il est vide
-        if (!store.projectName) {
-          store.setProjectName("Projet_Cherry");
-        }
+        setInitialTextSource({ label: "import init", source: "presse-papier" });
+        store.setProjectName("");
 
         setIsVersionModalInitMode(true);
         setIsVersionModalOpen(true);
@@ -299,14 +374,16 @@ export default function App() {
       .catch(() => alert("Impossible de lire le presse-papier."));
   };
 
-  // Copie dans le presse-papier du code courant
   const handleCopyMainCode = () => {
     if (!store.currentText) {
       alert("Aucun code source à copier.");
       return;
     }
     navigator.clipboard.writeText(store.currentText)
-      .then(() => alert("Code source copié dans le presse-papier !"))
+      .then(() => {
+        alert("Code source copié dans le presse-papier !");
+        store.pushInfoRecord("Export Presse-papier", "Code source copié dans le presse-papier");
+      })
       .catch(() => alert("Échec de la copie."));
   };
 
@@ -329,6 +406,7 @@ export default function App() {
         await writable.write(store.currentText);
         await writable.close();
         alert("Fichier enregistré avec succès !");
+        store.pushInfoRecord("Sauvegarde", `Fichier enregistré sous ${handle.name}`);
       } else {
         // Fallback pour les navigateurs non compatibles
         const blob = new Blob([store.currentText], { type: "text/plain" });
@@ -340,6 +418,7 @@ export default function App() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+        store.pushInfoRecord("Sauvegarde", `Fichier téléchargé : ${defaultName}`);
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -377,8 +456,11 @@ export default function App() {
         false, 
         [], 
         false, 
-        "Édition Libre",
-        false
+        "Manual Edit",
+        false,
+        null,
+        null,
+        "user"
       );
     }
     
@@ -400,12 +482,10 @@ export default function App() {
   // Edition d'un enregistrement d'historique (Label/Commentaire)
   const handleEditRecord = (index) => {
     const rec = store.history[index];
-    const newLabel = prompt("Nouveau label (action) :", rec.action);
-    if (newLabel !== null) {
-      const newComment = prompt("Nouveau commentaire :", rec.comment || "");
-      if (newComment !== null) {
-        store.editHistoryRecord(index, newLabel, newComment);
-      }
+    if (rec) {
+      setEditModalIndex(index);
+      setEditModalRecord(rec);
+      setIsEditModalOpen(true);
     }
   };
 
@@ -440,42 +520,109 @@ export default function App() {
       multiMode,
       multiIndices,
       splitChars,
-      commentText || null, // Le commentaire devient le label !
-      ignoreSpaces
+      currentLabel || null,
+      ignoreSpaces,
+      null, // explicitVersion
+      commentText || null,
+      (activeStackIndex >= 0 && pendingRequests[activeStackIndex]) ? "requête" : "user"
     );
 
     // Nettoyage et reset
     setFindText("");
     setReplaceText("");
     setCommentText("");
+    setCurrentLabel("");
 
-    // Dépilement du Multistack
-    if (pendingRequests.length > 1) {
-      const nextReqs = pendingRequests.slice(1);
-      setPendingRequests(nextReqs);
-      loadRequestIntoUI(nextReqs[0]);
-    } else if (pendingRequests.length === 1) {
-      setPendingRequests([]);
-      alert("🎉 Toutes les requêtes de la pile Multistack ont été appliquées avec succès !");
+    // Dépilement du Multistack avec gestion de l'index actif
+    if (pendingRequests.length > 0 && activeStackIndex >= 0) {
+      const newReqs = [...pendingRequests];
+      newReqs[activeStackIndex].status = 'success';
+      setPendingRequests(newReqs);
+
+      // Chercher la prochaine requête en attente
+      const nextIndex = newReqs.findIndex((req, idx) => idx > activeStackIndex && (req.status === 'pending' || req.status === 'repaired'));
+      
+      if (nextIndex !== -1) {
+        setActiveStackIndex(nextIndex);
+        loadRequestIntoUI(newReqs[nextIndex].parsed, nextIndex, newReqs);
+      } else if (newReqs.every(r => r.status === 'success' || r.status === 'ignored')) {
+        alert("🎉 Toutes les requêtes de la pile Multistack ont été appliquées avec succès !");
+        setIsPlayingStack(false);
+        setFindText("");
+        setReplaceText("");
+        setPendingRequests([]);
+        setActiveStackIndex(-1);
+      } else {
+        setIsPlayingStack(false);
+      }
+    } else {
+        setIsPlayingStack(false);
     }
   };
 
-  // Chargement d'une requête spécifique dans l'UI (Sas de sécurité)
-  const loadRequestIntoUI = (parsed) => {
-    if (parsed.isValid) {
-      const testOccs = store.currentText.indexOf(parsed.findText);
-      if (testOccs === -1) {
-        alert("Une requête exige une ouverture automatique du Débogueur : Texte recherché introuvable.");
-        setDebuggerRawText(parsed.rawText);
-        setIsDebuggerOpen(true);
+  // --- HELPER : Résolution des indices MULTI ---
+  const resolveMultiIndices = (parsed, text) => {
+    let finalMultiIndices = parsed.multiIndices;
+    if (parsed.multiMode) {
+      let occurrencesFoundCount = 0;
+      if (parsed.smartMode) {
+        const parts = parsed.findText.split(/\s+/).filter(p => p.length > 0);
+        if (parts.length > 0) {
+          const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+          const regex = new RegExp(escapedParts.join('\\s+'), 'gi');
+          let match;
+          while ((match = regex.exec(text)) !== null) occurrencesFoundCount++;
+        }
       } else {
-        setFindText(parsed.findText);
-        setReplaceText(parsed.replaceText);
-        setMultiMode(parsed.multiMode);
-        setMultiIndices(parsed.multiIndices);
-        setCommentText(parsed.comment || "");
+        occurrencesFoundCount = text.split(parsed.findText).length - 1;
+      }
+      
+      if (parsed.multiExclude) {
+        const inverted = [];
+        for (let i = 0; i < occurrencesFoundCount; i++) {
+          if (!parsed.multiIndices.includes(i)) inverted.push(i);
+        }
+        finalMultiIndices = inverted;
+      } else if (parsed.multiIndices.length === 0) {
+        const allIndices = [];
+        for (let i = 0; i < occurrencesFoundCount; i++) {
+          allIndices.push(i);
+        }
+        finalMultiIndices = allIndices;
+      }
+    }
+    return finalMultiIndices;
+  };
+
+  // Chargement d'une requête spécifique dans l'UI (Sas de sécurité)
+  const loadRequestIntoUI = (parsed, index = activeStackIndex, currentReqs = pendingRequests) => {
+    if (parsed.isValid) {
+      skipMultiResetRef.current = true;
+      let finalMultiIndices = resolveMultiIndices(parsed, store.currentText);
+
+      setFindText(parsed.findText);
+      setReplaceText(parsed.replaceText);
+      setMultiMode(parsed.multiMode);
+      setMultiIndices(finalMultiIndices);
+      setIgnoreSpaces(parsed.smartMode || false);
+      setCommentText(parsed.comment || "");
+      setCurrentLabel(parsed.label || "");
+
+      // Si erreur de localisation avec le vrai texte du store, on passe en error
+      if (!parsed.smartMode) {
+        const testOccs = store.currentText.indexOf(parsed.findText);
+        if (testOccs === -1 && currentReqs[index]) {
+          const newReqs = [...currentReqs];
+          newReqs[index].status = 'error';
+          setPendingRequests(newReqs);
+        }
       }
     } else {
+      if (currentReqs[index]) {
+        const newReqs = [...currentReqs];
+        newReqs[index].status = 'error';
+        setPendingRequests(newReqs);
+      }
       alert("Une requête exige une ouverture automatique du Débogueur : Erreur de syntaxe détectée.");
       setDebuggerRawText(parsed.rawText);
       setIsDebuggerOpen(true);
@@ -493,9 +640,15 @@ export default function App() {
       const validReqs = parsedRequests.filter(p => p.isSyntax);
       
       if (validReqs.length > 0) {
-        setPendingRequests(validReqs);
-        loadRequestIntoUI(validReqs[0]);
-        alert(`📦 MODE MULTISTACK : ${validReqs.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`);
+        const newPending = validReqs.map(p => ({
+          raw: p.rawText,
+          parsed: p,
+          status: 'pending' // 'pending', 'success', 'error', 'repaired'
+        }));
+        setPendingRequests(newPending);
+        setActiveStackIndex(0);
+        loadRequestIntoUI(newPending[0].parsed, 0, newPending);
+        alert(`📦 MODE MULTISTACK : ${newPending.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`);
       } else {
         alert("Aucune requête syntaxique valide trouvée dans la pile Multistack.");
       }
@@ -514,8 +667,13 @@ export default function App() {
             setFindText(parsed.findText);
             setReplaceText(parsed.replaceText);
             setMultiMode(parsed.multiMode);
-            setMultiIndices(parsed.multiIndices);
+            
+            skipMultiResetRef.current = true;
+            let finalMultiIndices = resolveMultiIndices(parsed, store.currentText);
+            setMultiIndices(finalMultiIndices);
+            
             setCommentText(parsed.comment || "");
+            setCurrentLabel(parsed.label || "");
             alert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.");
           }
         } else {
@@ -529,6 +687,91 @@ export default function App() {
         alert("Texte brut importé dans la zone de recherche (FIND).");
       }
     }
+  };
+
+  // Clic sur un item de la pile Multistack
+  const handleSelectStackRequest = (index) => {
+    setActiveStackIndex(index);
+    if (pendingRequests[index]) {
+      loadRequestIntoUI(pendingRequests[index].parsed, index);
+    }
+  };
+
+  const handlePlayStack = () => {
+    setIsPlayingStack(true);
+  };
+
+  // Moteur d'exécution automatique de la pile (Multistack)
+  useEffect(() => {
+    if (isPlayingStack) {
+      if (pendingRequests.length === 0 || activeStackIndex === -1 || activeStackIndex >= pendingRequests.length) {
+        setIsPlayingStack(false);
+        return;
+      }
+      
+      const req = pendingRequests[activeStackIndex];
+      
+      // Sécurité : on vérifie que les textboxes correspondent bien à la requête active
+      if (findText !== req.parsed.findText) {
+        return; // on attend le prochain render
+      }
+
+      if (req.status === 'error') {
+        setIsPlayingStack(false);
+        alert(`Arrêt de l'exécution de la pile : erreur détectée à l'index ${activeStackIndex + 1}.`);
+        return;
+      }
+      
+      if (occurrencesCount === 0) {
+        setIsPlayingStack(false);
+        alert(`Arrêt de l'exécution : l'occurrence est introuvable pour la requête n°${activeStackIndex + 1}.`);
+        return;
+      }
+      
+      if (multiMode && occurrencesCount > 1 && multiIndices.length !== occurrencesCount) {
+        setIsPlayingStack(false);
+        alert(`Arrêt de l'exécution : mode multi avec cherry-picking requis à l'index ${activeStackIndex + 1}. Veuillez sélectionner les occurrences ciblées.`);
+        return;
+      }
+
+      // Si tout est ok, on applique avec un délai pour l'animation
+      const timer = setTimeout(() => {
+        handleReplace();
+      }, 500); 
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isPlayingStack, activeStackIndex, pendingRequests, occurrencesCount, multiMode, multiIndices, findText]);
+
+  const handleClearStack = () => {
+    if (confirm("Voulez-vous vider la pile Multistack actuelle ?")) {
+      setPendingRequests([]);
+      setActiveStackIndex(-1);
+      setFindText("");
+      setReplaceText("");
+      setCommentText("");
+      setCurrentLabel("");
+    }
+  };
+
+  const handleRevertRequest = (index) => {
+    const newReqs = [...pendingRequests];
+    newReqs[index].status = 'pending';
+    setPendingRequests(newReqs);
+    setActiveStackIndex(index);
+    loadRequestIntoUI(newReqs[index].parsed, index, newReqs);
+  };
+
+  const handleAuditIA = () => {
+    const failed = pendingRequests.filter(r => r.status === 'error');
+    if (failed.length === 0) {
+      alert("Aucune erreur à auditer.");
+      return;
+    }
+    const auditText = failed.map((req, i) => `--- REQUETE EN ERREUR ${i+1} ---\n${req.raw}\n\n--- CAUSE PROBABLE ---\nTexte cible introuvable ou altéré par une modification précédente.`).join('\n\n');
+    navigator.clipboard.writeText(auditText)
+      .then(() => alert("Audit copié dans le presse-papier pour l'IA !"))
+      .catch(() => alert("Erreur de copie de l'audit."));
   };
 
   // Application de la requête réparée depuis la modale de Débogage
@@ -557,7 +800,9 @@ export default function App() {
       idxs,
       splitChars,
       label,
-      smartMode || false
+      smartMode || false,
+      null,
+      commentText || null
     );
 
     // Nettoyage après application
@@ -604,6 +849,8 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    store.pushInfoRecord("Export JSON", "Projet exporté au format JSON");
   };
 
   // Déclencheur d'ouverture de fichier pour l'import JSON
@@ -679,7 +926,10 @@ export default function App() {
         replaceText={replaceText}
         commentText={commentText}
         onChangeCommentText={setCommentText}
-        pendingRequestsCount={pendingRequests.length}
+        currentLabel={currentLabel}
+        pendingRequests={pendingRequests}
+        activeStackIndex={activeStackIndex}
+        onSelectStackRequest={handleSelectStackRequest}
         onChangeFindText={setFindText}
         onChangeReplaceText={(txt) => { setReplaceText(txt); setActiveOccIndex(-1); }}
         splitChars={splitChars}
@@ -698,6 +948,18 @@ export default function App() {
         onOpenDebugger={handleImportSyntaxRequest}
         syntaxConfig={syntaxConfig}
         width={leftWidth}
+        onPlayStack={handlePlayStack}
+        onClearStack={handleClearStack}
+        onRevertRequest={handleRevertRequest}
+        onAuditIA={handleAuditIA}
+        activeOccIndex={activeOccIndex}
+        onSetActiveOccIndex={setActiveOccIndex}
+        isCodeEmpty={!store.currentText}
+        isGlobalSearching={isGlobalSearching}
+        isFindActive={isFindActive}
+        setIsFindActive={setIsFindActive}
+        isReplaceActive={isReplaceActive}
+        setIsReplaceActive={setIsReplaceActive}
       />
 
       <Splitter direction="vertical" onResize={handleResizeLeft} />
@@ -707,19 +969,9 @@ export default function App() {
         
         {/* En-tête Éditeur Central */}
         <div className="flex justify-between items-start gap-4 border-b border-border-dark pb-2.5 flex-shrink-0">
-          <div className="flex flex-col flex-1 h-[75px] justify-between">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-[#aaa] font-bold whitespace-nowrap">Nom du projet</label>
-              <input 
-                type="text" 
-                value={store.projectName} 
-                onChange={(e) => store.setProjectName(e.target.value)} 
-                className="bg-bg-dark border border-border-dark text-[#d4d4d4] text-xs px-2 py-1 rounded w-full outline-none focus:border-primary-blue transition"
-                placeholder="Entrez le nom du projet..."
-              />
-            </div>
-            <div className="text-sm select-none font-bold mt-1">
-              CODE SOURCE - <span className="text-[#FF4500] uppercase font-mono">{store.projectName || 'SANS_NOM'}</span> - <span className="text-hl-yellow text-lg ml-1 font-black font-mono">{store.currentVersion}</span>
+          <div className="flex flex-col flex-1 h-[75px] justify-center">
+            <div className="text-2xl select-none font-bold mt-1 truncate" title={`CODE SOURCE - ${store.projectName || 'SANS_NOM'} - ${store.currentVersion}`}>
+              CODE SOURCE - <span className="text-[#FF4500] uppercase font-mono">{store.projectName || 'SANS_NOM'}</span> - <span className="text-hl-yellow text-3xl ml-1 font-black font-mono">{store.currentVersion}</span>
             </div>
           </div>
 
@@ -752,7 +1004,8 @@ export default function App() {
 
             <button
               onClick={handleCopyMainCode}
-              className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
+              disabled={!store.currentText || isProjectClean}
+              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${(!store.currentText || isProjectClean) ? 'opacity-50 grayscale' : ''}`}
               title="Copier le code source modifié dans le presse-papier"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -767,8 +1020,8 @@ export default function App() {
             <button
               type="button"
               onClick={handleSaveAs}
-              disabled={!store.currentText}
-              className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#ffd700] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={!store.currentText || isProjectClean}
+              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#ffd700] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${(!store.currentText || isProjectClean) ? 'opacity-50 grayscale' : ''}`}
               title="Enregistrer le fichier sur votre disque (Save As)"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -786,7 +1039,8 @@ export default function App() {
                 setIsVersionModalInitMode(false);
                 setIsVersionModalOpen(true);
               }}
-              className="px-3 bg-bg-panel-light border border-border-dark hover:border-[#20b2aa] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
+              disabled={!store.currentText}
+              className="px-3 bg-bg-panel-light border border-border-dark hover:border-[#20b2aa] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
               title="Configurer les versions ou forcer un saut"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#20b2aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -817,20 +1071,37 @@ export default function App() {
 
         {/* L'Éditeur proprement dit */}
         <CodeEditor
-          text={store.currentText}
+          text={previewData ? previewData.text : store.currentText}
           onTextChange={handleSaveFreeEdit}
           marks={allMarks}
-          activeOccIndex={activeOccIndex}
-          isEditable={isEditable}
+          activeOccIndex={isGlobalSearching ? globalSearchOccIndex : activeOccIndex}
+          isEditable={isEditable && !isReplaceActive && !isGlobalSearching}
           onToggleEditable={handleToggleEditable}
           fontSize={fontSize}
           setFontSize={setFontSize}
           statusBarInfo={
-            occurrencesCount > 0 
-              ? `Occurrence ${activeOccIndex + 1}/${occurrencesCount} ciblée | Lignes: ${store.currentText.split('\n').length}`
-              : `Lignes: ${store.currentText ? store.currentText.split('\n').length : 0} | Caractères: ${store.currentText ? store.currentText.length : 0}`
+            isGlobalSearching 
+              ? `Recherche globale : ${(globalSearchResult.foundRatio * 100).toFixed(0)}% de correspondance | ${globalSearchResult.marks.length} fragment(s)`
+              : (activeOccIndex !== -1 && occurrencesCount > 0 
+                  ? `Occurrence ${activeOccIndex + 1}/${occurrencesCount} ${multiMode ? '(MULTIPLE)' : '(UNIQUE)'}` 
+                  : 'Mode Normal')
           }
           scrollTargetIndex={historyScrollTarget}
+          onToggleOccurrence={(index) => {
+            if (isGlobalSearching) return;
+            if (multiMode) {
+              setMultiIndices(prev => 
+                prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index].sort((a,b)=>a-b)
+              );
+            }
+          }}
+          globalSearchBarText={globalSearchBarText}
+          setGlobalSearchBarText={setGlobalSearchBarText}
+          globalSearchSmartMode={globalSearchSmartMode}
+          setGlobalSearchSmartMode={setGlobalSearchSmartMode}
+          globalSearchOccIndex={globalSearchOccIndex}
+          setGlobalSearchOccIndex={setGlobalSearchOccIndex}
+          globalSearchMarks={globalSearchResult.marks}
         />
       </div>
 
@@ -853,9 +1124,93 @@ export default function App() {
             setReplaceText("");
           }
         }}
-        onBranchOut={store.createNewBranch}
+        onBranchOut={() => setIsVersionModalOpen(true)}
         onEditRecord={handleEditRecord}
         onGoToRecord={handleGoToRecord}
+        onCopyAsRequest={(index) => {
+          const rec = store.history[index];
+          if (!rec || rec.type === 'snapshot' || rec.type === 'info') {
+            alert("Attention : il est impossible de générer une requête pour ce type d'élément (snapshot ou info).");
+            return;
+          }
+          const multiTag = rec.multiMode 
+            ? (rec.multiIndices && rec.multiIndices.length > 0 ? `[MULTI:${rec.multiIndices.join(',')}]` : '[MULTI:TRUE]') 
+            : '[MULTI:FALSE]';
+          const smartTag = rec.ignoreSpaces ? '[SMART:TRUE]' : '[SMART:FALSE]';
+          const labelTag = rec.action ? `[LABEL:${rec.action}]` : '';
+          const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
+          const reqText = `${header}\n${syntaxConfig.FIND}\n${rec.findStr}\n${syntaxConfig.REPLACE}\n${rec.replaceStr}\n${syntaxConfig.END}`;
+          navigator.clipboard.writeText(reqText)
+            .then(() => alert("La requête a bien été copiée dans le presse-papier."))
+            .catch(() => alert("Erreur lors de la copie."));
+        }}
+        onUndoStrict={(index) => {
+          const rec = store.history[index];
+          if (!rec || rec.type !== 'replace') {
+            alert("Impossible d'annuler ce type d'élément.");
+            return;
+          }
+          // Tentative d'annulation : on inverse Find et Replace
+          const inverseFindStr = rec.replaceStr;
+          const inverseReplaceStr = rec.findStr;
+          
+          // Vérifier si le texte inversé existe dans le code actuel
+          const currentText = store.currentText;
+          const foundAt = currentText.indexOf(inverseFindStr);
+          
+          if (foundAt !== -1) {
+            // Cas simple : le texte du Replace existe encore tel quel dans le code
+            if (confirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nLe texte produit par cette requête a été retrouvé intact dans le code source. L'annulation va rétablir le texte d'origine.`)) {
+              store.pushReplace(
+                inverseFindStr,
+                inverseReplaceStr,
+                false,
+                [],
+                false,
+                `↩️ Annulation de "${rec.action || 'opération'}"`,
+                rec.splitChars || false
+              );
+            }
+          } else {
+            // Cas complexe : le texte a été modifié par des items ultérieurs
+            // Identifier les items conflictuels
+            const conflicting = [];
+            for (let i = index + 1; i < store.history.length; i++) {
+              const laterRec = store.history[i];
+              if (laterRec.type !== 'replace') continue;
+              // Un conflit existe si le findStr de l'item ultérieur chevauche le replaceStr de l'item à annuler
+              if (laterRec.findStr && rec.replaceStr && (
+                laterRec.findStr.includes(rec.replaceStr) || 
+                rec.replaceStr.includes(laterRec.findStr) ||
+                laterRec.findStr.includes(rec.findStr) ||
+                rec.findStr.includes(laterRec.findStr)
+              )) {
+                conflicting.push({ index: i, label: laterRec.action || `Item #${i}` });
+              }
+            }
+            
+            let message = `Impossible d'annuler directement "${rec.action || 'cette opération'}".\n\nLe texte produit par cette requête n'existe plus tel quel dans le code actuel.`;
+            
+            if (conflicting.length > 0) {
+              message += `\n\nOpérations ultérieures en conflit :\n${conflicting.map(c => `  • ${c.label} (item #${c.index + 1})`).join('\n')}`;
+              message += `\n\nVous devez d'abord annuler ces opérations en remontant le fil.`;
+            } else {
+              message += `\n\nLe texte a été modifié par des opérations ultérieures non identifiées automatiquement. Remontez le fil de l'historique pour annuler progressivement.`;
+            }
+            
+            alert(message);
+          }
+        }}
+        onCompress={(index) => {
+          if (index <= 0) {
+            alert("Impossible de compresser : cet item est déjà le premier de la pile.");
+            return;
+          }
+          if (confirm(`⚠️ ATTENTION — Opération irréversible !\n\nCette action va supprimer définitivement les ${index} entrées antérieures à l'item sélectionné et les remplacer par un snapshot unique.\n\nTout l'historique antérieur sera perdu. Continuer ?`)) {
+            store.compressHistory(index);
+          }
+        }}
+        onDeleteLast={store.popLastRecord}
         splitChars={splitChars}
         width={rightWidth}
       />
@@ -890,20 +1245,60 @@ export default function App() {
           }}
           initialConfig={store.versionConfig}
           currentVersion={store.currentVersion}
-          isInitMode={isVersionModalInitMode}
+          mode={isVersionModalInitMode ? 'init' : (store.selectedIndex < store.history.length - 1 ? 'branch' : 'upVersion')}
           projectName={store.projectName}
           onChangeProjectName={store.setProjectName}
-          onSaveConfig={(config, initVersionStr) => {
+          onSaveConfig={(config, initVersionStr, newProjectName) => {
+            if (newProjectName !== undefined) store.setProjectName(newProjectName);
             store.setVersionConfig(config);
             setIsVersionModalOpen(false);
             if (isVersionModalInitMode && initialTextPayload !== null) {
-              store.pushSnapshot(initialTextPayload, "IMPORT INITIAL", initVersionStr);
+              const pName = newProjectName !== undefined ? newProjectName : store.projectName;
+              store.pushSnapshot(
+                initialTextPayload, 
+                initialTextSource ? initialTextSource.label : "IMPORT INITIAL", 
+                initVersionStr, 
+                initialTextSource ? initialTextSource.source : "Système",
+                `Init projet — Initialisation du projet : ${pName}`
+              );
               setInitialTextPayload(null);
+              setInitialTextSource(null);
             }
           }}
-          onForceIncrement={(targetIndex) => {
-            store.createNewBranch(targetIndex);
+          onForceIncrement={(targetIndex, config, autoIndex, newProjectName, freezeArchive) => {
+            if (newProjectName !== undefined) store.setProjectName(newProjectName);
+            store.createNewBranch(targetIndex, freezeArchive);
             setIsVersionModalOpen(false);
+          }}
+          onRename={(configRanks, autoIndex, newProjectName, oldProjectName, freezeArchive) => {
+            if (newProjectName !== undefined) store.setProjectName(newProjectName);
+            const properConfig = { ranks: configRanks, autoIncrementIndex: autoIndex };
+            store.setVersionConfig(properConfig);
+            store.createNewBranch('rename', freezeArchive, oldProjectName, newProjectName, configRanks);
+            setIsVersionModalOpen(false);
+          }}
+          onBranchReset={(config, autoIndex, newProjectName, freezeArchive) => {
+            if (newProjectName !== undefined) store.setProjectName(newProjectName);
+            store.createNewBranch('0', freezeArchive);
+            setIsVersionModalOpen(false);
+          }}
+          onBranchFromParent={(config, autoIndex, newProjectName, freezeArchive) => {
+            if (newProjectName !== undefined) store.setProjectName(newProjectName);
+            store.createNewBranch('M', freezeArchive);
+            setIsVersionModalOpen(false);
+          }}
+        />
+      )}
+
+      {isEditModalOpen && (
+        <EditRecordModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          record={editModalRecord}
+          index={editModalIndex}
+          syntaxConfig={syntaxConfig}
+          onSave={(index, newLabel, newComment) => {
+            store.updateRecord(index, newLabel, newComment);
           }}
         />
       )}

@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
 import { computeLiveDiff } from '../utils/diffEngine.js';
 import { useZoomable } from '../hooks/useZoomable.js';
+import Splitter from './Splitter.jsx';
 
 /**
  * Formate un texte et ses marqueurs en HTML sécurisé pour l'affichage de diffing dans le Backdrop.
@@ -72,7 +73,10 @@ export default function SidebarLeft({
   replaceText,
   commentText,
   onChangeCommentText,
-  pendingRequestsCount,
+  currentLabel,
+  pendingRequests,
+  activeStackIndex,
+  onSelectStackRequest,
   onChangeFindText,
   onChangeReplaceText,
   splitChars,
@@ -90,14 +94,28 @@ export default function SidebarLeft({
   onOpenSettings,
   onOpenDebugger,
   syntaxConfig,
-  width
+  width,
+  onPlayStack,
+  onClearStack,
+  onRevertRequest,
+  onAuditIA,
+  activeOccIndex,
+  onSetActiveOccIndex,
+  isCodeEmpty,
+  isGlobalSearching,
+  isFindActive,
+  setIsFindActive,
+  isReplaceActive,
+  setIsReplaceActive
 }) {
   const [showInvisibles, setShowInvisibles] = useState(true);
+  const [topHeight, setTopHeight] = useState(window.innerHeight * 0.45);
 
   const backdrop1Ref = useRef(null);
   const textarea1Ref = useRef(null);
   const backdrop2Ref = useRef(null);
   const textarea2Ref = useRef(null);
+  const cherryPickListRef = useRef(null);
 
   const zoomRef1 = useZoomable(14);
   const zoomRef2 = useZoomable(14);
@@ -124,6 +142,15 @@ export default function SidebarLeft({
     handleScroll2();
   }, [findText, replaceText, showInvisibles]);
 
+  useEffect(() => {
+    if (activeOccIndex !== -1 && activeOccIndex !== undefined && cherryPickListRef.current) {
+      const activeElement = cherryPickListRef.current.children[activeOccIndex];
+      if (activeElement) {
+        activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [activeOccIndex]);
+
   // Génération du Prompt standard à copier
   const promptText = useMemo(() => {
     return `Agis comme un système de traitement de texte intelligent.
@@ -142,8 +169,8 @@ ${syntaxConfig.END}
 
 Paramètres Optionnels d'en-tête (à rajouter sur la même ligne que ${syntaxConfig.START}) :
 - [LABEL:nom-de-la-modif] : Identifiant court pour nommer ta requête dans l'historique. Fortement recommandé.
-- [MULTI:TRUE] ou [MULTI:1,3] : Active le remplacement multiple ou le cherry-picking.
-- [SMART:TRUE] : Demande l'activation du Smart Replace (Concilier les espaces) pour que le parseur ignore l'indentation d'origine (très utile pour l'édition de tableaux Markdown par exemple).
+- [MULTI:TRUE], [MULTI:1,3] ou [MULTI:NO 1,2] : Active le remplacement multiple, le cherry-picking, ou le cherry-picking inversé (NO) qui exclut spécifiquement certains index.
+- [SMART:TRUE] : Demande l'activation du Smart Replace (Concilier espaces et majuscules) pour que le parseur ignore l'indentation d'origine et la casse (très utile pour l'édition de tableaux Markdown ou corriger la casse sans tout casser).
 
 Règles d'or MANDATORY :
 - MULTISTACK : Si tu dois faire plusieurs requêtes séparées (pour éviter un FIND trop long), encadre-les toutes dans UN SEUL bloc de code, et sépare CHAQUE requête par la balise ##[MULTISTACK REQUEST]## sur une ligne vide.
@@ -195,12 +222,7 @@ Règles d'or MANDATORY :
   };
 
   const handleAuditIA = () => {
-    const text = `Bonjour. J'ai effectué la recherche selon tes consignes. Voici un audit des occurrences correspondant spécifiquement à ta requête de Cherry-Picking. Confirme-moi que tout est correct, ou donne-moi une nouvelle requête si nécessaire :
-Occurrence totale : ${occurrencesCount}
-Occurrences appliquées : [${multiIndices.join(', ')}]`;
-    navigator.clipboard.writeText(text)
-      .then(() => alert("Message d'audit IA copié dans le presse-papier !"))
-      .catch(() => alert("Erreur de copie."));
+    if (onAuditIA) onAuditIA();
   };
 
   const handlePasteImport = () => {
@@ -216,10 +238,13 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
   return (
     <div 
       style={{ width: `${width}px` }} 
-      className="flex-shrink-0 bg-bg-panel flex flex-col p-2.5 gap-2.5 overflow-y-auto select-none min-w-[200px]"
+      className="flex-shrink-0 bg-bg-panel flex flex-col overflow-hidden select-none min-w-[200px]"
     >
-      
-      {/* 1. Zone Prompt IA */}
+      {/* SECTION SUPÉRIEURE (Redimensionnable) */}
+      <div 
+        style={{ height: `${topHeight}px` }}
+        className="flex flex-col p-2.5 gap-2.5 overflow-y-auto"
+      >
       <div className="bg-[#333] p-2.5 border border-dashed border-[#555] rounded-md relative flex gap-3 text-xs flex-shrink-0">
         <div className="flex-1 min-w-0">
           <div className="font-black text-primary-blue text-base mb-1 tracking-wide uppercase">
@@ -227,7 +252,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           </div>
           <span className="text-[10px] text-[#888]">Syntaxe active :</span>
           <pre className="text-sm leading-[1.4] text-[#9cdcfe] mt-2 font-mono select-text overflow-x-auto">
-            {syntaxConfig.START} <span className="text-[#888]">[LABEL:Opt] [MULTI:Opt] [SMART:Opt]</span><br/>
+            {syntaxConfig.START} <span className="text-[#888]">[LABEL:Opt] [MULTI:Opt | NO] [SMART:Opt]</span><br/>
             <span className="text-[#888]">##Commentaire## (Optionnel)</span><br/>
             {syntaxConfig.FIND}<br/>
             <span className="text-[#888]">...texte à chercher...</span><br/>
@@ -261,17 +286,82 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         </button>
       </div>
 
-      {/* 2. Indicateur Multistack */}
-      {pendingRequestsCount > 0 && (
-        <div className="bg-[#59466D] text-white p-2 text-xs font-bold rounded-sm border border-[#8b6bb0] flex items-center justify-between shadow-md flex-shrink-0">
-          <span>📦 MULTISTACK ACTIF</span>
-          <span className="bg-[#222] px-2 py-0.5 rounded text-[10px]">{pendingRequestsCount} REQUÊTE{pendingRequestsCount > 1 ? 'S' : ''} EN ATTENTE</span>
+      {/* 2. Tableau Multistack */}
+      {pendingRequests && pendingRequests.length > 0 && (
+        <div className="flex flex-col flex-1 min-h-0 bg-[#1e1e1e] border border-border-dark p-2 rounded-sm overflow-y-auto custom-scrollbar relative">
+          <div className="text-[11px] font-bold text-[#aaa] mb-1 flex justify-between items-center">
+            <span>📦 PILE MULTISTACK</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[#20b2aa]">{pendingRequests.length} REQUÊTE{pendingRequests.length > 1 ? 'S' : ''}</span>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onClearStack(); }}
+                className="text-[#ff5555] hover:bg-[#ff555522] rounded px-1 transition"
+                title="Vider et supprimer la pile de requêtes"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            {pendingRequests.map((req, idx) => {
+              const isActive = idx === activeStackIndex;
+              let statusColor = "text-white";
+              let statusIcon = "⬜";
+              if (req.status === 'success') { statusColor = "text-[#4caf50]"; statusIcon = "✅"; }
+              else if (req.status === 'error') { statusColor = "text-[#f44336]"; statusIcon = "❌"; }
+              else if (req.status === 'repaired') { statusColor = "text-[#ff9800]"; statusIcon = "🟡"; }
+              
+              const labelText = req.parsed.label ? req.parsed.label : `Requête n° ${idx + 1}`;
+              const comment = req.parsed.comment ? ` - ${req.parsed.comment}` : '';
+              
+              return (
+                <div 
+                  key={idx} 
+                  className={`flex items-center justify-between text-xs p-1 rounded cursor-pointer border ${isActive ? 'bg-[#333] border-primary-blue' : 'hover:bg-[#2a2a2a] border-transparent'} transition`}
+                  onClick={() => onSelectStackRequest(idx)}
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="flex-shrink-0 text-[10px]" title={req.status === 'success' ? 'Succès' : req.status === 'error' ? 'Erreur' : req.status === 'repaired' ? 'Corrigée' : 'En attente'}>
+                      {statusIcon}
+                    </span>
+                    <span className={`truncate ${statusColor} ${isActive ? 'font-bold' : ''}`}>
+                      <span className="font-mono text-[10px] opacity-70 mr-1">{idx + 1} - </span>
+                      [{labelText}]
+                      {req.isModified && (
+                        <span className="text-[#ff9800] ml-1 text-[9px]" title="Cette requête a été modifiée localement">✎</span>
+                      )}
+                      <span className="opacity-60 italic text-[10px] ml-1">{comment}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-1">
+                    {req.isModified && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRevertRequest(idx); }}
+                        className="text-[#ff9800] hover:text-white hover:bg-[#ff980055] rounded px-1 py-0.5 transition leading-none"
+                        style={{ fontSize: '11px' }}
+                        title="Restaurer la requête d'origine"
+                      >
+                        ⟲
+                      </button>
+                    )}
+                    {isActive && <span className="text-primary-blue text-[10px] font-bold">&lt; ACTIVE</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* 3. Zone de Commentaire */}
-      <div className="flex flex-col flex-shrink-0">
-        <label className="text-[11px] font-bold text-[#aaa] mb-1">COMMENTAIRE (Optionnel)</label>
+      <div className="flex flex-col flex-shrink-0 mt-auto">
+        <div className="flex justify-between items-end mb-1">
+          <label className="text-[11px] font-bold text-[#aaa]">COMMENTAIRE (Optionnel)</label>
+          <span className={`text-[10px] font-bold transition-opacity ${currentLabel ? 'opacity-100' : 'opacity-0'}`}>
+            <span className="text-hl-yellow">REQ : </span>
+            <span className="text-white">{currentLabel}</span>
+          </span>
+        </div>
         <textarea
           value={commentText || ""}
           onChange={(e) => onChangeCommentText(e.target.value)}
@@ -281,12 +371,13 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
       </div>
 
       {/* 4. Boutons d'Action Principaux */}
-      <div className="flex flex-col gap-2 flex-shrink-0">
+      <div className="flex flex-col gap-2 flex-shrink-0 mb-2">
         <div className="flex gap-2 h-9">
           <button
             type="button"
+            disabled={isCodeEmpty}
             onClick={handlePasteImport}
-            className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white font-bold text-xs flex items-center justify-center gap-1.5 rounded-sm transition duration-150"
+            className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white font-bold text-xs flex items-center justify-center gap-1.5 rounded-sm transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
             title="Coller et analyser une requête syntaxique depuis le presse-papier"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.5 9.5 0 0 1 6.7 2.7L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
@@ -294,29 +385,115 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           </button>
           <button
             type="button"
-            disabled={!findText}
+            disabled={!findText || isGlobalSearching}
             onClick={onSearch}
-            className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white font-bold text-xs rounded-sm transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white font-bold text-xs rounded-sm transition duration-150 disabled:opacity-40 ${!findText || isGlobalSearching ? 'cursor-not-allowed opacity-40' : ''}`}
           >
-            🔍 RECHERCHER
+            {isGlobalSearching ? 'Recherche Globale Active' : '🔍 RECHERCHER'}
           </button>
         </div>
-        
-        <button
-          type="button"
-          disabled={occurrencesCount === 0}
-          onClick={onReplace}
-          className="w-full h-10 bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none"
-        >
-          {replaceText === "" ? '🗑️ SUPPRIMER L\'OCCURRENCE' : '⚙️ APPLIQUER LE REMPLACEMENT'}
-        </button>
-      </div>
 
-      {/* 3. Zone de Recherche (1) - Double calque Backdrop/Overlay */}
+        {pendingRequests && pendingRequests.length > 0 && (
+          <div className="text-[10px] text-center font-bold text-[#ff9800] bg-[#332200] border border-[#ff9800] rounded p-1">
+            ⚠️ Attention : il est potentiellement dangereux d'appliquer les requêtes dans le désordre.
+          </div>
+        )}
+
+        <div className="flex gap-2 h-10">
+          <button
+            type="button"
+            disabled={occurrencesCount === 0 || isGlobalSearching}
+            onClick={onReplace}
+            className={`${(pendingRequests && pendingRequests.length > 0) ? 'w-1/2' : 'w-full'} bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 ${occurrencesCount === 0 || isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''} select-none`}
+            title="Appliquer cette requête individuellement"
+          >
+            {replaceText === "" ? '🗑️ SUPPRIMER L\'OCCURRENCE' : '⚙️ APPLIQUER'}
+          </button>
+          
+          {pendingRequests && pendingRequests.length > 0 && (
+            <button
+              type="button"
+              disabled={isGlobalSearching}
+              onClick={onPlayStack}
+              className={`w-1/2 bg-[#4caf50] hover:bg-[#45a049] text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 select-none flex items-center justify-center gap-1 ${isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''}`}
+              title="Appliquer les requêtes de la pile dans l'ordre à partir de la requête active."
+            >
+              ▶ APPLIQUER PILE
+            </button>
+          )}
+        </div>
+      </div>
+      
+      </div> {/* Fin SECTION SUPÉRIEURE */}
+
+      {/* SPLITTER HORIZONTAL GAUCHE */}
+      <Splitter 
+        direction="horizontal" 
+        onResize={(clientY) => {
+          // Ajuste la hauteur de la zone supérieure selon la position de la souris
+          if (clientY > 100 && clientY < window.innerHeight - 150) {
+            setTopHeight(clientY);
+          }
+        }} 
+      />
+
+      {/* SECTION INFÉRIEURE (Recherche et paramétrage) */}
+      <div className="flex flex-col p-2.5 gap-2.5 flex-1 min-h-0 overflow-y-auto">
+      
+      {/* 5. Zone de Recherche (1) - Double calque Backdrop/Overlay */}
       <div className="flex flex-col flex-1 min-h-[100px]">
         <div className="flex justify-between items-center mb-1 flex-shrink-0">
           <span className="text-xxs text-[#aaa] font-bold uppercase">Texte à chercher (1)</span>
-          <span className="text-[11px] font-bold text-white uppercase select-all tracking-wider">FIND</span>
+          <div 
+            className={`text-[11px] font-mono px-2 py-0.5 rounded font-bold transition-colors select-none flex items-center gap-1.5 ${
+               isGlobalSearching
+                 ? 'bg-[#331111] text-[#883333] cursor-not-allowed border border-[#552222]'
+                 : isReplaceActive 
+                    ? 'bg-[#FF8C00]/20 text-[#FF8C00]/50 cursor-not-allowed'
+                    : (occurrencesCount > 0)
+                        ? (isFindActive ? 'bg-[#00FF7F] text-black shadow-[0_0_8px_rgba(0,255,127,0.6)] cursor-pointer' : 'bg-[#555] text-[#00FF7F] cursor-pointer')
+                        : (isFindActive ? 'bg-[#FF8C00] text-black cursor-pointer' : 'bg-[#555] text-[#FF8C00] cursor-pointer')
+            }`}
+            title={isGlobalSearching ? "Désactivé (Search globale active)" : isReplaceActive ? "Désactivé (Replace actif)" : "Simple-clic pour activer, double-clic pour désactiver"}
+            onDoubleClick={() => !isGlobalSearching && !isReplaceActive && setIsFindActive(false)}
+            onClick={() => {
+              if (!isGlobalSearching && !isReplaceActive && !isFindActive) {
+                setIsFindActive(true);
+              }
+            }}
+          >
+            {(occurrencesCount > 0 && isFindActive) ? (
+              <>
+                <span 
+                  className="hover:text-white px-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onSetActiveOccIndex) {
+                      onSetActiveOccIndex(prev => prev > 0 ? prev - 1 : occurrencesCount - 1);
+                    }
+                  }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                >
+                  ◀
+                </span>
+                <span>{activeOccIndex + 1} / {occurrencesCount}</span>
+                <span 
+                  className="hover:text-white px-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onSetActiveOccIndex) {
+                      onSetActiveOccIndex(prev => prev < occurrencesCount - 1 ? prev + 1 : 0);
+                    }
+                  }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                >
+                  ▶
+                </span>
+              </>
+            ) : (
+              <span>FIND</span>
+            )}
+          </div>
         </div>
         <div 
           ref={zoomRef1}
@@ -334,13 +511,14 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
             value={findText}
             onChange={(e) => onChangeFindText(normalizeText(e.target.value))}
             onScroll={handleScroll1}
+            disabled={isCodeEmpty || isGlobalSearching}
             spellCheck="false"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-            placeholder="Entrez le texte à chercher..."
-            className="overlay-layer text-left"
-            style={{ fontSize: 'inherit' }}
+            placeholder={isCodeEmpty ? "Importez d'abord un fichier source..." : "Entrez le texte à chercher..."}
+            className={`overlay-layer text-left ${isCodeEmpty || isGlobalSearching || isReplaceActive ? 'cursor-not-allowed opacity-30' : ''}`}
+            style={{ fontSize: 'inherit', color: 'transparent', backgroundColor: (isGlobalSearching || isReplaceActive) ? '#331111' : 'transparent' }}
           />
         </div>
       </div>
@@ -349,7 +527,6 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
       <div className="flex flex-col flex-1 min-h-[100px]">
         <div className="flex justify-between items-center mb-1 flex-shrink-0">
           <span className="text-xxs text-[#aaa] font-bold uppercase">À remplacer par (2)</span>
-          <span className="text-[11px] font-bold text-white uppercase select-all tracking-wider">REPLACE</span>
         </div>
         <div 
           ref={zoomRef2}
@@ -365,130 +542,146 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
           <textarea
             ref={textarea2Ref}
             value={replaceText}
+            disabled={isCodeEmpty || isGlobalSearching}
             onChange={(e) => onChangeReplaceText(normalizeText(e.target.value))}
             onScroll={handleScroll2}
             spellCheck="false"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-            placeholder="Laissez vide pour supprimer..."
-            className="overlay-layer text-left"
-            style={{ fontSize: 'inherit' }}
+            placeholder={isCodeEmpty ? "" : "Entrez le texte de remplacement..."}
+            className={`overlay-layer text-left ${isCodeEmpty || isGlobalSearching ? 'cursor-not-allowed' : ''}`}
+            style={{ fontSize: 'inherit', color: 'transparent' }}
           />
         </div>
       </div>
 
       {/* 5. Paramètres de validation et Cherry-Picking */}
       <div className="flex flex-col gap-2 mt-2 flex-shrink-0">
-        <div className="text-[11px] text-[#ccc] font-medium flex flex-col gap-2">
+        <div className="flex flex-row gap-2">
           
-          <div className="flex items-center gap-2 cursor-pointer">
+          {/* Options de validation (Gauches) */}
+          <div className="flex flex-col gap-2 flex-1 text-[11px] text-[#ccc] font-medium justify-start">
+          
+          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
             <input 
               type="checkbox" 
               id="chk-split-chars" 
               checked={splitChars}
               onChange={(e) => onChangeSplitChars(e.target.checked)}
-              className="w-4 h-4 cursor-pointer"
+              disabled={isCodeEmpty}
+              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             />
-            <label htmlFor="chk-split-chars" className="cursor-pointer select-none">
+            <label htmlFor="chk-split-chars" className={`select-none ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               Moteur strict (LCS fin)
             </label>
           </div>
 
-          <div className="flex items-center gap-2 cursor-pointer">
+          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
             <input 
               type="checkbox" 
               id="chk-ignore-spaces" 
               checked={ignoreSpaces}
               onChange={(e) => onChangeIgnoreSpaces(e.target.checked)}
-              className="w-4 h-4 cursor-pointer"
+              disabled={isCodeEmpty}
+              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             />
-            <label htmlFor="chk-ignore-spaces" className="cursor-pointer select-none font-bold text-white">
-              Concilier les espaces (Smart Replace)
+            <label htmlFor="chk-ignore-spaces" className={`select-none font-bold text-white ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+              Concilier espaces et majuscules (Smart)
             </label>
           </div>
 
-          <div className="flex items-center gap-2 cursor-pointer">
+          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
             <input 
               type="checkbox" 
               id="chk-show-invisibles" 
               checked={showInvisibles}
               onChange={(e) => setShowInvisibles(e.target.checked)}
-              className="w-4 h-4 cursor-pointer"
+              disabled={isCodeEmpty}
+              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             />
-            <label htmlFor="chk-show-invisibles" className="cursor-pointer select-none">
+            <label htmlFor="chk-show-invisibles" className={`select-none ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               Afficher les caractères cachés (·, →, ↵)
             </label>
           </div>
 
-          <div className="flex items-center gap-2 cursor-pointer mt-1">
+          <div className={`flex items-center gap-2 mt-1 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
             <input 
               type="checkbox" 
               id="chk-multi" 
               checked={multiMode}
               onChange={(e) => onChangeMultiMode(e.target.checked)}
-              className="w-4 h-4 cursor-pointer"
+              disabled={isCodeEmpty}
+              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             />
-            <label htmlFor="chk-multi" className="cursor-pointer select-none font-bold text-white">
-              {multiMode ? `Multi-remplacement (${occurrencesCount} trouvés)` : 'Occurrence unique exigée'}
+            <label htmlFor="chk-multi" className={`select-none font-bold text-white ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+              Multi-emplacement ({occurrencesCount} trouvé{occurrencesCount !== 1 ? 's' : ''})
             </label>
           </div>
 
+          </div>
+
+          {/* 6. Combo-Box de Cherry-Picking (Droite) */}
+          {multiMode && occurrencesCount > 0 && (
+            <div className="flex flex-col gap-1.5 animate-fadeIn w-[45%] flex-shrink-0">
+              <div ref={cherryPickListRef} className="max-h-[90px] overflow-y-auto bg-bg-dark border border-border-dark p-2 rounded-sm flex flex-col gap-1 text-xs text-left border-l-4 border-primary-blue scroll-smooth">
+                {cherryPickList.map((idx) => {
+                  const isChecked = multiIndices.includes(idx);
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`flex items-center gap-2 hover:bg-bg-panel px-1 py-1 rounded transition ${activeOccIndex === idx ? 'bg-primary-blue/20 border border-primary-blue/50' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleOccurrence(idx)}
+                        className="cursor-pointer w-4 h-4"
+                      />
+                      <span 
+                        className="text-[13px] font-mono text-text-light/95 cursor-pointer flex-1 select-none"
+                        onClick={() => onSetActiveOccIndex && onSetActiveOccIndex(idx)}
+                      >
+                        Occurrence #{idx + 1}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Boutons de contrôle Cherry-Picking */}
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                <button 
+                  onClick={() => handleCheckAll(true)}
+                  className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white text-[10px] font-bold py-1 rounded"
+                >
+                  ☑ TOUT
+                </button>
+                <button 
+                  onClick={() => handleCheckAll(false)}
+                  className="flex-1 bg-disabled-dark hover:bg-border-dark text-[#ccc] text-[10px] font-bold py-1 rounded"
+                >
+                  ☐ RIEN
+                </button>
+                <button 
+                  onClick={handleAuditIA}
+                  className="w-full bg-[#9E67BA] hover:bg-[#83509e] text-white text-[10px] font-bold py-1 rounded"
+                  title="Générer un rapport d'audit dans le presse-papier"
+                >
+                  AUDIT IA 🤖
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 6. Combo-Box de Cherry-Picking */}
-        {multiMode && occurrencesCount > 0 && (
-          <div className="flex flex-col gap-1.5 animate-fadeIn">
-            <div className="max-h-[90px] overflow-y-auto bg-bg-dark border border-border-dark p-2 rounded-sm flex flex-col gap-1 text-xs text-left border-l-4 border-primary-blue">
-              {cherryPickList.map((idx) => {
-                const isChecked = multiIndices.includes(idx);
-                return (
-                  <label key={idx} className="flex items-center gap-2 cursor-pointer hover:bg-bg-panel px-1 py-0.5 rounded transition">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleOccurrence(idx)}
-                      className="cursor-pointer"
-                    />
-                    <span className="text-xxs font-mono text-text-light/95">
-                      Occurrence #{idx + 1}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            {/* Boutons de contrôle Cherry-Picking */}
-            <div className="flex gap-1.5 mt-1">
-              <button 
-                onClick={() => handleCheckAll(true)}
-                className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white text-[10px] font-bold py-1 rounded"
-              >
-                ☑ TOUT
-              </button>
-              <button 
-                onClick={() => handleCheckAll(false)}
-                className="flex-1 bg-disabled-dark hover:bg-border-dark text-[#ccc] text-[10px] font-bold py-1 rounded"
-              >
-                ☐ RIEN
-              </button>
-              <button 
-                onClick={handleAuditIA}
-                className="flex-1 bg-[#9E67BA] hover:bg-[#83509e] text-white text-[10px] font-bold py-1 rounded"
-                title="Générer un rapport d'audit dans le presse-papier"
-              >
-                AUDIT IA 🤖
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mt-2.5">
-          <span className="text-[10px] text-text-light/40">v8.0.0 React Framework</span>
+        <div className="flex justify-between items-center mt-3">
+          <span className="text-sm font-bold text-text-light/60">Rogue Cherry v8.11</span>
           <button
             type="button"
+            disabled={isCodeEmpty}
             onClick={onClear}
-            className="bg-disabled-dark hover:bg-cherry-red hover:text-white text-[10px] text-[#ccc] font-bold px-3 py-1 rounded-sm transition duration-150"
+            className="bg-disabled-dark hover:bg-cherry-red hover:text-white text-xs text-[#ccc] font-bold px-4 py-1.5 rounded-sm transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
             title="Effacer les zones (1) et (2)"
           >
             🗑️ VIDER 1 & 2
@@ -496,7 +689,7 @@ Occurrences appliquées : [${multiIndices.join(', ')}]`;
         </div>
 
       </div>
-
+      </div> {/* Fin SECTION INFÉRIEURE */}
     </div>
   );
 }

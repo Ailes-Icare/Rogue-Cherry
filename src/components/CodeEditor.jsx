@@ -17,6 +17,9 @@ function renderLineContent(text, lineMarks) {
     } else {
       for (let i = mark.start; i < mark.start + mark.length && i < chars.length; i++) {
         chars[i].classes.add(mark.type);
+        if (mark.occIndex !== undefined) {
+          chars[i].occIndex = mark.occIndex;
+        }
       }
     }
   });
@@ -26,10 +29,23 @@ function renderLineContent(text, lineMarks) {
   let currentText = "";
   let elementIndex = 0;
 
-  const pushCurrent = () => {
+  const pushCurrent = (occIdx) => {
     if (currentText) {
       if (currentClasses) {
-        elements.push(<mark key={`chunk-${elementIndex++}`} className={currentClasses}>{currentText}</mark>);
+        elements.push(
+          <mark 
+            key={`chunk-${elementIndex++}`} 
+            className={currentClasses}
+            onDoubleClick={(e) => {
+              if (occIdx !== undefined && typeof window.handleToggleOcc === 'function') {
+                e.stopPropagation();
+                window.handleToggleOcc(occIdx);
+              }
+            }}
+          >
+            {currentText}
+          </mark>
+        );
       } else {
         elements.push(currentText);
       }
@@ -37,9 +53,11 @@ function renderLineContent(text, lineMarks) {
     }
   };
 
+  let currentOccIndex = undefined;
+
   for (let i = 0; i <= chars.length; i++) {
     if (zeroMarks[i]) {
-      pushCurrent();
+      pushCurrent(currentOccIndex);
       const zClasses = Array.from(zeroMarks[i]).join(" ");
       elements.push(<span key={`zero-${elementIndex++}`} className={zClasses}></span>);
     }
@@ -48,15 +66,16 @@ function renderLineContent(text, lineMarks) {
       const charData = chars[i];
       const classesStr = Array.from(charData.classes).sort().join(" ");
       
-      if (classesStr !== currentClasses) {
-        pushCurrent();
+      if (classesStr !== currentClasses || charData.occIndex !== currentOccIndex) {
+        pushCurrent(currentOccIndex);
         currentClasses = classesStr;
+        currentOccIndex = charData.occIndex;
       }
       currentText += charData.char;
     }
   }
   
-  pushCurrent();
+  pushCurrent(currentOccIndex);
   
   return elements;
 }
@@ -64,7 +83,7 @@ function renderLineContent(text, lineMarks) {
 /**
  * Ligne individuelle de code mémoïsée pour éviter les re-rendus globaux inefficaces.
  */
-const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine, isActiveOccLine, onClick }) => {
+const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine, isActiveOccLine, isTargeted, onClick }) => {
   const lineContent = useMemo(() => renderLineContent(text, marks), [text, marks]);
 
   return (
@@ -84,7 +103,11 @@ const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine,
             <span className="text-[#FFD700]/70" title="Occurrence trouvée">●</span>
           ) : null}
         </span>
-        <span className={`${isGutterModified ? 'bg-gutter-mod text-black font-bold rounded-sm px-[2px] text-[10px]' : ''}`}>
+        <span className={`
+          ${isGutterModified ? 'bg-gutter-mod text-black font-bold rounded-sm text-[10px]' : ''} 
+          ${isTargeted ? 'outline outline-1 outline-red-500 rounded-sm shadow-[0_0_5px_rgba(239,68,68,0.8)] z-10 relative bg-bg-dark text-white' : ''}
+          ${isGutterModified || isTargeted ? 'px-[2px]' : ''}
+        `}>
           {number}
         </span>
       </div>
@@ -112,12 +135,72 @@ export default function CodeEditor({
   fontSize = 14,
   setFontSize,
   statusBarInfo = "",
-  scrollTargetIndex = null
+  scrollTargetIndex = null,
+  onToggleOccurrence,
+  // Props de la recherche globale
+  globalSearchBarText = "",
+  setGlobalSearchBarText,
+  globalSearchSmartMode = false,
+  setGlobalSearchSmartMode,
+  globalSearchOccIndex = 0,
+  setGlobalSearchOccIndex,
+  globalSearchMarks = []
 }) {
   const [localEditText, setLocalEditText] = useState(text);
   const containerRef = useRef(null);
   const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
   const editorWrapperRef = useRef(null);
+
+  const linesCount = text ? text.split('\n').length : 0;
+  const charsCount = text ? text.length : 0;
+
+  const [targetHighlightLine, setTargetHighlightLine] = useState(null);
+  const targetHighlightTimerRef = useRef(null);
+
+  const [goToLineVisible, setGoToLineVisible] = useState(false);
+  const [goToLinePos, setGoToLinePos] = useState({ x: 0, y: 0 });
+  const [goToLineValue, setGoToLineValue] = useState("");
+
+  const handleStatusBarDoubleClick = (e) => {
+    setGoToLinePos({ x: e.clientX, y: e.clientY });
+    setGoToLineValue("");
+    setGoToLineVisible(true);
+  };
+
+  const handleGoToLine = () => {
+    const lineNum = parseInt(goToLineValue, 10);
+    if (!isNaN(lineNum) && lineNum >= 1 && lineNum <= linesCount) {
+      const targetLineIndex = lineNum - 1;
+      setTargetHighlightLine(targetLineIndex);
+      
+      if (targetHighlightTimerRef.current) clearTimeout(targetHighlightTimerRef.current);
+      targetHighlightTimerRef.current = setTimeout(() => {
+        setTargetHighlightLine(null);
+      }, 30000);
+
+      if (isEditable) {
+        if (textareaRef.current) {
+          const lineHeight = 1.5 * fontSize;
+          textareaRef.current.scrollTop = targetLineIndex * lineHeight;
+        }
+      } else {
+        if (containerRef.current) {
+          const targetLineNode = containerRef.current.children[targetLineIndex];
+          if (targetLineNode) {
+            targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }
+      setGoToLineVisible(false);
+    }
+  };
+
+  // Expose onToggleOccurrence to the global window for the memoized lines
+  useEffect(() => {
+    window.handleToggleOcc = onToggleOccurrence;
+    return () => { delete window.handleToggleOcc; };
+  }, [onToggleOccurrence]);
 
   // Écouteur natif pour le zoom de l'éditeur principal (évite l'erreur passive)
   useEffect(() => {
@@ -176,7 +259,8 @@ export default function CodeEditor({
             lineMarks.push({
               start: localStart,
               length: localEnd - localStart,
-              type: mark.type
+              type: mark.type,
+              occIndex: mark.occIndex
             });
 
             // Détection du statut d'occurrence pour la gouttière
@@ -251,7 +335,53 @@ export default function CodeEditor({
     <div className="flex-1 flex flex-col border border-border-dark overflow-hidden bg-bg-dark rounded-sm">
       {/* Barre d'outils de l'éditeur */}
       <div className="flex justify-between items-center bg-[#252526] px-3 py-1.5 border-b border-border-dark text-xs select-none">
-        <div className="flex-1"></div>
+        {/* Recherche globale */}
+        <div className="flex-1 flex items-center">
+          <div className={`flex items-center gap-2 px-2 py-0.5 rounded border transition-colors ${globalSearchBarText ? 'border-[#FFD700] bg-[#1e1e1e]' : 'border-border-dark bg-bg-dark'}`}>
+            <span className="text-primary-blue text-sm">🔍</span>
+            <input
+              type="text"
+              value={globalSearchBarText}
+              onChange={(e) => setGlobalSearchBarText(e.target.value)}
+              placeholder="Recherche dynamique globale..."
+              className="bg-transparent text-white text-xs outline-none w-64"
+              spellCheck="false"
+            />
+            {globalSearchBarText && (
+              <>
+                <label className="flex items-center gap-1.5 cursor-pointer ml-2 text-[#ccc]">
+                  <input 
+                    type="checkbox" 
+                    checked={globalSearchSmartMode}
+                    onChange={(e) => setGlobalSearchSmartMode(e.target.checked)}
+                    className="cursor-pointer"
+                  />
+                  Smart
+                </label>
+                <div className="flex items-center gap-1 ml-2 border-l border-border-dark pl-2">
+                  <span className="font-mono text-[#FFD700] text-[10px] w-12 text-center">
+                    {globalSearchMarks.length > 0 ? `${globalSearchOccIndex + 1}/${globalSearchMarks.length}` : '0/0'}
+                  </span>
+                  <button 
+                    onClick={() => setGlobalSearchOccIndex(Math.max(0, globalSearchOccIndex - 1))}
+                    disabled={globalSearchMarks.length === 0}
+                    className="hover:text-white disabled:opacity-50 px-1"
+                  >
+                    ▲
+                  </button>
+                  <button 
+                    onClick={() => setGlobalSearchOccIndex(Math.min(globalSearchMarks.length - 1, globalSearchOccIndex + 1))}
+                    disabled={globalSearchMarks.length === 0}
+                    className="hover:text-white disabled:opacity-50 px-1"
+                  >
+                    ▼
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
           <div className="text-[#9cdcfe] font-mono font-bold text-[11px] tracking-wider uppercase">
             {isEditable ? '✏️ MODE ÉDITION LIBRE' : '👁️ MODE LECTURE SEULE'}
@@ -288,18 +418,47 @@ export default function CodeEditor({
         style={{ fontSize: `${fontSize}px` }}
       >
         {isEditable ? (
-          // Mode Édition Libre : Textarea fluide anti-lag
-          <textarea
-            ref={textareaRef}
-            value={localEditText}
-            onChange={handleTextareaChange}
-            spellCheck="false"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            className="w-full h-full p-3 bg-bg-dark text-text-light font-mono border-none outline-none resize-none overflow-auto"
-            style={{ fontSize: 'inherit', lineHeight: 1.5 }}
-          />
+          // Mode Édition Libre : Textarea fluide anti-lag avec Gouttière
+          <div className="flex w-full h-full bg-bg-dark">
+            <div 
+              ref={gutterRef}
+              className="w-12 pr-2 text-right text-[#858585] bg-[#252526] border-r border-border-dark select-none font-sans overflow-hidden py-3"
+              style={{ fontSize: 'inherit', lineHeight: 1.5 }}
+            >
+              {localEditText.split('\n').map((_, i) => {
+                const isModified = i < lineRecords.length && lineRecords[i].isGutterModified;
+                const isTargeted = targetHighlightLine === i;
+                return (
+                  <div key={i} className="flex justify-end items-center h-[1.5em]">
+                    <span className={`pl-1 font-bold text-xs
+                      ${isModified ? 'bg-gutter-mod text-black rounded-sm text-[10px]' : ''}
+                      ${isTargeted ? 'outline outline-1 outline-red-500 rounded-sm shadow-[0_0_5px_rgba(239,68,68,0.8)] z-10 relative bg-bg-dark text-white' : ''}
+                      ${isModified || isTargeted ? 'px-[2px]' : ''}
+                    `}>
+                      {i + 1}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={localEditText}
+              onChange={handleTextareaChange}
+              onScroll={(e) => {
+                if (gutterRef.current) {
+                  gutterRef.current.scrollTop = e.target.scrollTop;
+                }
+              }}
+              spellCheck="false"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              wrap="off"
+              className="flex-1 p-3 bg-bg-dark text-text-light font-mono border-none outline-none resize-none overflow-auto whitespace-pre"
+              style={{ fontSize: 'inherit', lineHeight: 1.5 }}
+            />
+          </div>
         ) : (
           // Mode Lecture Seule : Rendu mémoïsé par lignes ultra-performant
           <div 
@@ -320,6 +479,7 @@ export default function CodeEditor({
                   isOccLine={line.isOccLine}
                   isActiveOccLine={line.isActiveOccLine}
                   isGutterModified={line.isGutterModified}
+                  isTargeted={targetHighlightLine === line.number - 1}
                 />
               ))
             )}
@@ -328,10 +488,54 @@ export default function CodeEditor({
       </div>
 
       {/* Status Bar */}
-      <div className="flex justify-between items-center bg-[#007acc] text-white px-3 py-0.5 text-[11px] font-sans select-none">
+      <div 
+        className="flex justify-between items-center bg-[#007acc] text-white px-4 py-1.5 text-xs font-bold font-sans select-none flex-shrink-0 z-10 cursor-pointer"
+        onDoubleClick={handleStatusBarDoubleClick}
+        title="Double-clic pour aller à une ligne spécifique"
+      >
         <span>{statusBarInfo || 'Prêt'}</span>
-        <span>UTF-8</span>
+        <div className="flex gap-4">
+          <span>{linesCount} Lignes</span>
+          <span>{charsCount} Caractères</span>
+          <span>UTF-8</span>
+        </div>
       </div>
+
+      {/* Mini-Modal Aller à la Ligne */}
+      {goToLineVisible && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setGoToLineVisible(false)} 
+          />
+          <div 
+            className="fixed z-50 bg-[#252526] border border-border-dark p-3 rounded shadow-xl flex flex-col gap-2 animate-fadeIn"
+            style={{ left: Math.min(goToLinePos.x, window.innerWidth - 250), top: Math.max(10, goToLinePos.y - 80) }}
+          >
+            <span className="text-[11px] text-[#ccc] font-bold uppercase tracking-wider">Aller à la ligne (1 - {linesCount})</span>
+            <div className="flex gap-1.5 items-center">
+              <input 
+                type="number" 
+                min={1} 
+                max={linesCount}
+                value={goToLineValue}
+                onChange={(e) => setGoToLineValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleGoToLine();
+                  if (e.key === 'Escape') setGoToLineVisible(false);
+                }}
+                autoFocus
+                className="bg-bg-dark text-text-light border border-border-dark px-2 py-1 text-xs outline-none focus:border-primary-blue w-24 rounded-sm font-mono"
+              />
+              <div className="flex flex-col gap-0.5">
+                <button onClick={() => setGoToLineValue(v => Math.min(linesCount, (parseInt(v)||1) + 1))} className="px-1.5 bg-[#333] hover:bg-[#444] text-white rounded-[2px] text-[8px] leading-none py-0.5">▲</button>
+                <button onClick={() => setGoToLineValue(v => Math.max(1, (parseInt(v)||1) - 1))} className="px-1.5 bg-[#333] hover:bg-[#444] text-white rounded-[2px] text-[8px] leading-none py-0.5">▼</button>
+              </div>
+              <button onClick={handleGoToLine} className="ml-1 px-3 py-1 bg-primary-blue hover:bg-primary-blue-hover transition text-white rounded-sm text-xs font-bold">GO</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

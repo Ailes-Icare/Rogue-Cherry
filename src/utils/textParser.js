@@ -31,11 +31,7 @@ export function splitMultistackRequest(rawInput) {
   
   // Si la balise Multistack est détectée
   if (text.includes("##[MULTISTACK REQUEST]##")) {
-    // On retire TOUTES les balises de séparation (regex /gi pour tous les cas)
-    text = text.replace(/##\[MULTISTACK REQUEST\]##/gi, "").trim();
-    // On sépare le texte à chaque fois qu'on rencontre soit un [REQMODIFIER], soit un START standard.
-    // L'expression régulière (?=...) permet de séparer sans consommer le délimiteur.
-    const parts = text.split(/(?=\[REQMODIFIER\]|##SYNTAX_COPIE##)/i);
+    const parts = text.split(/##\[MULTISTACK REQUEST\]##/gi);
     return parts.map(p => p.trim()).filter(p => p.length > 0);
   }
   
@@ -79,8 +75,15 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
   const sReplace = escapeRegExp(syntax.REPLACE);
   const sEnd = escapeRegExp(syntax.END);
 
-  // Vérification de l'unicité stricte des balises structurelles
   const countStr = (str, search) => (str.match(new RegExp(escapeRegExp(search), 'g')) || []).length;
+  
+  // 1. Extraction du LABEL (Nom de la requête) MÊME SI INVALIDE
+  let extractedLabel = null;
+  const labelMatch = text.match(/\[LABEL:([^\]]+)\]/i);
+  if (labelMatch) {
+    extractedLabel = labelMatch[1].trim();
+  }
+
   if (
     countStr(text, syntax.START) !== 1 || 
     countStr(text, syntax.FIND) !== 1 || 
@@ -91,7 +94,9 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
       isSyntax: true, 
       isValid: false, 
       error: "La structure de la requête est invalide. Assurez-vous qu'il n'y ait qu'une seule occurrence exacte des balises.",
-      syntaxUsed: syntax
+      syntaxUsed: syntax,
+      rawText: rawInput,
+      label: extractedLabel // On passe quand même le label !
     };
   }
 
@@ -105,19 +110,16 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
     const findText = match[2];
     const replaceText = match[3];
 
-    // 1. Extraction du LABEL (Nom de la requête)
-    // Format attendu : [LABEL:Texte libre sans crochets]
-    let label = null;
-    const labelMatch = headerContent.match(/\[LABEL:([^\]]+)\]/i);
-    if (labelMatch) {
-      label = labelMatch[1].trim();
-    }
+    // Le label a déjà été extrait en amont
+    let label = extractedLabel;
 
     // 2. Extraction du mode MULTI (occurrences multiples)
-    // Format attendu (Optionnel) : [MULTI:TRUE] ou [MULTI:FALSE] ou [MULTI:1,2,5]
+    // Format attendu (Optionnel) : [MULTI:TRUE] ou [MULTI:FALSE] ou [MULTI:0,2,5] ou [MULTI:NO 1,2,5]
+    // Les indices sont en BASE-0 (0 = 1ère occurrence, 1 = 2ème, etc.)
     let isMulti = false;
     let indices = [];
-    const multiMatch = headerContent.match(/\[MULTI:(TRUE|FALSE|\d+(?:,\d+)*)\]/i);
+    let isMultiExclude = false;
+    const multiMatch = headerContent.match(/\[MULTI:(TRUE|FALSE|NO\s+[\d\s,.-]+|[\d\s,.-]+)\]/i);
     
     if (multiMatch) {
       const mVal = multiMatch[1].toUpperCase();
@@ -125,8 +127,12 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
         isMulti = true;
       } else if (mVal !== 'FALSE') {
         isMulti = true;
-        // On convertit les index de l'IA (base 1 : 1ère occurrence) en index JS (base 0)
-        indices = mVal.split(',').map(n => parseInt(n.trim(), 10) - 1).filter(n => !isNaN(n) && n >= 0);
+        if (mVal.startsWith('NO')) {
+          isMultiExclude = true;
+          indices = mVal.replace('NO', '').replace(/[.-]/g, ',').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n >= 0);
+        } else {
+          indices = mVal.replace(/[.-]/g, ',').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n >= 0);
+        }
       }
     }
 
@@ -139,12 +145,15 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
     }
 
     // 4. Extraction du COMMENTAIRE optionnel
-    // Format attendu : ##Commentaire## suivi du texte jusqu'à la balise FIND
+    // Format attendu : ##Commentaire## Texte (sur la même ligne ou la ligne suivante)
     let comment = null;
-    const commentMatch = headerContent.match(/(?:##|@@)Commentaire(?:##|@@)?[ \t]*\n([\s\S]*)$/i);
+    const commentMatch = headerContent.match(/(?:##|@@)Commentaire(?:##|@@)?[ \t]*([\s\S]*)$/i);
     if (commentMatch) {
       // On retire les espaces superflus mais on garde les sauts de ligne internes du commentaire
-      comment = commentMatch[1].trim();
+      const extracted = commentMatch[1].trim();
+      if (extracted.length > 0) {
+        comment = extracted;
+      }
     }
 
     return {
@@ -155,6 +164,7 @@ export function parseSyntaxRequest(rawInput, customSyntax = DEFAULT_SYNTAX) {
       replaceText,
       multiMode: isMulti,
       multiIndices: indices,
+      multiExclude: isMultiExclude,
       smartMode: isSmart,
       label: label,
       comment: comment,

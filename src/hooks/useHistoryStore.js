@@ -18,10 +18,8 @@ export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndi
   
   if (ignoreSpaces) {
     const parts = findStr.split(/\s+/).filter(p => p.length > 0);
-    if (parts.length === 0) return text; // Sécurité si que des espaces
-
     const escapedParts = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const regex = new RegExp(escapedParts.join('\\s+'), 'g');
+    const regex = new RegExp(escapedParts.join('\\s+'), 'gi');
     
     let match;
     let newText = "";
@@ -60,12 +58,45 @@ export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndi
           
           let hybridText = "";
           for (let i = 0; i < replaceNonWs.length; i++) {
-            hybridText += replaceNonWs[i];
+            let repWord = replaceNonWs[i];
+            // Préservation de la casse d'origine si le mot n'est pas modifié
+            if (repWord.toLowerCase() === findNonWs[i].toLowerCase()) {
+              repWord = origTokens[i * 2];
+            }
+            hybridText += repWord;
             if (i < origWsTokens.length) {
-              hybridText += origWsTokens[i];
+              hybridText += origWsTokens[i]; // Préserve les espaces d'origine
             }
           }
           smartReplaced = hybridText;
+        } else {
+          // Si les longueurs diffèrent, on préserve au moins la casse des mots inchangés
+          const origTokens = matchedOriginalStr.split(/(\s+)/);
+          let origWordIndex = 0;
+          const origWords = origTokens.filter((_, idx) => idx % 2 === 0);
+          
+          const finalTokens = replaceTokens.map((token, idx) => {
+            if (idx % 2 !== 0) return token; // Espace de remplacement
+            if (token.trim() === '') return token;
+            
+            const tokenLower = token.toLowerCase();
+            let foundIdx = -1;
+            for (let i = origWordIndex; i < origWords.length; i++) {
+               if (origWords[i].toLowerCase() === tokenLower) {
+                  foundIdx = i;
+                  break;
+               }
+            }
+            
+            if (foundIdx !== -1) {
+               origWordIndex = foundIdx + 1;
+               return origWords[foundIdx]; // Conserver la casse d'origine
+            }
+            
+            return token; // Ajout ou modification : prend la casse de la requête
+          });
+          
+          smartReplaced = finalTokens.join('');
         }
         
         newText += text.substring(lastIndex, match.index) + smartReplaced;
@@ -82,6 +113,8 @@ export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndi
   }
   
   // MOTEUR STRICT (Ancien comportement)
+  // IMPORTANT : on utilise des fonctions de remplacement (arrow functions) au lieu
+  // de chaînes directes pour éviter que JS interprète les patterns $& $' $` dans replaceStr.
   if (multiMode) {
     if (multiIndices && multiIndices.length > 0) {
       const parts = text.split(findStr);
@@ -97,10 +130,12 @@ export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndi
       }
       return newText;
     } else {
-      return text.replaceAll(findStr, replaceStr);
+      // replaceAll avec fonction pour neutraliser les patterns $ de JS
+      return text.replaceAll(findStr, () => replaceStr);
     }
   } else {
-    return text.replace(findStr, replaceStr);
+    // replace avec fonction pour neutraliser les patterns $ de JS
+    return text.replace(findStr, () => replaceStr);
   }
 }
 
@@ -153,9 +188,13 @@ export function rebuildTextAt(history, targetIndex) {
  */
 export function useHistoryStore() {
   const [projectName, setProjectName] = useState("");
-  const [history, setHistory] = useState([]);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [storeState, setStoreState] = useState({
+    history: [],
+    selectedIndex: -1
+  });
   const [versionConfig, setVersionConfig] = useState(DEFAULT_VERSION_CONFIG);
+
+  const { history, selectedIndex } = storeState;
 
   // Mémoïsation pour éviter de recalculer le texte complet à chaque re-rendu de l'application
   const currentText = useMemo(() => {
@@ -173,14 +212,16 @@ export function useHistoryStore() {
    */
   const importProject = (name, historyArray) => {
     setProjectName(name);
-    setHistory(historyArray);
-    setSelectedIndex(historyArray.length - 1);
+    setStoreState({
+      history: historyArray,
+      selectedIndex: historyArray.length - 1
+    });
   };
 
   /**
    * Enregistre un Snapshot complet (Point d'ancrage) dans l'historique.
    */
-  const pushSnapshot = (rawText, actionName = "IMPORT INITIAL", customVersion = null) => {
+  const pushSnapshot = (rawText, actionName = "IMPORT INITIAL", customVersion = null, customSource = null, comment = null) => {
     const timestamp = getFullTimestamp();
     const normalizedRawText = normalizeText(rawText);
     
@@ -203,97 +244,282 @@ export function useHistoryStore() {
       version: nextVer,
       action: actionName,
       timestamp,
-      rawText: normalizedRawText
+      rawText: normalizedRawText,
+      source: customSource || (customVersion ? (actionName.includes("Fichier") ? actionName : "Import") : "Système"),
+      comment: comment
     };
 
-    const newHistory = [...history, record];
-    setHistory(newHistory);
-    setSelectedIndex(newHistory.length - 1);
+    setStoreState(prev => {
+      const newHistory = [...prev.history, record];
+      return {
+        history: newHistory,
+        selectedIndex: newHistory.length - 1
+      };
+    });
     return record;
   };
 
   /**
    * Enregistre une Delta-Opération (Remplacement appliqué) dans l'historique.
    */
-  const pushReplace = (findStr, replaceStr, multiMode, multiIndices, splitChars, label, ignoreSpaces = false) => {
+  const pushReplace = (findStr, replaceStr, multiMode, multiIndices, splitChars, label, ignoreSpaces = false, explicitVersion = null, comment = null, source = "requête") => {
     if (selectedIndex === -1) return null;
 
     const timestamp = getFullTimestamp();
     const lastRec = history[selectedIndex];
     
     // Déduction du nom d'action (Label)
-    const actionName = label ? label : `Opération Z${history.filter(h => h.type === "replace").length + 1}`;
+    let actionName = label;
+    if (!label || label === "spécifique" || label === "User Input") {
+      actionName = `User Input ${history.filter(h => h.action && h.action.startsWith("User Input")).length + 1}`;
+    } else if (label === "Manual Edit") {
+      actionName = `Manual Edit ${history.filter(h => h.action && h.action.startsWith("Manual Edit")).length + 1}`;
+    }
 
-    // Calcul de la version incrémentale via le moteur dynamique
-    const currentRanks = parseVersionStringToRanks(lastRec.version, versionConfig.ranks);
-    const nextRanks = incrementRank(currentRanks, versionConfig.autoIncrementIndex);
-    const nextVer = formatVersionString(nextRanks);
+    // Calcul de la version incrémentale via le moteur dynamique ou utilisation de la version explicite
+    let nextVer;
+    if (explicitVersion) {
+      nextVer = explicitVersion;
+    } else {
+      const currentRanks = parseVersionStringToRanks(lastRec.version, versionConfig.ranks);
+      const nextRanks = incrementRank(currentRanks, versionConfig.autoIncrementIndex);
+      nextVer = formatVersionString(nextRanks);
+    }
 
     const record = {
       type: "replace",
       version: nextVer,
       action: actionName,
+      label: label || null,
       timestamp,
       findStr,
       replaceStr,
       multiMode,
       multiIndices,
       splitChars,
-      ignoreSpaces
+      ignoreSpaces,
+      comment,
+      source: source
     };
 
     // Si on insère à un index intermédiaire (Time-Travel puis application d'une nouvelle branche),
     // on coupe l'historique à l'index sélectionné avant de pousser.
-    const cleanHistory = history.slice(0, selectedIndex + 1);
-    const newHistory = [...cleanHistory, record];
+    setStoreState(prev => {
+      const cleanHistory = prev.history.slice(0, prev.selectedIndex + 1);
+      
+      // Sécurisation : Il faut recalculer dynamiquement la version et le label basés sur `cleanHistory` 
+      // pour que ce soit synchronisé si plusieurs appels synchrones ont lieu !
+      const dynamicLastRec = cleanHistory[prev.selectedIndex];
+      const dynamicActionName = (!label || label === "spécifique" || label === "User Input") 
+        ? `User Input ${cleanHistory.filter(h => h.action && h.action.startsWith("User Input")).length + 1}` 
+        : (label === "Manual Edit" ? `Manual Edit ${cleanHistory.filter(h => h.action && h.action.startsWith("Manual Edit")).length + 1}` : label);
+      
+      let dynamicNextVer;
+      if (explicitVersion) {
+        dynamicNextVer = explicitVersion;
+      } else {
+        const currentRanks = parseVersionStringToRanks(dynamicLastRec.version, versionConfig.ranks);
+        const nextRanks = incrementRank(currentRanks, versionConfig.autoIncrementIndex);
+        dynamicNextVer = formatVersionString(nextRanks);
+      }
+
+      const finalRecord = {
+        ...record,
+        action: dynamicActionName,
+        version: dynamicNextVer
+      };
+
+      const newHistory = [...cleanHistory, finalRecord];
+      return {
+        history: newHistory,
+        selectedIndex: newHistory.length - 1
+      };
+    });
     
-    setHistory(newHistory);
-    setSelectedIndex(newHistory.length - 1);
+    return record;
+  };
+
+  /**
+   * Enregistre un Item informatif dans l'historique (ex: Export, Sauvegarde).
+   * Transparent : il est ignoré lors des opérations de retour en arrière ou de navigation dans l'historique.
+   */
+  const pushInfoRecord = (actionName, comment = null, source = "Système") => {
+    if (selectedIndex === -1) return null;
+
+    const timestamp = getFullTimestamp();
+    const lastRec = history[selectedIndex];
+    
+    // La version reste identique au dernier snapshot/replace actif
+    const currentVer = lastRec.version;
+
+    const record = {
+      type: "info",
+      version: currentVer,
+      action: actionName,
+      label: actionName,
+      timestamp,
+      comment,
+      source
+    };
+
+    setStoreState(prev => {
+      const newHistory = [...prev.history, record];
+      // On n'incrémente PAS le selectedIndex pour que le time-travel pointe toujours sur la vraie dernière modif !
+      // Mais wait, si on n'incrémente pas selectedIndex, le record sera effacé au prochain pushReplace...
+      // La consigne est "n'incrémente pas la version", et ignoré par la navigation.
+      // Donc oui on doit incrémenter selectedIndex pour qu'il soit dans l'historique de base, mais on le gérera dans App.js ou SidebarRight pour le bloquer au clic.
+      return {
+        history: newHistory,
+        selectedIndex: newHistory.length - 1
+      };
+    });
+    
     return record;
   };
 
   /**
    * Crée une ramification / embranchement à partir de l'index sélectionné dans l'historique.
    * 
-   * @param {number} targetRankIndex - L'index du rang à incrémenter (ou -1 pour annuler le futur sans saut)
+   * @param {number|string} targetRankIndex - L'index du rang à incrémenter (ou 'rename', ou -1 pour annuler)
+   * @param {boolean} freezeArchive - Si vrai, on appose le label "+ Save"
    */
-  const createNewBranch = (targetRankIndex) => {
+  const createNewBranch = (targetRankIndex, freezeArchive = false, oldProjectName = "", newProjectName = "", overrideConfigRanks = null) => {
     if (selectedIndex === -1 || !history[selectedIndex]) return;
 
     if (targetRankIndex === -1) {
       // Pur retour en arrière (annulation complète du futur)
-      const cleanHistory = history.slice(0, selectedIndex + 1);
-      setHistory(cleanHistory);
-      setSelectedIndex(cleanHistory.length - 1);
+      setStoreState(prev => {
+        const cleanHistory = prev.history.slice(0, prev.selectedIndex + 1);
+        return {
+          history: cleanHistory,
+          selectedIndex: cleanHistory.length - 1
+        };
+      });
       return;
     }
 
     const currentTextCopy = currentText;
     const lastRec = history[selectedIndex];
     const timestamp = getFullTimestamp();
+    const baseVersion = lastRec.version;
 
     // Calcul de la version dynamique
     const currentRanks = parseVersionStringToRanks(lastRec.version, versionConfig.ranks);
-    const nextRanks = incrementRank(currentRanks, targetRankIndex);
+    let nextRanks;
+    let actionLabel = "";
+    let commentText = "";
+    
+    if (targetRankIndex === 'rename') {
+      nextRanks = currentRanks; // Version inchangée au niveau des numéros
+      if (overrideConfigRanks && nextRanks.length > 0 && nextRanks[0].type === 'fixed' && overrideConfigRanks.length > 0) {
+        nextRanks[0].value = overrideConfigRanks[0].value;
+      }
+      actionLabel = freezeArchive ? "CHGNAME + Save" : "CHGNAME";
+      commentText = `Changement du nom — ${oldProjectName} vers ${newProjectName}`;
+    } else if (targetRankIndex === '0') {
+      // Remettre à zéro : V1.0.0 (premier rang num/alpha à 1, les suivants à 0)
+      nextRanks = JSON.parse(JSON.stringify(currentRanks));
+      let isFirstNumeric = true;
+      for (let i = 0; i < nextRanks.length; i++) {
+        if (nextRanks[i].type === 'numeric') {
+          nextRanks[i].value = isFirstNumeric ? 1 : 0;
+          isFirstNumeric = false;
+        } else if (nextRanks[i].type === 'alpha') {
+          const isUpper = String(nextRanks[i].value) === String(nextRanks[i].value).toUpperCase();
+          nextRanks[i].value = isUpper ? 'A' : 'a';
+          isFirstNumeric = false;
+        }
+      }
+    } else if (targetRankIndex === 'M') {
+      // Repartir de la branche parente
+      nextRanks = incrementRank(currentRanks, versionConfig.autoIncrementIndex);
+    } else {
+      nextRanks = incrementRank(currentRanks, targetRankIndex);
+    }
+    
     const nextVer = formatVersionString(nextRanks);
 
-    const actionName = `SAUT DE VERSION (depuis ${lastRec.version})`;
+    // Ajout linéaire du Snapshot de saut de version à la fin de l'historique
+    setStoreState(prev => {
+      const isAtTip = prev.selectedIndex === prev.history.length - 1;
+      
+      if (targetRankIndex !== 'rename') {
+        if (isAtTip) {
+          actionLabel = freezeArchive ? "CHG VER + Save" : "CHG VER";
+          commentText = `Changement de version (v${baseVersion} -> ${nextVer})`;
+        } else {
+          actionLabel = freezeArchive ? "BRANCHE + Save" : "Nouvelle Branche";
+          commentText = `Nouvelle Branche à partir de v${baseVersion}`;
+        }
+      }
 
-    // Nettoyage de l'historique futur
-    const newHistory = history.slice(0, selectedIndex + 1);
-    
-    // On force la création d'un nouveau Snapshot pour fixer le nouvel embranchement majeur !
-    const record = {
-      type: "snapshot",
-      version: nextVer,
-      action: actionName,
-      timestamp,
-      rawText: currentTextCopy
-    };
-    
-    const updatedHistory = [...newHistory, record];
-    setHistory(updatedHistory);
-    setSelectedIndex(updatedHistory.length - 1);
+      const record = {
+        type: "snapshot",
+        version: nextVer,
+        action: actionLabel,
+        comment: commentText,
+        timestamp,
+        source: "user_cmd",
+        rawText: currentTextCopy,
+        isSaved: freezeArchive
+      };
+      
+      const updatedHistory = [...prev.history, record];
+      return {
+        history: updatedHistory,
+        selectedIndex: updatedHistory.length - 1
+      };
+    });
+  };
+
+  /**
+   * Supprime strictement le dernier item de la pile.
+   * Rétablit l'état tel qu'il était avant cette opération.
+   */
+  const popLastRecord = () => {
+    setStoreState(prev => {
+      if (prev.history.length === 0) return prev;
+      const newHistory = prev.history.slice(0, prev.history.length - 1);
+      return {
+        history: newHistory,
+        selectedIndex: newHistory.length - 1
+      };
+    });
+  };
+
+  /**
+   * Compresse l'historique : purge tous les items avant targetIndex
+   * et les remplace par un snapshot contenant le texte compilé à ce point.
+   * 
+   * @param {number} targetIndex - L'index à partir duquel conserver l'historique.
+   */
+  const compressHistory = (targetIndex) => {
+    setStoreState(prev => {
+      if (targetIndex <= 0 || targetIndex >= prev.history.length) return prev;
+      
+      // Reconstruire le texte juste avant l'index cible
+      const textAtTarget = rebuildTextAt(prev.history, targetIndex - 1);
+      
+      // Créer un snapshot de remplacement
+      const compressionSnapshot = {
+        type: 'snapshot',
+        version: prev.history[targetIndex].version || '1.0.0',
+        action: `Compression de l'historique (Base: v${prev.history[targetIndex].version})`,
+        timestamp: getFullTimestamp(),
+        source: "user_cmd",
+        rawText: textAtTarget,
+        comment: `Historique compressé. ${targetIndex} entrées antérieures ont été fusionnées.`
+      };
+      
+      // Nouveau tableau : snapshot + items à partir de targetIndex
+      const newHistory = [compressionSnapshot, ...prev.history.slice(targetIndex)];
+      
+      return {
+        history: newHistory,
+        // L'ancien selectedIndex pointe maintenant sur un index décalé
+        selectedIndex: Math.max(0, prev.selectedIndex - targetIndex + 1)
+      };
+    });
   };
 
   /**
@@ -301,8 +527,22 @@ export function useHistoryStore() {
    */
   const resetStore = () => {
     setProjectName("");
-    setHistory([]);
-    setSelectedIndex(-1);
+    setStoreState({ history: [], selectedIndex: -1 });
+  };
+
+  // Rétrocompatibilité pour les exports
+  const setHistory = (newHist) => {
+    setStoreState(prev => ({
+      ...prev,
+      history: typeof newHist === 'function' ? newHist(prev.history) : newHist
+    }));
+  };
+
+  const setSelectedIndex = (index) => {
+    setStoreState(prev => ({
+      ...prev,
+      selectedIndex: typeof index === 'function' ? index(prev.selectedIndex) : index
+    }));
   };
 
   return {
@@ -311,7 +551,6 @@ export function useHistoryStore() {
     history,
     setHistory,
     selectedIndex,
-    setSelectedIndex,
     currentText,
     currentVersion,
     versionConfig,
@@ -319,16 +558,24 @@ export function useHistoryStore() {
     importProject,
     pushSnapshot,
     pushReplace,
-    editHistoryRecord: (index, actionName, comment) => {
-      setHistory(prev => {
-        const newHistory = [...prev];
+    pushInfoRecord,
+    createNewBranch,
+    popLastRecord,
+    compressHistory,
+    setSelectedIndex: (idx) => {
+      // Sécurité : on empêche la sélection des items informatifs
+      if (storeState.history[idx] && storeState.history[idx].type === 'info') return;
+      setStoreState(prev => ({ ...prev, selectedIndex: idx }));
+    },
+    resetStore,
+    updateRecord: (index, actionName, comment) => {
+      setStoreState(prev => {
+        const newHistory = [...prev.history];
         if (newHistory[index]) {
           newHistory[index] = { ...newHistory[index], action: actionName, comment };
         }
-        return newHistory;
+        return { ...prev, history: newHistory };
       });
-    },
-    createNewBranch,
-    resetStore
+    }
   };
 }

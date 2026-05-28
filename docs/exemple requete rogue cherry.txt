@@ -1,0 +1,77 @@
+##SYNTAX_COPIE## [LABEL:MAINT-1-LOGS] [MULTI:TRUE]
+##Commentaire## Regroupement 1 : Nettoyage global de toutes les alertes de capteurs thermiques redondantes.
+##FIND##
+[LOG_ERROR] Anomalie mineure détectée sur le capteur thermique secteur 4.
+##REPLACE##
+[LOG_SYSTEM] Capteur thermique secteur 4 réinitialisé et calibré. Status: OK.
+##END_COPIE##
+
+##[MULTISTACK REQUEST]##
+
+##SYNTAX_COPIE## [LABEL:MAINT-1-DROIDES] [MULTI:FALSE]
+##Commentaire## Regroupement 1 (suite) : Mise à jour de l'état de l'équipe technique des droïdes.
+##FIND##
+Rapport de maintenance des droïdes :
+
+- Droïde 1 : Actif
+- Droïde 2 : En charge
+- Droïde 3 : En réparation
+##REPLACE##
+Rapport de maintenance des droïdes :
+- Droïde 1 : Actif
+- Droïde 2 : Actif et disponible
+- Droïde 3 : En phase de remontage (75%)
+##END_COPIE##
+
+##[MULTISTACK REQUEST]##
+
+##SYNTAX_COPIE## [LABEL:UX-TABLEAU-RESSOURCES] [SMART:TRUE]
+##Commentaire## Requête ciblée sur le tableau : SMART=TRUE permet d'ignorer la sur-indentation de l'original et d'injecter la colonne 'Urgence'.
+##FIND##
+| Ressource | Quantité | Statut |
+| :--- | :---: | ---: |
+| Oxygène | 98% | Critique |
+| Eau | 45% | Nominal |
+| Carburant | 12% | Alerte |
+##REPLACE##
+| Ressource | Quantité | Statut | Urgence |
+| :--- | :---: | :---: | :---: |
+| Oxygène | 100% | Nominal | Basse |
+| Eau | 85% | Nominal | Basse |
+| Carburant | 95% | Nominal | Basse |
+##END_COPIE##
+
+##[MULTISTACK REQUEST]##
+
+##SYNTAX_COPIE## [LABEL:SOLO-CIBLAGE-ALPHA] [MULTI:0,2]
+##Commentaire## Requête Solo : Remplacement chirurgical des occurrences index 0 et 2 du bloc ALPHA_TARGET.
+##FIND##
+Cette phrase contient le mot-clé : ALPHA_TARGET.
+##REPLACE##
+[CRITICAL_UPDATE] Point de passage ALPHA_TARGET sécurisé. Redirection des flux validée.
+##END_COPIE##
+
+##[MULTISTACK REQUEST]##
+
+##SYNTAX_COPIE## [LABEL:SOLO-TRAJECTOIRE] [MULTI:FALSE]
+##Commentaire## Requête Solo : Ajustement des paramètres de navigation pour le retour sur Terre.
+##FIND##
+Calcul de la trajectoire de retour vers la Terre.
+La trajectoire optimale passe par la frange externe de la ceinture d'astéroïdes.
+Vitesse estimée : Mach 450.
+Temps estimé : 4 ans.
+##REPLACE##
+Calcul de la trajectoire de retour vers la Terre.
+[CORRECTION] La trajectoire évite désormais la ceinture d'astéroïdes via un saut hyper-espace.
+Vitesse estimée : Distorsion 2.1.
+Temps estimé : 3 semaines.
+##END_COPIE##
+
+
+
+
+
+
+
+
+

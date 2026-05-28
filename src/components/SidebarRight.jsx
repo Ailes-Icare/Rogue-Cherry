@@ -4,30 +4,53 @@ import { computeLiveDiff } from '../utils/diffEngine.js';
 import { useZoomable } from '../hooks/useZoomable.js';
 
 // Rendu des segments de texte avec les balises CSS
+// Approche par char-map : chaque caractère reçoit l'union de ses classes CSS.
+// Gère correctement les marks qui se chevauchent (ex: hl-line-mod + hl-word-mod).
 function renderDiffSegment(text, marks) {
   if (!text) return "";
   if (!marks || marks.length === 0) return text;
 
-  const sorted = [...marks].sort((a, b) => a.start - b.start);
-  const elements = [];
-  let lastIdx = 0;
+  // Étape 1 : Construire un tableau de classes pour chaque caractère
+  const charClasses = new Array(text.length);
+  for (let i = 0; i < text.length; i++) charClasses[i] = new Set();
 
-  sorted.forEach((mark, index) => {
-    if (mark.start > lastIdx) {
-      elements.push(text.substring(lastIdx, mark.start));
+  marks.forEach(mark => {
+    if (mark.length === 0) return; // Marques de longueur 0 (curseur de suppression) ignorées visuellement
+    for (let i = mark.start; i < mark.start + mark.length && i < text.length; i++) {
+      charClasses[i].add(mark.type);
     }
-    const highlighted = text.substring(mark.start, mark.start + mark.length);
-    elements.push(
-      <mark key={`${index}-${mark.start}`} className={mark.type}>
-        {highlighted}
-      </mark>
-    );
-    lastIdx = mark.start + mark.length;
   });
 
-  if (lastIdx < text.length) {
-    elements.push(text.substring(lastIdx));
+  // Étape 2 : Fusionner les caractères consécutifs ayant les mêmes classes
+  const elements = [];
+  let currentClasses = "";
+  let currentText = "";
+  let elementIndex = 0;
+
+  const pushCurrent = () => {
+    if (currentText) {
+      if (currentClasses) {
+        elements.push(
+          <mark key={`seg-${elementIndex++}`} className={currentClasses}>
+            {currentText}
+          </mark>
+        );
+      } else {
+        elements.push(currentText);
+      }
+      currentText = "";
+    }
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const classesStr = Array.from(charClasses[i]).sort().join(" ");
+    if (classesStr !== currentClasses) {
+      pushCurrent();
+      currentClasses = classesStr;
+    }
+    currentText += text[i];
   }
+  pushCurrent();
 
   return elements;
 }
@@ -45,13 +68,17 @@ export default function SidebarRight({
   onBranchOut,
   onEditRecord,
   onGoToRecord,
+  onCopyAsRequest,
+  onUndoStrict,
+  onCompress,
+  onDeleteLast,
   splitChars,
   width,
   onResizeWidth
 }) {
   const [showMiniViews, setShowMiniViews] = useState(true);
   const [isSyncScroll, setIsSyncScroll] = useState(true);
-  const [historyHeight, setHistoryHeight] = useState(250); // Hauteur par défaut en pixels pour la table d'historique
+  const [historyHeight, setHistoryHeight] = useState(Math.max(250, window.innerHeight * 0.5)); // Hauteur par défaut à 50% de l'écran
   const beforeScrollRef = useZoomable(10);
   const afterScrollRef = useZoomable(10);
   const isSyncingRef = useRef(false);
@@ -120,15 +147,7 @@ export default function SidebarRight({
 
   const handleBranchClick = () => {
     if (selectedIndex === -1 || !history[selectedIndex]) return;
-    const currentVer = history[selectedIndex].version;
-    const type = prompt(
-      `${currentVer} (Sélectionnée).\nVoulez-vous passer à la version supérieure ?\n\nÉcrivez 'M' pour Majeur (VX.0.0),\n'm' pour Mineur (VX.Y.0),\nou '0' pour couper l'historique futur (retour arrière pur) :`
-    );
-    if (type === 'M' || type === 'm' || type === '0') {
-      onBranchOut(type);
-    } else if (type !== null) {
-      alert("Option invalide. Veuillez saisir M, m ou 0.");
-    }
+    onBranchOut('modal');
   };
 
   const handleHistoryResize = (newY) => {
@@ -175,9 +194,11 @@ export default function SidebarRight({
         </button>
       </div>
 
-      {/* Titre Historique */}
-      <div className="text-[1.3em] font-extrabold text-primary-blue tracking-wide uppercase select-none flex-shrink-0 mt-1">
-        📚 HISTORIQUE DES VERSIONS
+      {/* Titre Historique & Navigation */}
+      <div className="flex flex-col gap-2 flex-shrink-0 mt-1">
+        <div className="text-[1.3em] font-extrabold text-primary-blue tracking-wide uppercase select-none">
+          📚 HISTORIQUE DES VERSIONS
+        </div>
       </div>
 
       {/* 2. Tableau de la pile d'historique (3 colonnes) */}
@@ -185,54 +206,62 @@ export default function SidebarRight({
         style={{ height: showMiniViews ? `${historyHeight}px` : 'auto' }}
         className={`border border-border-dark bg-bg-dark rounded-sm overflow-y-auto ${showMiniViews ? 'flex-shrink-0' : 'flex-1'}`}
       >
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full text-left text-xs border-collapse table-auto">
           <thead className="bg-bg-panel sticky top-0 z-10 select-none border-b border-border-dark text-[10px] text-[#888] uppercase tracking-wider">
             <tr>
-              <th className="p-2 w-[25%]">Ver.</th>
-              <th className="p-2 w-[50%]">Action / Label</th>
-              <th className="p-2 w-[25%] text-right pr-3">Heure</th>
+              <th className="p-2 whitespace-nowrap w-px">Ver.</th>
+              <th className="p-2 whitespace-nowrap w-px">Label</th>
+              <th className="p-2 w-full">Commentaire</th>
+              <th className="p-2 whitespace-nowrap w-px">Source</th>
+              <th className="p-2 text-right pr-3 whitespace-nowrap w-px">Heure</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#2d2d2d] font-sans">
             {history.length === 0 ? (
               <tr>
-                <td colSpan="3" className="p-4 text-center text-[#666] italic">
+                <td colSpan="5" className="p-4 text-center text-[#666] italic">
                   Aucun historique.
                 </td>
               </tr>
             ) : (
-              history.map((rec, index) => (
-                <tr
-                  key={index}
-                  onClick={() => onSelectIndex(index)}
-                  className={`cursor-pointer transition duration-100 ${
-                    index === selectedIndex
-                      ? 'bg-[#37373d] border-l-4 border-primary-blue font-bold text-white'
-                      : 'hover:bg-bg-panel text-text-light/90'
-                  }`}
-                >
-                  <td className="p-2 font-mono text-[11px] align-top">{rec.version}</td>
-                  <td className="p-2 align-top">
-                    <div className="truncate max-w-[120px]" title={rec.action}>
-                      {rec.action}
-                    </div>
-                    {rec.comment && (
-                      <div className="text-[9px] text-[#888] italic truncate max-w-[120px] mt-0.5" title={rec.comment}>
-                        {rec.comment}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-2 text-right pr-3 text-[#999] text-xs font-mono align-top whitespace-nowrap">
-                    {rec.timestamp ? rec.timestamp.split(' ')[1] : ''}
-                    {index === selectedIndex && rec.type !== 'snapshot' && (
-                       <div className="flex gap-2 justify-end mt-1 text-base">
-                           <button onClick={(e) => { e.stopPropagation(); onEditRecord(index); }} title="Éditer le label ou le commentaire" className="hover:text-primary-blue transition-colors">✏️</button>
-                           <button onClick={(e) => { e.stopPropagation(); onGoToRecord(); }} title="Aller à la modification ciblée" className="hover:text-primary-blue transition-colors">🎯</button>
-                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))
+              history.map((rec, index) => {
+                const isInfo = rec.type === 'info';
+                const isSelected = index === selectedIndex && !isInfo;
+                
+                return (
+                  <tr
+                    key={index}
+                    onClick={() => { if (!isInfo) onSelectIndex(index); }}
+                    className={`transition duration-100 ${
+                      isInfo 
+                        ? 'bg-[#1a1a1a] text-[#666] border-l-4 border-transparent cursor-default'
+                        : isSelected
+                          ? 'bg-[#37373d] border-l-4 border-primary-blue font-bold text-white cursor-pointer'
+                          : 'hover:bg-bg-panel text-text-light/90 cursor-pointer'
+                    }`}
+                  >
+                    <td className={`p-2 font-mono text-[10px] align-top whitespace-nowrap w-px ${rec.isSaved ? 'text-[#87cefa]' : ''}`}>{rec.version}</td>
+                    <td className={`p-2 align-top whitespace-nowrap w-px ${rec.isSaved ? 'text-[#87cefa] font-bold' : ''}`} title={rec.action}>
+                      {isInfo ? <span className="italic">[{rec.action}]</span> : rec.action}
+                    </td>
+                    <td className={`p-2 align-top break-words w-full ${rec.isSaved ? 'text-[#87cefa]' : 'text-[#888]'}`} title={rec.comment}>
+                      {rec.comment}
+                    </td>
+                    <td className="p-2 align-top text-[#9cdcfe] text-[10px] whitespace-nowrap w-px" title={rec.source}>
+                      {rec.source && rec.source.startsWith("file :") ? "Fichier : 📁" : rec.source}
+                    </td>
+                    <td className="p-2 text-right pr-3 text-[#999] text-[10px] font-mono align-top whitespace-nowrap w-px">
+                      {rec.timestamp}
+                      {isSelected && rec.type !== 'snapshot' && (
+                         <div className="flex gap-1.5 justify-end mt-1 text-base">
+                             <button onClick={(e) => { e.stopPropagation(); onEditRecord(index); }} title="Éditer le label ou le commentaire" className="hover:text-primary-blue transition-colors">✏️</button>
+                             <button onClick={(e) => { e.stopPropagation(); onGoToRecord(); }} title="Aller à la modification ciblée" className="hover:text-primary-blue transition-colors">🎯</button>
+                         </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -243,40 +272,138 @@ export default function SidebarRight({
         <Splitter direction="horizontal" onResize={handleHistoryResize} />
       )}
 
-      {/* Barre de contrôles des Mini-Views */}
-      <div className="flex justify-between items-center text-xs flex-shrink-0 mt-1 select-none">
-        <div className="bg-[#333] border border-dashed border-[#555] rounded px-2 py-1 text-[11px] text-[#888] italic">
-          futures optimisations V2.0
+      {/* Barre de contrôles des Mini-Views et Commentaire */}
+      <div className="flex flex-col gap-1.5 flex-shrink-0 mt-1 select-none">
+        
+        {/* Commentaire de la version sélectionnée */}
+        <div className="flex flex-col">
+          <div className="flex justify-between items-center mb-0.5">
+            <span className="text-[10px] text-[#aaa] font-bold uppercase">Commentaire de l'action</span>
+            <div className="flex gap-1">
+              {selectedIndex !== -1 && history[selectedIndex] && history[selectedIndex].multiMode && (
+                <span className="bg-[#5c2d91] text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">
+                  {history[selectedIndex].multiIndices && history[selectedIndex].multiIndices.length > 0 
+                    ? `CHERRY-PICK [${history[selectedIndex].multiIndices.map(i=>i+1).join(', ')}]` 
+                    : 'MULTI'}
+                </span>
+              )}
+              {selectedIndex !== -1 && history[selectedIndex] && history[selectedIndex].ignoreSpaces && (
+                <span className="bg-[#007acc] text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">SMART</span>
+              )}
+            </div>
+          </div>
+          <textarea
+            readOnly
+            value={selectedIndex !== -1 && history[selectedIndex] ? (history[selectedIndex].comment || "Aucun commentaire.") : ""}
+            className="w-full h-[35px] bg-bg-dark border border-border-dark text-[#d4d4d4] text-[10px] p-1.5 rounded-sm resize-none focus:outline-none font-sans italic"
+            placeholder="Aucun commentaire disponible..."
+          />
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <span className="text-[10px] text-[#aaa] font-bold">Détails (AVANT / APRÈS)</span>
-          <div className="flex gap-2">
+
+        <div className="flex justify-between items-center text-xs gap-2">
+          {/* Navigation et actions (déplacées de la topbar et du tableau) */}
+          <div className="flex flex-1 gap-1 h-12 select-none">
             <button
               type="button"
-              onClick={() => setIsSyncScroll(!isSyncScroll)}
-              className={`w-8 h-7 flex items-center justify-center rounded border transition text-base ${
-                isSyncScroll
-                  ? 'bg-[#2a2d2e] border-primary-blue text-white'
-                  : 'bg-bg-dark border-border-dark text-[#777]'
-              }`}
-              title={isSyncScroll ? "Désactiver le défilement synchronisé des mini-views" : "Activer le défilement synchronisé (🔗)"}
+              disabled={selectedIndex <= 0}
+              onClick={() => onSelectIndex(selectedIndex - 1)}
+              className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-sm rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Retourner à la version précédente"
             >
-              {isSyncScroll ? '🔗' : '🔓'}
+              ◀ Préc.
+            </button>
+            <button
+              disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
+              onClick={() => onSelectIndex(selectedIndex + 1)}
+              className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-sm rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Avancer à la version suivante"
+            >
+              Suiv. ▶
             </button>
             <button
               type="button"
-              onClick={() => setShowMiniViews(!showMiniViews)}
-              className="bg-bg-panel hover:bg-bg-dark border border-border-dark px-3 py-1 rounded text-[11px] font-bold text-[#d4d4d4]"
+              disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
+              onClick={handleBranchClick}
+              className="flex-[1.5] bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded transition duration-150 flex justify-center items-center gap-1 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-center leading-tight px-1 overflow-hidden"
+              title="Créer une nouvelle branche à partir de cette version"
             >
-              {showMiniViews ? 'Masquer ▲' : 'Afficher ▼'}
+              <span className="mr-1.5 whitespace-nowrap flex-shrink-0">New Branch</span>
+              <svg className="transform scale-y-[-1] flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
             </button>
+            
+            <div className="w-px bg-[#444] mx-0.5"></div>
+            
+            <button
+              disabled={selectedIndex === -1 || history[selectedIndex]?.type === 'snapshot' || history[selectedIndex]?.type === 'info'}
+              onClick={() => onCopyAsRequest && onCopyAsRequest(selectedIndex)}
+              className="flex-1 bg-bg-panel hover:bg-bg-dark text-green-500 border border-border-dark font-bold text-lg rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              title="Copier la requête"
+            >
+              📋
+            </button>
+            <button
+              disabled={selectedIndex === -1 || history[selectedIndex]?.type !== 'replace'}
+              onClick={() => onUndoStrict && onUndoStrict(selectedIndex)}
+              className="flex-1 bg-bg-panel hover:bg-bg-dark text-cherry-red border border-border-dark font-bold text-lg rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              title="Annuler (Undo)"
+            >
+              ↩️
+            </button>
+            <button
+              disabled={selectedIndex <= 0}
+              onClick={() => onCompress && onCompress(selectedIndex)}
+              className="flex-1 bg-bg-panel hover:bg-bg-dark text-purple-400 border border-border-dark font-bold text-lg rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              title="Compresser l'historique"
+            >
+              🗜️
+            </button>
+            
+            <div className="w-px bg-[#444] mx-0.5"></div>
+            
+            <button
+              disabled={selectedIndex === -1 || selectedIndex !== history.length - 1}
+              onClick={() => {
+                if (confirm("Voulez-vous vraiment supprimer définitivement ce dernier élément ?")) {
+                  onDeleteLast();
+                }
+              }}
+              className="flex-1 bg-bg-panel hover:bg-cherry-red text-white border border-border-dark hover:border-cherry-red font-bold text-xs rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              title="Supprimer dernier item"
+            >
+              🗑️
+            </button>
+          </div>
+          
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
+            <span className="text-[10px] text-[#aaa] font-bold">Détails (AVANT / APRÈS)</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSyncScroll(!isSyncScroll)}
+                className={`w-8 h-7 flex items-center justify-center rounded border transition text-base ${
+                  isSyncScroll
+                    ? 'bg-[#2a2d2e] border-primary-blue text-white'
+                    : 'bg-bg-dark border-border-dark text-[#777]'
+                }`}
+                title={isSyncScroll ? "Désactiver le défilement synchronisé des mini-views" : "Activer le défilement synchronisé (🔗)"}
+              >
+                {isSyncScroll ? '🔗' : '🔓'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMiniViews(!showMiniViews)}
+                className="bg-bg-panel hover:bg-bg-dark border border-border-dark px-3 py-1 rounded text-[11px] font-bold text-[#d4d4d4]"
+              >
+                {showMiniViews ? 'Masquer ▲' : 'Afficher ▼'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* 4. Les Mini-Views AVANT / APRÈS */}
       {showMiniViews && (
-        <div className="flex-1 flex flex-col gap-2 min-h-[120px]">
+        <div className="flex-1 flex flex-col gap-2 min-h-[120px] mt-1">
           {/* Mini-View AVANT (FIND) */}
           <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-bg-dark border border-border-dark rounded-sm">
             <div className="bg-bg-panel px-2.5 py-0.5 text-[10px] text-[#888] font-bold border-b border-border-dark uppercase tracking-wider text-left">
@@ -319,41 +446,7 @@ export default function SidebarRight({
         </div>
       )}
 
-      {/* 5. Pile de boutons temporels */}
-      <div className="flex gap-2 h-14 flex-shrink-0 mt-1 select-none">
-        <button
-          type="button"
-          disabled={selectedIndex <= 0}
-          onClick={() => onSelectIndex(selectedIndex - 1)}
-          className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-xs rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Retourner à la version précédente"
-        >
-          ◀ Préc.
-        </button>
-        <button
-          type="button"
-          disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
-          onClick={handleBranchClick}
-          className="flex-[2] bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-[11px] rounded transition duration-150 flex justify-center items-center gap-1.5 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-center leading-tight"
-          title="Créer une nouvelle branche à partir de cette version"
-        >
-          <span>CRÉER BRANCHE<br/>À PARTIR DE</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'scaleY(-1)' }}>
-            <line x1="6" y1="3" x2="6" y2="15"></line>
-            <circle cx="18" cy="6" r="3"></circle>
-            <circle cx="6" cy="18" r="3"></circle>
-            <path d="M18 9a9 9 0 0 1-9 9"></path>
-          </svg>
-        </button>
-        <button
-          disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
-          onClick={() => onSelectIndex(selectedIndex + 1)}
-          className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-xs rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Avancer à la version suivante"
-        >
-          Suiv. ▶
-        </button>
-      </div>
+      {/* Les boutons ont été déplacés en haut */}
 
     </div>
   );

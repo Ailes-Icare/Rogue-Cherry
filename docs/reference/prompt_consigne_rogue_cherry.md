@@ -21,7 +21,7 @@ Voici la syntaxe exacte pour formuler une requête de modification. L'en-tête (
 [Insère ici le texte EXACT à trouver dans le document. Il doit être absolument UNIQUE dans tout le document.]
 ##REPLACE##
 [Insère ici le texte de remplacement complet.]
-##END##
+##END_COPIE##
 ```
 
 ### Règle de la zone label (Optionnelle mais recommandée) : 
@@ -45,7 +45,7 @@ Exemple de Multistack :
 Texte A
 ##REPLACE##
 Nouveau Texte A
-##END##
+##END_COPIE##
 
 ##[MULTISTACK REQUEST]##
 
@@ -54,17 +54,18 @@ Nouveau Texte A
 Texte B
 ##REPLACE##
 Nouveau Texte B
-##END##
+##END_COPIE##
 ```
 
-### B. Smart Replace (Concilier les espaces)
-Si tu modifies du texte particulièrement sensible à l'indentation (comme des tableaux Markdown dont les tirets ont été décalés), tu peux ajouter la balise `[SMART:TRUE]` dans ton en-tête.
-Cela demande à Rogue Cherry d'ignorer les espaces et tabulations d'origine lors de la recherche, permettant de trouver le texte même si l'indentation a légèrement changé côté utilisateur.
-Si non précisé, cette option est considérée comme inactive `[SMART:FALSE]`. Cette fonctionnalité ne doit être activée que si tu es certain que des problèmes d'espacements vont empêcher le Find classique.
+### B. Smart Replace (Concilier les espaces et les majuscules)
+Si tu modifies du texte particulièrement sensible à l'indentation (comme des tableaux Markdown dont les tirets ont été décalés), ou dont la casse (majuscules/minuscules) pourrait varier, tu peux ajouter la balise `[SMART:TRUE]` dans ton en-tête.
+Cela demande à Rogue Cherry d'ignorer les espaces et tabulations d'origine lors de la recherche, **et rend la recherche insensible à la casse**, permettant de trouver le texte même s'il a été légèrement altéré côté utilisateur. Lors du remplacement, Rogue Cherry préservera intelligemment la casse d'origine des mots non modifiés.
+Si non précisé, cette option est considérée comme inactive `[SMART:FALSE]`. Cette fonctionnalité ne doit être activée que si tu es certain que des problèmes d'espacements ou de casse vont empêcher le Find classique.
 
 ### C. Cherry-Picking (Mode Multi ciblé)
 Si la portion de texte de ta zone FIND apparaît plusieurs fois dans le document, mais que tu ne souhaites la remplacer qu'à des emplacements spécifiques, utilise le tag `[MULTI]` dans l'en-tête de ta requête.
 - `[MULTI:0,2]` : Remplacera **uniquement** la 1ère (index 0) et la 3ème occurrence (index 2) de la zone FIND.
+- `[MULTI:NO 1,2]` : Remplacera **toutes** les occurrences SAUF la 2ème (index 1) et la 3ème (index 2). (Mode "Cherry-Picking Inversé").
 - `[MULTI:TRUE]` : Remplacera **absolument toutes** les occurrences trouvées.
 
 ### D. Mode Furtif (Cas Exceptionnel)
@@ -84,3 +85,5 @@ Exemple :
 @@CHERCHER@@
 ...
 ```
+Attention : Si tu veux générer une requete "multistack" (voir 3.A) il faudra que tu utilise l'attribut "REQMODIFIER" dans toute les sous requete individuelle où c'est necessaire.
+cet attribut est necessaire seulement si tu cherche spécifiquement à modifier un texte qui COMPORTE les carractère / syntaxe d'échappement classique. c'est necessaire nulle part ailleurs. en somme : cela serait indispensable si tu étais en train d'écrire une requete pour modifier ce document, et particulièrement l'exemple du 3.A, où les balises des requêtes standards sont présentes. mais si tu cherchais à modifier le paragraphe "Règle de la zone label (Optionnelle mais recommandée)" il ne serait pas nécessaire.
