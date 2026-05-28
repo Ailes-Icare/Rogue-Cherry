@@ -1,5 +1,21 @@
 #VERSION 8 : derniers ajouts
 
+README / CONSIGNE :
+- tu lira ce fichier dans l'ordre.
+- tu ne retirera jamais la "story" tel que je l'ai écrite. tu écrira toujours les infos lié au sujet d'un chapitre dans le chapitre, sans un sous chapitre a ta propre attention. tu y ajoutera le contexte, les elements supplémentaire necessaire pour clarifier une contradiction ou un element que j'aurais omis
+- si tu identifie de nouveaux points, tu les ajoutera dans la pile. soit dans le chapitre V8 si on le traitera en V8, soit en V99 ou ultérieur si c'est ultérieur.
+- tu as le droit de décider de les faire dans le désordre. cette pile de chose a faire n'est pas directive quant a l'ordonnancement, a toi de faire au mieux. mais dans le doute, fait étape par étape, dans l'ordre, et défini plutot au besoin des sous étapes.
+
+quand je te dirais que un sujet est clos, ajoute dans le titre du chapitre DONE
+et ajoute a la fin du chapitre un paragraphe qui explicite ce qui est "mandatory" et qui ressort comme une nouvelle règle, si cela est necessaire et que ce qui est écrit au dessus n'est pas deja suffisement clair.
+
+puis prends ce chapitre tel quel, créé un dossier ARCHIVE RULES dans DOCS, puis créé un RULES STORY avec le numéro de version et un nom descriptif, et met y ce chapitre. puis copie TEL QUEL sans modifier les elements le points clos, et supprime le de cette présente liste.
+
+cette liste figure "ce qui reste à faire ou qui est en cours et non validé".
+les archives contiennent ce qui est deja validé et fait.
+
+quand je te dirais qu'on "versionne" (qu'on passe de la V8 a la V9 par exemple), duplique complètement tout le code source du projet dans un sous dossier "V8" dans ce dossier (Archives rules). mets y que le code source, pas les fichiers d'accompagnement.
+
 ###Question A :
 le bandeau en bas en bleu affiche "mode normal". a quoi ca correspond ? quand est ce que ca change ?
 si moi meme je comprends pas, c'est que c'est pas adapté.

@@ -9,7 +9,7 @@ import VersionTagModal from './components/VersionTagModal.jsx';
 import EditRecordModal from './components/EditRecordModal.jsx';
 import { useHistoryStore, applyDeltaOnText, rebuildTextAt } from './hooks/useHistoryStore.js';
 import { parseSyntaxRequest, splitMultistackRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
-import { computeLiveDiff, computeGhostDelta } from './utils/diffEngine.js';
+import { computeLiveDiff, computeGhostDelta, computeSearchHeatmap } from './utils/diffEngine.js';
 
 export default function App() {
   // 1. Instanciation du store d'historique compressé Delta-Encoding
@@ -1004,8 +1004,8 @@ export default function App() {
 
             <button
               onClick={handleCopyMainCode}
-              disabled={!store.currentText || isProjectClean}
-              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${(!store.currentText || isProjectClean) ? 'opacity-50 grayscale' : ''}`}
+              disabled={!store.currentText}
+              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${isProjectClean ? 'opacity-50' : ''}`}
               title="Copier le code source modifié dans le presse-papier"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -1020,8 +1020,8 @@ export default function App() {
             <button
               type="button"
               onClick={handleSaveAs}
-              disabled={!store.currentText || isProjectClean}
-              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#ffd700] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${(!store.currentText || isProjectClean) ? 'opacity-50 grayscale' : ''}`}
+              disabled={!store.currentText}
+              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#ffd700] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${isProjectClean ? 'opacity-50' : ''}`}
               title="Enregistrer le fichier sur votre disque (Save As)"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">

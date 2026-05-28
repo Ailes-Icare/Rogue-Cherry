@@ -13,7 +13,8 @@ export default function VersionTagModal({
   mode = 'init', // 'init', 'upVersion', 'branch'
   projectName = "",
   onChangeProjectName,
-  onRename
+  onRename,
+  onChangePattern
 }) {
   const [ranks, setRanks] = useState([]);
   const [autoIndex, setAutoIndex] = useState(0);
@@ -23,6 +24,9 @@ export default function VersionTagModal({
   const [initialPrefixState, setInitialPrefixState] = useState("");
   const [interactionMode, setInteractionMode] = useState('increment'); // 'increment', 'rename', 'changePattern'
   const [freezeArchive, setFreezeArchive] = useState(false);
+  const [initialRanksSnapshot, setInitialRanksSnapshot] = useState(null); // Snapshot des rangs à l'ouverture
+  const [initialAutoIndex, setInitialAutoIndex] = useState(0); // Snapshot de autoIndex à l'ouverture
+  const [showBranchWarning, setShowBranchWarning] = useState(false); // Avertissement si modifs en cours + clic branche
 
   // Synchronisation à l'ouverture
   useEffect(() => {
@@ -69,6 +73,12 @@ export default function VersionTagModal({
       setLocalProjectName(projectName);
       setInteractionMode('increment'); // Réinitialise l'onglet par défaut
       setFreezeArchive(false); // Reset checkbox
+      setShowBranchWarning(false);
+      // Sauvegarder un snapshot des rangs et autoIndex à l'ouverture pour détecter les changements en mode changePattern
+      if (initialConfig) {
+        setInitialRanksSnapshot(JSON.parse(JSON.stringify(initialConfig.ranks)));
+        setInitialAutoIndex(initialConfig.autoIncrementIndex);
+      }
     }
   }, [isOpen, initialConfig, projectName, mode, currentVersion]);
 
@@ -132,7 +142,53 @@ export default function VersionTagModal({
     }
   };
 
+  const handleActionChangePattern = () => {
+    if (onChangePattern) {
+      const oldPatternPreview = initialRanksSnapshot ? formatVersionString(initialRanksSnapshot) : currentVersion;
+      onChangePattern(getProcessedRanks(), autoIndex, localProjectName.trim(), oldPatternPreview, freezeArchive);
+    }
+  };
+
+  // Remise à 0 du compteur : réinitialise les valeurs numériques/alpha comme sur un import
+  const handleResetCounters = () => {
+    const newRanks = ranks.map((r, idx) => {
+      if (r.type === 'numeric') {
+        return { ...r, value: idx === autoIndex ? 0 : 0 };
+      } else if (r.type === 'alpha') {
+        const isUpper = String(r.value) === String(r.value).toUpperCase();
+        return { ...r, value: isUpper ? 'A' : 'a' };
+      }
+      return r;
+    });
+    setRanks(newRanks);
+  };
+
+  // RESET complet : revenir au motif par défaut (V1.0.0, 4 rangs, pas de préfixe)
+  const handleResetDefault = () => {
+    setRanks([
+      { type: 'fixed', value: 'V', separator: '' },
+      { type: 'numeric', value: 1, separator: '' },
+      { type: 'numeric', value: 0, separator: '.' },
+      { type: 'numeric', value: 0, separator: '.' }
+    ]);
+    setAutoIndex(3);
+    setLocalPrefix('');
+  };
+
   const isRenameDirty = localProjectName.trim() !== projectName || localPrefix !== initialPrefixState;
+
+  // Détection de modifications en mode changePattern
+  const isPatternDirty = (() => {
+    if (!initialRanksSnapshot) return false;
+    if (autoIndex !== initialAutoIndex) return true;
+    if (ranks.length !== initialRanksSnapshot.length) return true;
+    for (let i = 0; i < ranks.length; i++) {
+      if (ranks[i].type !== initialRanksSnapshot[i].type) return true;
+      if (String(ranks[i].value) !== String(initialRanksSnapshot[i].value)) return true;
+      if (ranks[i].separator !== initialRanksSnapshot[i].separator) return true;
+    }
+    return false;
+  })();
 
   return (
     <div 
@@ -141,6 +197,7 @@ export default function VersionTagModal({
         if (e.key === 'Enter') {
           if (mode === 'init') handleSaveInit();
           if (mode !== 'init' && interactionMode === 'rename' && isRenameDirty) handleActionRename();
+          if (mode !== 'init' && interactionMode === 'changePattern' && isPatternDirty) handleActionChangePattern();
         } 
       }}
     >
@@ -196,7 +253,7 @@ export default function VersionTagModal({
                 type="text"
                 autoFocus={mode === 'init'}
                 value={localProjectName}
-                disabled={mode !== 'init' && interactionMode === 'increment'}
+                disabled={mode !== 'init' && (interactionMode === 'increment' || interactionMode === 'changePattern')}
                 onChange={(e) => {
                   setLocalProjectName(e.target.value);
                   if (showNameError) setShowNameError(false);
@@ -211,7 +268,7 @@ export default function VersionTagModal({
                   showNameError 
                     ? 'border-hl-yellow shadow-[0_0_10px_rgba(255,215,0,0.6)]' 
                     : 'border-[#444] focus:border-primary-blue'
-                } ${mode !== 'init' && interactionMode === 'increment' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${mode !== 'init' && (interactionMode === 'increment' || interactionMode === 'changePattern') ? 'opacity-50 cursor-not-allowed' : ''}`}
                 placeholder="Ex: MonSuperProjet"
                 spellCheck="false"
               />
@@ -224,9 +281,9 @@ export default function VersionTagModal({
                   type="text"
                   autoFocus
                   value={localPrefix}
-                  disabled={interactionMode === 'increment'}
+                  disabled={interactionMode === 'increment' || interactionMode === 'changePattern'}
                   onChange={(e) => setLocalPrefix(e.target.value)}
-                  className={`bg-[#111] text-[#d4d4d4] text-sm border border-[#444] focus:border-primary-blue rounded w-full py-1.5 px-2 outline-none transition-all duration-300 ${interactionMode === 'increment' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`bg-[#111] text-[#d4d4d4] text-sm border border-[#444] focus:border-primary-blue rounded w-full py-1.5 px-2 outline-none transition-all duration-300 ${(interactionMode === 'increment' || interactionMode === 'changePattern') ? 'opacity-50 cursor-not-allowed' : ''}`}
                   placeholder="Ex: ALPHA, BETA, RELEASE..."
                   spellCheck="false"
                 />
@@ -236,19 +293,42 @@ export default function VersionTagModal({
 
           {/* Constructeur de Format */}
           <div className="flex flex-col gap-3">
-            <h3 className="text-[#aaa] text-xs font-bold uppercase tracking-wider">Structure des Rangs</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[#aaa] text-xs font-bold uppercase tracking-wider">Structure des Rangs</h3>
+              {mode !== 'init' && interactionMode === 'changePattern' && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetCounters}
+                    className="text-[10px] px-3 py-1 rounded border border-[#555] text-[#d4d4d4] bg-[#333] hover:bg-[#444] font-bold transition"
+                    title="Remet toutes les valeurs numériques/alpha à leur état initial (0, A, a...)"
+                  >
+                    Remise à 0 compteur
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetDefault}
+                    className="text-[10px] px-3 py-1 rounded border border-cherry-red text-cherry-red bg-transparent hover:bg-cherry-red hover:text-white font-bold transition"
+                    title="Revenir au motif par défaut : 4 rangs, pas de préfixe, V1.0.0"
+                  >
+                    RESET
+                  </button>
+                </div>
+              )}
+            </div>
             
             <div className={`flex flex-col gap-2 ${mode !== 'init' && interactionMode === 'rename' ? 'opacity-50 pointer-events-none select-none' : ''}`}>
               {ranks.map((rank, idx) => {
                 const isAutoLine = autoIndex === idx;
                 const isIncrementMode = mode !== 'init' && interactionMode === 'increment';
                 const isRenameMode = mode !== 'init' && interactionMode === 'rename';
+                const isChangePatternMode = mode !== 'init' && interactionMode === 'changePattern';
                 const isLineDisabled = isIncrementMode && isAutoLine;
                 
                 // Si on est en RenameMode, la ligne complète doit avoir l'air neutre (grise)
                 const borderBgClass = isAutoLine 
-                  ? (isRenameMode ? 'border-border-dark bg-[#1a1a1a]' : (isIncrementMode ? 'border-[#444] bg-[#1a1a1a] opacity-80' : 'border-primary-blue bg-[#0e2941]'))
-                  : 'border-border-dark bg-bg-dark';
+                  ? (isRenameMode ? 'border-border-dark bg-[#1a1a1a]' : (isIncrementMode ? 'border-[#444] bg-[#1a1a1a] opacity-80' : (isChangePatternMode ? 'border-primary-blue bg-[#0e2941]' : 'border-primary-blue bg-[#0e2941]')))
+                  : (isChangePatternMode ? 'border-[#555] bg-[#2a2a2a]' : 'border-border-dark bg-bg-dark');
 
                 return (
                 <div key={idx} className={`flex items-center gap-2 p-2 rounded-sm border ${borderBgClass}`}>
@@ -259,9 +339,9 @@ export default function VersionTagModal({
                     <input 
                       type="text" 
                       value={rank.separator} 
-                      disabled={isIncrementMode}
+                      disabled={isIncrementMode || isChangePatternMode}
                       onChange={(e) => handleRankChange(idx, 'separator', e.target.value)}
-                      className={`bg-[#222] text-white text-xs text-center border border-[#444] rounded w-full py-1 outline-none ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : 'focus:border-primary-blue'}`}
+                      className={`bg-[#222] text-white text-xs text-center border border-[#444] rounded w-full py-1 outline-none ${(isIncrementMode || isChangePatternMode) ? 'opacity-50 cursor-not-allowed' : 'focus:border-primary-blue'}`}
                     />
                   </div>
 
@@ -270,9 +350,9 @@ export default function VersionTagModal({
                     <span className="text-[10px] text-[#888] mb-1">Type</span>
                     <select 
                       value={rank.type} 
-                      disabled={isIncrementMode}
+                      disabled={isIncrementMode || isChangePatternMode}
                       onChange={(e) => handleRankChange(idx, 'type', e.target.value)}
-                      className={`bg-[#222] text-white text-xs border border-[#444] rounded w-full py-1 px-1 outline-none ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`bg-[#222] text-white text-xs border border-[#444] rounded w-full py-1 px-1 outline-none ${(isIncrementMode || isChangePatternMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <option value="fixed">Fixe (Texte)</option>
                       <option value="numeric">Numérique (1,2..)</option>
@@ -288,7 +368,7 @@ export default function VersionTagModal({
                       value={rank.value} 
                       disabled={isIncrementMode}
                       onChange={(e) => handleRankChange(idx, 'value', e.target.value)}
-                      className={`bg-[#222] text-[#9cdcfe] font-mono font-bold text-xs border border-[#444] rounded w-full py-1 px-2 outline-none ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`bg-[#222] font-mono font-bold text-xs border rounded w-full py-1 px-2 outline-none ${isIncrementMode ? 'text-[#9cdcfe] border-[#444] opacity-50 cursor-not-allowed' : (isChangePatternMode ? 'text-hl-yellow border-hl-yellow bg-[#1a1a0a] shadow-[0_0_6px_rgba(255,215,0,0.15)]' : 'text-[#9cdcfe] border-[#444]')}`}
                     />
                   </div>
 
@@ -296,15 +376,15 @@ export default function VersionTagModal({
                   <div className="flex items-end gap-2 h-full pb-[2px]">
                     <button 
                       type="button"
-                      disabled={isIncrementMode}
+                      disabled={isIncrementMode || isChangePatternMode}
                       onClick={() => setAutoIndex(idx)}
-                      className={`text-[10px] px-2 py-1 rounded border font-bold transition ${isAutoLine ? (isRenameMode ? 'bg-transparent text-[#aaa] border-[#444]' : 'bg-primary-blue text-white border-primary-blue') : 'bg-transparent text-[#aaa] border-[#444] hover:border-primary-blue'} ${isIncrementMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`text-[10px] px-2 py-1 rounded border font-bold transition ${isAutoLine ? ((isRenameMode || isChangePatternMode) ? 'bg-transparent text-[#aaa] border-[#444]' : 'bg-primary-blue text-white border-primary-blue') : 'bg-transparent text-[#aaa] border-[#444] hover:border-primary-blue'} ${(isIncrementMode || isChangePatternMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                       title="Ce rang s'incrémentera automatiquement à chaque modification"
                     >
                       {isAutoLine ? '✓ AUTO' : 'AUTO'}
                     </button>
 
-                    {mode !== 'init' && (rank.type === 'numeric' || rank.type === 'alpha') && (
+                    {mode !== 'init' && !isChangePatternMode && (rank.type === 'numeric' || rank.type === 'alpha') && (
                       <button 
                         type="button"
                         disabled={isLineDisabled}
@@ -319,8 +399,8 @@ export default function VersionTagModal({
                     <button 
                       type="button"
                       onClick={() => handleRemoveRank(idx)}
-                      disabled={ranks.length === 1 || isIncrementMode}
-                      className="text-[#ff5555] hover:bg-[#ff555522] px-2 py-0.5 rounded transition disabled:opacity-30 disabled:cursor-not-allowed"
+                      disabled={ranks.length === 1 || isIncrementMode || isRenameMode}
+                      className={`text-[#ff5555] hover:bg-[#ff555522] px-2 py-0.5 rounded transition disabled:opacity-30 disabled:cursor-not-allowed ${isChangePatternMode ? '' : ''}`}
                       title="Supprimer ce rang"
                     >
                       ✕
@@ -344,11 +424,15 @@ export default function VersionTagModal({
           <div className="bg-[#1e1e1e] p-4 border border-[#333] rounded-md shadow-inner flex justify-between items-center">
             <div>
               <div className="text-[10px] text-[#888] uppercase mb-1">Aperçu de la version actuelle</div>
-              <div className="text-xl font-mono font-black text-hl-yellow tracking-wider">{currentPreview}</div>
+              <div className="text-xl font-mono font-black text-hl-yellow tracking-wider">{initialRanksSnapshot ? formatVersionString(initialRanksSnapshot) : currentPreview}</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-[#888] uppercase mb-1">Aperçu prochaine auto-incrémentation</div>
-              <div className="text-xl font-mono font-black text-[#20b2aa] tracking-wider">{autoPreview}</div>
+              <div className="text-[10px] text-[#888] uppercase mb-1">
+                {interactionMode === 'rename' ? 'Aperçu après renommage' : (interactionMode === 'changePattern' ? 'Aperçu du nouveau motif' : 'Aperçu prochaine auto-incrémentation')}
+              </div>
+              <div className="text-xl font-mono font-black text-[#20b2aa] tracking-wider">
+                {interactionMode === 'changePattern' ? currentPreview : autoPreview}
+              </div>
             </div>
           </div>
 
@@ -370,7 +454,7 @@ export default function VersionTagModal({
               </label>
             )}
 
-            {mode === 'branch' && interactionMode !== 'rename' && (
+            {mode === 'branch' && interactionMode !== 'rename' && interactionMode !== 'changePattern' && (
               <>
                 <button 
                   type="button"
@@ -388,9 +472,46 @@ export default function VersionTagModal({
                 </button>
               </>
             )}
+
+            {mode === 'branch' && interactionMode === 'changePattern' && (
+              <>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (isPatternDirty) {
+                      setShowBranchWarning(true);
+                      setTimeout(() => setShowBranchWarning(false), 4000);
+                    } else {
+                      onBranchReset(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive);
+                    }
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-cherry-red hover:bg-cherry-red-hover rounded shadow-md transition"
+                >
+                  Remettre à zéro
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (isPatternDirty) {
+                      setShowBranchWarning(true);
+                      setTimeout(() => setShowBranchWarning(false), 4000);
+                    } else {
+                      onBranchFromParent(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive);
+                    }
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#0e2941] border border-primary-blue hover:bg-primary-blue rounded shadow-md transition"
+                >
+                  Repartir de la branche
+                </button>
+              </>
+            )}
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
+            {showBranchWarning && (
+              <div className="text-xs text-cherry-red font-bold animate-pulse">⚠️ Vos modifications de motif seront perdues ! Utilisez "Valider" pour les conserver.</div>
+            )}
+
             {mode !== 'init' && interactionMode === 'rename' && isRenameDirty && (
               <button 
                 type="button"
@@ -398,6 +519,16 @@ export default function VersionTagModal({
                 className="px-6 py-1.5 text-sm font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition animate-pulse"
               >
                 VALIDER LE RENOMMAGE
+              </button>
+            )}
+
+            {mode !== 'init' && interactionMode === 'changePattern' && isPatternDirty && (
+              <button 
+                type="button"
+                onClick={handleActionChangePattern}
+                className="px-6 py-1.5 text-sm font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition animate-pulse"
+              >
+                VALIDER LE CHANGEMENT DE MOTIF
               </button>
             )}
 
