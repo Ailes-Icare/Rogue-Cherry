@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Splitter from './Splitter.jsx';
 import { computeLiveDiff } from '../utils/diffEngine.js';
 import { useZoomable } from '../hooks/useZoomable.js';
+import { useMessageBox } from '../context/MessageBoxContext.jsx';
 
 // Rendu des segments de texte avec les balises CSS
 // Approche par char-map : chaque caractère reçoit l'union de ses classes CSS.
@@ -60,6 +61,7 @@ function renderDiffSegment(text, marks) {
  */
 export default function SidebarRight({
   history,
+  projectSizeBytes = 0,
   selectedIndex,
   onSelectIndex,
   onSaveProject,
@@ -74,8 +76,12 @@ export default function SidebarRight({
   onDeleteLast,
   splitChars,
   width,
-  onResizeWidth
+  onResizeWidth,
+  projectName,
+  isProjectEmpty,
+  isProjectDirty
 }) {
+  const { showConfirm } = useMessageBox();
   const [showMiniViews, setShowMiniViews] = useState(true);
   const [isSyncScroll, setIsSyncScroll] = useState(true);
   const [historyHeight, setHistoryHeight] = useState(Math.max(250, window.innerHeight * 0.5)); // Hauteur par défaut à 50% de l'écran
@@ -183,35 +189,53 @@ export default function SidebarRight({
       <div className="flex gap-2 h-14 flex-shrink-0">
         <button
           onClick={onSaveProject}
-          className="flex-1 bg-bg-panel hover:border-primary-blue text-xs font-bold border border-border-dark flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150"
+          disabled={isProjectEmpty}
+          className={`flex-1 bg-bg-panel hover:border-primary-blue text-[10px] font-bold border border-border-dark flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : (!isProjectDirty ? 'opacity-50' : '')}`}
           title="Sauvegarder le projet et tout l'historique dans un fichier JSON"
         >
           <span className="text-lg leading-none">💾</span>
-          <span>SAVE</span>
+          <span className="text-center px-1">SAVE<br/>PROJECT</span>
         </button>
         <button
           onClick={onLoadProject}
-          className="flex-1 bg-bg-panel hover:border-primary-blue text-xs font-bold border border-border-dark flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150"
+          className={`flex-1 bg-bg-panel hover:border-primary-blue text-[10px] font-bold border border-border-dark flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 ${!isProjectEmpty ? 'opacity-50' : ''}`}
           title="Importer un projet Rogue Cherry à partir d'un fichier JSON"
         >
           <span className="text-lg leading-none">📂</span>
-          <span>OPEN</span>
+          <span className="text-center px-1">OPEN<br/>PROJECT</span>
         </button>
         <button
           type="button"
           onClick={onResetProject}
-          className="flex-1 bg-cherry-red hover:bg-cherry-red-hover text-xs font-bold border border-cherry-red flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 text-white"
-          title="Vider et réinitialiser tout le projet"
+          disabled={isProjectEmpty}
+          className={`flex-1 bg-cherry-red hover:bg-cherry-red-hover text-[10px] font-bold border border-cherry-red flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 text-white ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : ''}`}
+          title="Fermer le projet courant"
+        >
+          <span className="text-lg leading-none">❌</span>
+          <span className="text-center px-1">FERMER<br/>PROJET</span>
+        </button>
+        <button
+          type="button"
+          onClick={onResetProject}
+          disabled={isProjectEmpty}
+          className={`flex-1 bg-cherry-red hover:bg-cherry-red-hover text-[10px] font-bold border border-cherry-red flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 text-white ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : ''}`}
+          title="Ferme tous les projets en cours et remet l'application vierge"
         >
           <span className="text-lg leading-none">🔄</span>
-          <span>RESET</span>
+          <span className="text-center px-1 mt-1">RESET</span>
         </button>
       </div>
+      {/* Taille du projet JSON */}
+      {projectSizeBytes > 0 && (
+        <div className="text-center text-[10px] text-[#888] font-mono select-none -mt-1.5 mb-0.5">
+          Taille export JSON : {projectSizeBytes < 1024 ? `${projectSizeBytes} o` : projectSizeBytes < 1024*1024 ? `${(projectSizeBytes/1024).toFixed(1)} Ko` : `${(projectSizeBytes/(1024*1024)).toFixed(2)} Mo`}
+        </div>
+      )}
 
       {/* Titre Historique & Navigation */}
       <div className="flex flex-col gap-2 flex-shrink-0 mt-1">
         <div className="text-[1.3em] font-extrabold text-primary-blue tracking-wide uppercase select-none">
-          📚 HISTORIQUE DES VERSIONS
+          📚 HISTORIQUE DES VERSIONS{projectName ? ` - ${projectName}` : ''}
         </div>
       </div>
 
@@ -418,8 +442,8 @@ export default function SidebarRight({
             
             <button
               disabled={selectedIndex === -1 || selectedIndex !== history.length - 1}
-              onClick={() => {
-                if (confirm("Voulez-vous vraiment supprimer définitivement ce dernier élément ?")) {
+              onClick={async () => {
+                if (await showConfirm("Voulez-vous vraiment supprimer définitivement ce dernier élément ?")) {
                   onDeleteLast();
                 }
               }}

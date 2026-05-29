@@ -3,6 +3,7 @@ import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
 import { computeLiveDiff } from '../utils/diffEngine.js';
 import { useZoomable } from '../hooks/useZoomable.js';
 import Splitter from './Splitter.jsx';
+import { useMessageBox } from '../context/MessageBoxContext.jsx';
 
 /**
  * Formate un texte et ses marqueurs en HTML sécurisé pour l'affichage de diffing dans le Backdrop.
@@ -93,6 +94,7 @@ export default function SidebarLeft({
   onClear,
   onOpenSettings,
   onOpenDebugger,
+  onDirectOpenDebugger,
   syntaxConfig,
   width,
   onPlayStack,
@@ -106,10 +108,16 @@ export default function SidebarLeft({
   isFindActive,
   setIsFindActive,
   isReplaceActive,
-  setIsReplaceActive
+  setIsReplaceActive,
+  onOpenLineChoiceModal,
+  occLinesArray,
+  isFindEscapeHatchActive,
+  onForceFindEscapeHatch
 }) {
+  const { showAlert } = useMessageBox();
   const [showInvisibles, setShowInvisibles] = useState(true);
   const [topHeight, setTopHeight] = useState(window.innerHeight * 0.45);
+  const clickTimeoutRef = useRef(null);
   const [isAssistantCollapsed, setIsAssistantCollapsed] = useState(false);
   const [isAssistantCollapsedByUser, setIsAssistantCollapsedByUser] = useState(false);
   const assistantRef = useRef(null);
@@ -249,10 +257,13 @@ Règles d'or MANDATORY :
 - MODE FURTIF : Si le document traite de la syntaxe de Rogue Cherry elle-même, commence ta réponse par [REQMODIFIER] suivi de tes balises personnalisées.`;
   }, [syntaxConfig]);
 
-  const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(promptText)
-      .then(() => alert("Prompt copié dans le presse-papier !"))
-      .catch(() => alert("Erreur lors de la copie."));
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(promptText);
+      await showAlert("Prompt copié dans le presse-papier !");
+    } catch (e) {
+      await showAlert("Erreur lors de la copie.", "Erreur");
+    }
   };
 
   // Précalcul du rendu HTML des backdrops de saisie
@@ -291,18 +302,63 @@ Règles d'or MANDATORY :
     }
   };
 
+  const handleDoubleClickInput = async (isFind) => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      const currentVal = isFind ? findText : replaceText;
+      
+      if (clipboardText.trim() && !currentVal) {
+        if (isFind) {
+          onChangeFindText(clipboardText);
+        } else {
+          onChangeReplaceText(clipboardText);
+        }
+        await navigator.clipboard.writeText("");
+        return; // On s'arrête ici si on a collé
+      }
+    } catch (err) {
+      console.warn("Clipboard read failed or denied", err);
+    }
+    
+    // Soit le presse-papier est vide, soit le champ n'est pas vide
+    if (!onDirectOpenDebugger) return;
+    
+    // Si on est sur une requête de pile
+    if (pendingRequests && pendingRequests.length > 0 && activeStackIndex >= 0 && activeStackIndex < pendingRequests.length) {
+      const activeReq = pendingRequests[activeStackIndex];
+      const raw = activeReq.parsed ? activeReq.parsed.rawText : (activeReq.rawText || "");
+      onDirectOpenDebugger(raw || "");
+      return;
+    }
+    
+    // Sinon on regénère la requête actuelle depuis l'interface
+    const multiTag = multiMode 
+      ? (multiIndices && multiIndices.length > 0 ? `[MULTI:${multiIndices.join(',')}]` : '[MULTI:TRUE]') 
+      : '[MULTI:FALSE]';
+    const smartTag = ignoreSpaces ? '[SMART:TRUE]' : '[SMART:FALSE]';
+    const labelTag = currentLabel ? `[LABEL:${currentLabel}]` : '';
+    const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
+    
+    let commentPart = "";
+    if (commentText) {
+      commentPart = `##Commentaire## ${commentText}\n`;
+    }
+    
+    const reqText = `${header}\n${commentPart}${syntaxConfig.FIND}\n${findText || ""}\n${syntaxConfig.REPLACE}\n${replaceText || ""}\n${syntaxConfig.END}`;
+    onDirectOpenDebugger(reqText);
+  };
+
   const handleAuditIA = () => {
     if (onAuditIA) onAuditIA();
   };
 
-  const handlePasteImport = () => {
-    navigator.clipboard.readText()
-      .then(clip => {
-        onOpenDebugger(clip); // Envoie directement au Débogueur pour traitement et validation
-      })
-      .catch(() => {
-        alert("Accès refusé au presse-papier ou presse-papier vide.");
-      });
+  const handlePasteImport = async () => {
+    try {
+      const clip = await navigator.clipboard.readText();
+      onOpenDebugger(clip);
+    } catch (e) {
+      await showAlert("Accès refusé au presse-papier ou presse-papier vide.", "Erreur");
+    }
   };
 
   return (
@@ -609,15 +665,37 @@ Règles d'or MANDATORY :
                         ? (isFindActive ? 'bg-[#00FF7F] text-black shadow-[0_0_8px_rgba(0,255,127,0.6)] cursor-pointer' : 'bg-[#555] text-[#00FF7F] cursor-pointer')
                         : (isFindActive ? 'bg-[#FF8C00] text-black cursor-pointer' : 'bg-[#555] text-[#FF8C00] cursor-pointer')
             }`}
-            title={isGlobalSearching ? "Désactivé (Search globale active)" : isReplaceActive ? "Désactivé (Replace actif)" : "Simple-clic pour activer, double-clic pour désactiver"}
-            onDoubleClick={() => !isGlobalSearching && !isReplaceActive && setIsFindActive(false)}
-            onClick={() => {
-              if (!isGlobalSearching && !isReplaceActive && !isFindActive) {
-                setIsFindActive(true);
+            title={isGlobalSearching ? "Désactivé (Search globale active)" : isReplaceActive ? "Désactivé (Replace actif)" : "Simple-clic pour ouvrir, double-clic pour activer/désactiver"}
+            onClick={(e) => {
+              if (isGlobalSearching || isReplaceActive) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              
+              if (clickTimeoutRef.current) {
+                // Double clic détecté : annule le simple clic et bascule l'activation
+                clearTimeout(clickTimeoutRef.current);
+                clickTimeoutRef.current = null;
+                setIsFindActive(prev => !prev);
+              } else {
+                // Attente pour voir s'il s'agit d'un double clic
+                clickTimeoutRef.current = setTimeout(() => {
+                  clickTimeoutRef.current = null;
+                  // Traitement du simple clic
+                  if (isFindActive && occurrencesCount > 1) {
+                    if (onOpenLineChoiceModal) {
+                      onOpenLineChoiceModal({
+                        pos: { x: rect.left - 250, y: rect.top - 20 },
+                        maxLines: occurrencesCount,
+                        linesArray: occLinesArray,
+                        title: `Aller à l'occurrence (1 - ${occurrencesCount})`,
+                        initialValue: (activeOccIndex + 1).toString()
+                      });
+                    }
+                  }
+                }, 250);
               }
             }}
           >
-            {(occurrencesCount > 0 && isFindActive) ? (
+            {(occurrencesCount > 1 && isFindActive) ? (
               <>
                 <span 
                   className="hover:text-white px-1"
@@ -650,6 +728,15 @@ Règles d'or MANDATORY :
             )}
           </div>
         </div>
+        {isFindEscapeHatchActive && (
+          <div 
+            className="text-[10px] text-center font-bold text-[#ff9800] bg-[#332200] border border-[#ff9800] rounded p-1 my-1 cursor-pointer hover:bg-[#442200] transition-colors"
+            onDoubleClick={onForceFindEscapeHatch}
+            title="Double-cliquez pour ignorer cette sécurité et forcer la recherche (risque de lag)"
+          >
+            ⚠️ Texte à chercher trop court dans un texte trop long (double-cliquez pour forcer)
+          </div>
+        )}
         <div 
           ref={zoomRef1}
           className="flex-1 min-h-[40px] border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
@@ -666,6 +753,7 @@ Règles d'or MANDATORY :
             value={findText}
             onChange={(e) => onChangeFindText(normalizeText(e.target.value))}
             onScroll={handleScroll1}
+            onDoubleClick={() => handleDoubleClickInput(true)}
             disabled={isCodeEmpty || isGlobalSearching}
             spellCheck="false"
             autoComplete="off"
@@ -700,6 +788,7 @@ Règles d'or MANDATORY :
             disabled={isCodeEmpty || isGlobalSearching}
             onChange={(e) => onChangeReplaceText(normalizeText(e.target.value))}
             onScroll={handleScroll2}
+            onDoubleClick={() => handleDoubleClickInput(false)}
             spellCheck="false"
             autoComplete="off"
             autoCorrect="off"
@@ -780,8 +869,8 @@ Règles d'or MANDATORY :
 
           {/* 6. Combo-Box de Cherry-Picking (Droite) */}
           {multiMode && occurrencesCount > 0 && (
-            <div className="flex flex-col gap-1.5 animate-fadeIn w-[45%] flex-shrink-0">
-              <div ref={cherryPickListRef} className="max-h-[90px] overflow-y-auto bg-bg-dark border border-border-dark p-2 rounded-sm flex flex-col gap-1 text-xs text-left border-l-4 border-primary-blue scroll-smooth">
+            <div className="flex flex-row gap-1.5 animate-fadeIn w-[45%] flex-shrink-0">
+              <div ref={cherryPickListRef} className="flex-1 h-[150px] overflow-y-auto bg-bg-dark border border-border-dark p-2 rounded-sm flex flex-col gap-1 text-xs text-left border-l-4 border-primary-blue scroll-smooth">
                 {cherryPickList.map((idx) => {
                   const isChecked = multiIndices.includes(idx);
                   return (
@@ -807,25 +896,27 @@ Règles d'or MANDATORY :
               </div>
 
               {/* Boutons de contrôle Cherry-Picking */}
-              <div className="flex flex-wrap gap-1.5 mt-1">
+              <div className="flex flex-col justify-between gap-1 w-[45px] shrink-0">
                 <button 
                   onClick={() => handleCheckAll(true)}
-                  className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white text-[10px] font-bold py-1 rounded"
+                  className="flex-1 bg-primary-blue hover:bg-primary-blue-hover text-white text-[12px] font-bold py-1 rounded"
+                  title="Sélectionner toutes les occurrences"
                 >
-                  ☑ TOUT
+                  ☑
                 </button>
                 <button 
                   onClick={() => handleCheckAll(false)}
-                  className="flex-1 bg-disabled-dark hover:bg-border-dark text-[#ccc] text-[10px] font-bold py-1 rounded"
+                  className="flex-1 bg-disabled-dark hover:bg-border-dark text-[#ccc] text-[12px] font-bold py-1 rounded"
+                  title="Désélectionner tout"
                 >
-                  ☐ RIEN
+                  ☐
                 </button>
                 <button 
                   onClick={handleAuditIA}
-                  className="w-full bg-[#9E67BA] hover:bg-[#83509e] text-white text-[10px] font-bold py-1 rounded"
+                  className="flex-1 bg-[#9E67BA] hover:bg-[#83509e] text-white text-[10px] font-bold py-1 rounded leading-none"
                   title="Générer un rapport d'audit dans le presse-papier"
                 >
-                  AUDIT IA 🤖
+                  IA
                 </button>
               </div>
             </div>

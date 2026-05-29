@@ -5,6 +5,25 @@ import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
 import { computeSearchHeatmap, computeLiveDiff } from '../utils/diffEngine.js';
 import { useZoomable } from '../hooks/useZoomable.js';
 import { applyDeltaOnText } from '../hooks/useHistoryStore.js';
+import { useDraggable } from '../hooks/useDraggable.js';
+import { useMessageBox } from '../context/MessageBoxContext.jsx';
+
+const EyeIcon = ({ active }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={`w-4 h-4 transition-colors ${active ? 'text-[#FFD700]' : 'text-[#888] hover:text-[#bbb]'}`}
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+    {!active && <line x1="1" y1="1" x2="23" y2="23"></line>}
+  </svg>
+);
 
 function renderSyntaxHighlightHtml(text, syntax, showInvisibles = true) {
   if (!text) return "";
@@ -32,8 +51,27 @@ function renderSyntaxHighlightHtml(text, syntax, showInvisibles = true) {
 /**
  * Fragment de ligne surligné de façon chirurgicale pour le miroir.
  */
-function renderLineContent(text, lineMarks) {
-  if (!lineMarks || lineMarks.length === 0) return text;
+function renderLineContent(text, lineMarks, showInvisibles = false) {
+  const renderChunk = (chunk, isMark, markProps = {}) => {
+    let content = chunk;
+    if (showInvisibles) {
+      const parts = [];
+      for (let i = 0; i < chunk.length; i++) {
+        if (chunk[i] === ' ') parts.push(<span key={`sp-${Math.random()}`} className="hc-space"> </span>);
+        else if (chunk[i] === '\t') parts.push(<span key={`tb-${Math.random()}`} className="hc-tab">\t</span>);
+        else parts.push(chunk[i]);
+      }
+      content = parts;
+    }
+    if (isMark) {
+      return <mark key={markProps.key} className={markProps.className}>{content}</mark>;
+    }
+    return content;
+  };
+
+  if (!lineMarks || lineMarks.length === 0) {
+    return renderChunk(text, false);
+  }
   
   const sorted = [...lineMarks].sort((a, b) => a.start - b.start);
   const elements = [];
@@ -41,19 +79,15 @@ function renderLineContent(text, lineMarks) {
   
   sorted.forEach((mark, index) => {
     if (mark.start > lastIdx) {
-      elements.push(text.substring(lastIdx, mark.start));
+      elements.push(<React.Fragment key={`text-${index}-${lastIdx}`}>{renderChunk(text.substring(lastIdx, mark.start), false)}</React.Fragment>);
     }
     const highlighted = text.substring(mark.start, mark.start + mark.length);
-    elements.push(
-      <mark key={`${index}-${mark.start}`} className={mark.type}>
-        {highlighted}
-      </mark>
-    );
+    elements.push(renderChunk(highlighted, true, { key: `${index}-${mark.start}`, className: mark.type }));
     lastIdx = mark.start + mark.length;
   });
   
   if (lastIdx < text.length) {
-    elements.push(text.substring(lastIdx));
+    elements.push(<React.Fragment key={`text-end-${lastIdx}`}>{renderChunk(text.substring(lastIdx), false)}</React.Fragment>);
   }
   
   return elements;
@@ -69,10 +103,14 @@ export default function SmartDebugger({
   sourceText,
   onApply,
   onAcceptAndCopy,
-  syntaxConfig
+  syntaxConfig,
+  searchLimits,
+  setSearchLimits
 }) {
+  const { showCustom } = useMessageBox();
   const [rawText, setRawText] = useState(initialRawText || "");
   const [showInvisibles, setShowInvisibles] = useState(true);
+  const [showMirrorInvisibles, setShowMirrorInvisibles] = useState(false);
   const [leftWidthPercent, setLeftWidthPercent] = useState(40); // Pourcentage de largeur de la colonne gauche
 
   // Nouveaux états V8
@@ -174,7 +212,54 @@ export default function SmartDebugger({
   const activeSearchText = searchBarText || (parsedRequest && parsedRequest.isValid ? parsedRequest.findText : "");
   const activeSmartMode = searchBarText ? isSearchSmartMode : ((parsedRequest && parsedRequest.isValid) ? parsedRequest.smartMode : false);
 
+  const [forceSearchOverride, setForceSearchOverride] = useState(false);
+  
+  useEffect(() => {
+    setForceSearchOverride(false);
+  }, [activeSearchText]);
+
+  const isEscapeHatchActive = useMemo(() => {
+    if (!sourceText || !activeSearchText) return false;
+    const linesCount = sourceText.split('\n').length;
+    return (linesCount > searchLimits.maxLines && activeSearchText.length > 0 && activeSearchText.length < searchLimits.minChars && !forceSearchOverride);
+  }, [sourceText, activeSearchText, searchLimits, forceSearchOverride]);
+
+  const handleEscapeHatchDoubleClick = async () => {
+    const res = await showCustom({
+      title: "Attention : Risque de ralentissement",
+      message: "Forcer la recherche dynamique pour une occurrence courte dans un texte long risque de ralentir fortement l'application.",
+      buttons: [
+        { label: 'Annuler', value: 'cancel', variant: 'secondary' },
+        { label: 'Éditer les limites', value: 'edit', variant: 'secondary' },
+        { label: 'Forcer la recherche', value: 'accept', variant: 'primary' }
+      ]
+    });
+    
+    if (res === 'accept') {
+      setForceSearchOverride(true);
+    } else if (res === 'edit') {
+      const editRes = await showCustom({
+        title: "Éditer les limites de l'échappement",
+        message: "Définissez les nouvelles limites pour la sécurité anti-lag de la recherche dynamique :",
+        inputs: [
+          { id: 'maxLines', type: 'number', label: "Nombre maximal de lignes tolérées dans le texte principal", defaultValue: searchLimits.maxLines },
+          { id: 'minChars', type: 'number', label: "Nombre minimum de caractères requis pour lancer la recherche", defaultValue: searchLimits.minChars }
+        ],
+        buttons: [
+          { label: 'Annuler', value: null, variant: 'secondary' },
+          { label: 'Valider', value: 'submit', variant: 'primary' }
+        ]
+      });
+      if (editRes && editRes !== 'cancel') {
+        const newMaxLines = parseInt(editRes.maxLines) || 500;
+        const newMinChars = parseInt(editRes.minChars) || 3;
+        setSearchLimits({ maxLines: newMaxLines, minChars: newMinChars });
+      }
+    }
+  };
+
   const searchResult = useMemo(() => {
+    if (isEscapeHatchActive) return { marks: [], foundRatio: 0 };
     const res = computeSearchHeatmap(sourceText, activeSearchText, activeSmartMode);
     // Si la recherche n'est pas forcée par la barre, et que le bouton Find est désactivé, 
     // on purge les marques visuelles mais on conserve le ratio pour les boutons de validation
@@ -182,7 +267,7 @@ export default function SmartDebugger({
       res.marks = [];
     }
     return res;
-  }, [sourceText, activeSearchText, activeSmartMode, searchBarText, isFindActive]);
+  }, [sourceText, activeSearchText, activeSmartMode, searchBarText, isFindActive, isEscapeHatchActive]);
 
   // Fix bounds pour searchOccIndex
   useEffect(() => {
@@ -279,6 +364,8 @@ export default function SmartDebugger({
     }
   }, [searchResult, displayedSourceText, searchOccIndex]);
 
+  const { modalRef, dragHandlers, style } = useDraggable();
+
   if (!isOpen) return null;
 
   // Calcul du rendu HTML des calques
@@ -324,19 +411,24 @@ export default function SmartDebugger({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[1000] flex justify-end items-center pr-[1%] box-sizing-border select-none p-4">
+    <div className="fixed inset-0 bg-black/80 z-[1000] flex justify-center items-center box-sizing-border select-none p-4 pointer-events-none">
       
       {/* Cadre de la Modale */}
       <div 
+        ref={modalRef}
         style={{
           borderColor: parsedRequest.isValid ? '#00FF7F' : '#d16969',
-          boxShadow: parsedRequest.isValid ? '0 0 15px rgba(0, 255, 127, 0.25)' : '0 0 15px rgba(209, 105, 105, 0.25)'
+          boxShadow: parsedRequest.isValid ? '0 0 15px rgba(0, 255, 127, 0.25)' : '0 0 15px rgba(209, 105, 105, 0.25)',
+          ...style
         }}
-        className="bg-bg-panel w-[90%] h-[95%] border flex flex-col shadow-2xl rounded-md overflow-hidden transition-all duration-300"
+        className="bg-bg-panel w-[90%] h-[95%] border flex flex-col shadow-2xl rounded-md overflow-hidden transition-[box-shadow,border-color] duration-300 pointer-events-auto"
       >
         
         {/* Header de la Modale */}
-        <div className="flex justify-between items-center p-3 bg-bg-dark border-b border-border-dark flex-shrink-0">
+        <div 
+          className="flex justify-between items-center p-3 bg-bg-dark border-b border-border-dark flex-shrink-0 cursor-move"
+          {...dragHandlers}
+        >
           <div className="flex items-center gap-3">
             <span className="text-[1.25em] font-extrabold text-[#FF8C00] uppercase tracking-wide">
               🛠️ DÉBOGUEUR DE REQUÊTE IA
@@ -436,9 +528,7 @@ export default function SmartDebugger({
                         ? 'FIND' 
                         : (parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1)
                             ? `FIND (${searchResult.marks.length}) : Occ ${searchOccIndex + 1}/${searchResult.marks.length} ; réf. ${searchOccIndex}`
-                            : (parsedRequest.isValid && searchResult.foundRatio === 1)
-                                ? `FIND (${searchResult.marks.length})`
-                                : 'FIND'}
+                            : 'FIND'}
                     </span>
                     {!searchBarText && !isReplaceActive && parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1 && (
                       <span className="flex items-center gap-0.5 ml-1 border-l border-black/30 pl-1">
@@ -550,7 +640,15 @@ export default function SmartDebugger({
                   >{isSearchExpanded ? '▲' : '▼'}</button>
                 )}
               </div>
-              {searchBarText && (
+              {isEscapeHatchActive ? (
+                <div 
+                  className="text-[10px] text-center font-bold text-[#ff9800] bg-[#332200] border-t border-[#ff9800] p-1 cursor-pointer hover:bg-[#442200] transition-colors"
+                  onDoubleClick={handleEscapeHatchDoubleClick}
+                  title="Double-cliquez pour ignorer cette sécurité et forcer la recherche (risque de lag)"
+                >
+                  ⚠️ Texte trop court (double-cliquez pour forcer)
+                </div>
+              ) : searchBarText && (
                 <div className="flex justify-between items-center px-2 py-1 bg-bg-dark text-xs text-[#ccc]">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input 
@@ -607,8 +705,15 @@ export default function SmartDebugger({
 
             {/* Miroir de prévisualisation du code source complet */}
             <div className="flex-1 border border-border-dark bg-bg-dark rounded-sm overflow-hidden flex flex-col">
-              <div className="bg-bg-panel px-3 py-1 border-b border-border-dark text-[10px] text-[#888] font-bold uppercase tracking-wider text-left select-none">
-                Miroir de Prévisualisation du Code Source (T3)
+              <div className="bg-bg-panel px-3 py-1 border-b border-border-dark flex justify-between items-center text-[10px] text-[#888] font-bold uppercase tracking-wider text-left select-none">
+                <span>Miroir de Prévisualisation du Code Source (T3)</span>
+                <button
+                  className="hover:bg-black/20 p-0.5 rounded transition-colors"
+                  onClick={(e) => { e.stopPropagation(); setShowMirrorInvisibles(!showMirrorInvisibles); }}
+                  title="Affiche ou cache les cara inivisble dans le texte principal"
+                >
+                  <EyeIcon active={showMirrorInvisibles} />
+                </button>
               </div>
               
               <div 
@@ -635,8 +740,13 @@ export default function SmartDebugger({
                       </div>
                       
                       {/* Ligne de texte avec surbrillance heatmap */}
-                      <div className="flex-1 pl-2.5 whitespace-pre text-left overflow-x-auto min-w-0 select-text">
-                        {line.text === "" ? "\n" : renderLineContent(line.text, line.marks)}
+                      <div className="flex-1 pl-2.5 whitespace-pre text-left overflow-x-auto overflow-y-hidden min-w-0 select-text">
+                        {line.text === "" ? (showMirrorInvisibles ? <span className="hc-nl"></span> : "\n") : (
+                          <>
+                            {renderLineContent(line.text, line.marks, showMirrorInvisibles)}
+                            {showMirrorInvisibles && <span className="hc-nl"></span>}
+                          </>
+                        )}
                       </div>
                     </div>
                   ))

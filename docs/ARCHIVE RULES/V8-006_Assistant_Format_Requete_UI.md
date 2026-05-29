@@ -69,7 +69,6 @@ ce constat est exactement le meme en haut, le meme "slider" apparait. par contre
 
 il faudrait que arrivé a un certain stade, ce slider disparaisse.
 voir meme qu'il n'apparait pas du tout.
-
 ---
 ## 🛠 Précisions ultérieures & Résolution technique (Notes d'implémentation)
 

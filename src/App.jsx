@@ -10,8 +10,11 @@ import EditRecordModal from './components/EditRecordModal.jsx';
 import { useHistoryStore, applyDeltaOnText, rebuildTextAt } from './hooks/useHistoryStore.js';
 import { parseSyntaxRequest, splitMultistackRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
 import { computeLiveDiff, computeGhostDelta, computeSearchHeatmap } from './utils/diffEngine.js';
+import { useMessageBox } from './context/MessageBoxContext.jsx';
 
 export default function App() {
+  const { showAlert, showConfirm, showCustom } = useMessageBox();
+
   // 1. Instanciation du store d'historique compressé Delta-Encoding
   const store = useHistoryStore();
 
@@ -37,6 +40,54 @@ export default function App() {
   const [globalSearchOccIndex, setGlobalSearchOccIndex] = useState(0);
   const isGlobalSearching = globalSearchBarText.trim().length > 0;
   
+  // NOUVEAU: Limites et Echappement du Find Dynamique (Task 8.8)
+  const [searchLimits, setSearchLimits] = useState({ maxLines: 500, minChars: 3 });
+  const [forceFindSearchOverride, setForceFindSearchOverride] = useState(false);
+  const [forceGlobalSearchOverride, setForceGlobalSearchOverride] = useState(false);
+
+  // NOUVEAU: Gestion des états de propreté du projet (Tâche 8.7)
+  const [lastSavedHistoryLength, setLastSavedHistoryLength] = useState(0);
+  const isProjectEmpty = store.history.length === 0;
+  const isProjectDirty = store.history.length !== lastSavedHistoryLength;
+
+  useEffect(() => { setForceFindSearchOverride(false); }, [findText]);
+  useEffect(() => { setForceGlobalSearchOverride(false); }, [globalSearchBarText]);
+
+  const handleEscapeHatchDoubleClick = async (type) => {
+    const res = await showCustom({
+      title: "Attention : Risque de ralentissement",
+      message: "Forcer la recherche dynamique pour une occurrence courte dans un texte long risque de ralentir fortement l'application.",
+      buttons: [
+        { label: 'Annuler', value: 'cancel', variant: 'secondary' },
+        { label: 'Éditer les limites', value: 'edit', variant: 'secondary' },
+        { label: 'Forcer la recherche', value: 'accept', variant: 'primary' }
+      ]
+    });
+    
+    if (res === 'accept') {
+      if (type === 'global') setForceGlobalSearchOverride(true);
+      else if (type === 'find') setForceFindSearchOverride(true);
+    } else if (res === 'edit') {
+      const editRes = await showCustom({
+        title: "Éditer les limites de l'échappement",
+        message: "Définissez les nouvelles limites pour la sécurité anti-lag de la recherche dynamique :",
+        inputs: [
+          { id: 'maxLines', type: 'number', label: "Nombre maximal de lignes tolérées dans le texte principal", defaultValue: searchLimits.maxLines },
+          { id: 'minChars', type: 'number', label: "Nombre minimum de caractères requis pour lancer la recherche", defaultValue: searchLimits.minChars }
+        ],
+        buttons: [
+          { label: 'Annuler', value: null, variant: 'secondary' },
+          { label: 'Valider', value: 'submit', variant: 'primary' }
+        ]
+      });
+      if (editRes && editRes !== 'cancel') {
+        const newMaxLines = parseInt(editRes.maxLines) || 500;
+        const newMinChars = parseInt(editRes.minChars) || 3;
+        setSearchLimits({ maxLines: newMaxLines, minChars: newMinChars });
+      }
+    }
+  };
+
   // File d'attente pour le Multistack
   const [pendingRequests, setPendingRequests] = useState([]);
   const [activeStackIndex, setActiveStackIndex] = useState(-1);
@@ -53,6 +104,7 @@ export default function App() {
   // Modale de Versioning Dynamique
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
   const [isVersionModalInitMode, setIsVersionModalInitMode] = useState(false);
+  const [versionModalInitialTab, setVersionModalInitialTab] = useState('increment');
   const [initialTextPayload, setInitialTextPayload] = useState(null);
   const [initialTextSource, setInitialTextSource] = useState(null);
 
@@ -83,10 +135,10 @@ export default function App() {
   const processImportFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target.result;
       if (store.history.length > 0) {
-        if (!confirm("Attention : L'importation d'un nouveau fichier va réinitialiser tout le projet. Continuer ?")) {
+        if (!(await showConfirm("Attention : L'importation d'un nouveau fichier va réinitialiser tout le projet. Continuer ?"))) {
           return;
         }
       }
@@ -99,6 +151,7 @@ export default function App() {
       
       // On ouvre la modale pour forcer l'initialisation de la V1.0.0 au format souhaité
       setIsVersionModalInitMode(true);
+      setVersionModalInitialTab('increment');
       setIsVersionModalOpen(true);
     };
     reader.readAsText(file);
@@ -126,8 +179,14 @@ export default function App() {
   };
 
   // --- RECHERCHE ET LOCALISATION DES OCCURRENCES DANS LE CODE ACTIF ---
+  const isFindEscapeHatchActive = useMemo(() => {
+    if (!store.currentText || !findText) return false;
+    const linesCount = store.currentText.split('\n').length;
+    return (linesCount > searchLimits.maxLines && findText.length > 0 && findText.length < searchLimits.minChars && !forceFindSearchOverride);
+  }, [store.currentText, findText, searchLimits, forceFindSearchOverride]);
+
   const occurrences = useMemo(() => {
-    if (!store.currentText || !findText) return [];
+    if (!store.currentText || !findText || isFindEscapeHatchActive) return [];
     const results = [];
     
     if (ignoreSpaces) {
@@ -334,10 +393,16 @@ export default function App() {
   }, []);
 
   // --- RECHERCHE GLOBALE ---
+  const isGlobalEscapeHatchActive = useMemo(() => {
+    if (!store.currentText || !globalSearchBarText) return false;
+    const linesCount = store.currentText.split('\n').length;
+    return (linesCount > searchLimits.maxLines && globalSearchBarText.length > 0 && globalSearchBarText.length < searchLimits.minChars && !forceGlobalSearchOverride);
+  }, [store.currentText, globalSearchBarText, searchLimits, forceGlobalSearchOverride]);
+
   const globalSearchResult = useMemo(() => {
-    if (!globalSearchBarText) return { marks: [], foundRatio: 0 };
+    if (!globalSearchBarText || isGlobalEscapeHatchActive) return { marks: [], foundRatio: 0 };
     return computeSearchHeatmap(store.currentText, globalSearchBarText, globalSearchSmartMode);
-  }, [store.currentText, globalSearchBarText, globalSearchSmartMode]);
+  }, [store.currentText, globalSearchBarText, globalSearchSmartMode, isGlobalEscapeHatchActive]);
 
   useEffect(() => {
     if (globalSearchResult.marks.length > 0) {
@@ -352,13 +417,13 @@ export default function App() {
   // Importation directe du Code source
   const handleImportMainCode = () => {
     navigator.clipboard.readText()
-      .then(clipText => {
+      .then(async clipText => {
         if (!clipText.trim()) {
-          alert("Le presse-papier est vide.");
+          await showAlert("Le presse-papier est vide.", "Erreur");
           return;
         }
         if (store.history.length > 0) {
-          if (!confirm("Attention : L'importation d'un nouveau fichier va réinitialiser tout le projet. Continuer ?")) {
+          if (!(await showConfirm("Attention : L'importation d'un nouveau fichier va réinitialiser tout le projet. Continuer ?"))) {
             return;
           }
         }
@@ -369,22 +434,28 @@ export default function App() {
         store.setProjectName("");
 
         setIsVersionModalInitMode(true);
+        setVersionModalInitialTab('increment');
         setIsVersionModalOpen(true);
       })
-      .catch(() => alert("Impossible de lire le presse-papier."));
+      .catch(async () => await showAlert("Impossible de lire le presse-papier.", "Erreur"));
   };
 
-  const handleCopyMainCode = () => {
+  const handleCopyMainCode = async () => {
     if (!store.currentText) {
-      alert("Aucun code source à copier.");
+      await showAlert("Aucun code source à copier.", "Avertissement");
       return;
     }
     navigator.clipboard.writeText(store.currentText)
-      .then(() => {
-        alert("Code source copié dans le presse-papier !");
+      .then(async () => {
+        await showAlert("Code source copié dans le presse-papier !");
         store.pushInfoRecord("Export Presse-papier", "Code source copié dans le presse-papier");
       })
-      .catch(() => alert("Échec de la copie."));
+      .catch(async () => await showAlert("Échec de la copie.", "Erreur"));
+  };
+
+  const handleDirectOpenDebugger = (text) => {
+    setDebuggerRawText(text || "");
+    setIsDebuggerOpen(true);
   };
 
   // Enregistrer Sous
@@ -405,7 +476,7 @@ export default function App() {
         const writable = await handle.createWritable();
         await writable.write(store.currentText);
         await writable.close();
-        alert("Fichier enregistré avec succès !");
+        await showAlert("Fichier enregistré avec succès !");
         store.pushInfoRecord("Sauvegarde", `Fichier enregistré sous ${handle.name}`);
       } else {
         // Fallback pour les navigateurs non compatibles
@@ -423,7 +494,7 @@ export default function App() {
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error(err);
-        alert("Erreur lors de l'enregistrement du fichier.");
+        await showAlert("Erreur lors de l'enregistrement du fichier.", "Erreur");
       }
     }
   };
@@ -468,9 +539,9 @@ export default function App() {
   };
 
   // Lancement de la recherche manuelle
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (occurrencesCount === 0) {
-      alert("Texte recherché introuvable dans le code source. Ouverture du Débogueur pour visualiser le décalage (Heatmap).");
+      await showAlert("Texte recherché introuvable dans le code source. Ouverture du Débogueur pour visualiser le décalage (Heatmap).", "Avertissement");
       const dummyRaw = `${syntaxConfig.START} [MULTI:FALSE]\n${syntaxConfig.FIND}\n${findText}\n${syntaxConfig.REPLACE}\n${replaceText}\n${syntaxConfig.END}`;
       setDebuggerRawText(dummyRaw);
       setIsDebuggerOpen(true);
@@ -490,26 +561,26 @@ export default function App() {
   };
 
   // Centrage de l'écran sur une modification de l'historique
-  const handleGoToRecord = () => {
+  const handleGoToRecord = async () => {
     if (historyMarks && historyMarks.length > 0) {
       // On prend la première marque générée par l'historique actif
       setHistoryScrollTarget(historyMarks[0].start);
     } else {
-      alert("Impossible de localiser cette modification dans le code actuel.");
+      await showAlert("Impossible de localiser cette modification dans le code actuel.", "Erreur");
     }
   };
 
   // Application du remplacement unitaire ou multiple
-  const handleReplace = () => {
+  const handleReplace = async () => {
     if (occurrencesCount === 0) return;
 
     // Remplacement unitaire en mode strict
     if (!multiMode && occurrencesCount > 1) {
-      alert(`Erreur : Trouvé ${occurrencesCount} fois. Une occurrence unique est exigée en mode strict.`);
+      await showAlert(`Erreur : Trouvé ${occurrencesCount} fois. Une occurrence unique est exigée en mode strict.`, "Erreur");
       return;
     }
 
-    if (replaceText === "" && !confirm("ATTENTION : La zone de remplacement est vide. Voulez-vous vraiment SUPPRIMER cette occurrence du code ?")) {
+    if (replaceText === "" && !(await showConfirm("ATTENTION : La zone de remplacement est vide. Voulez-vous vraiment SUPPRIMER cette occurrence du code ?"))) {
       return;
     }
 
@@ -546,7 +617,7 @@ export default function App() {
         setActiveStackIndex(nextIndex);
         loadRequestIntoUI(newReqs[nextIndex].parsed, nextIndex, newReqs);
       } else if (newReqs.every(r => r.status === 'success' || r.status === 'ignored')) {
-        alert("🎉 Toutes les requêtes de la pile Multistack ont été appliquées avec succès !");
+        await showAlert("🎉 Toutes les requêtes de la pile Multistack ont été appliquées avec succès !");
         setIsPlayingStack(false);
         setFindText("");
         setReplaceText("");
@@ -595,7 +666,7 @@ export default function App() {
   };
 
   // Chargement d'une requête spécifique dans l'UI (Sas de sécurité)
-  const loadRequestIntoUI = (parsed, index = activeStackIndex, currentReqs = pendingRequests) => {
+  const loadRequestIntoUI = async (parsed, index = activeStackIndex, currentReqs = pendingRequests) => {
     if (parsed.isValid) {
       skipMultiResetRef.current = true;
       let finalMultiIndices = resolveMultiIndices(parsed, store.currentText);
@@ -623,14 +694,14 @@ export default function App() {
         newReqs[index].status = 'error';
         setPendingRequests(newReqs);
       }
-      alert("Une requête exige une ouverture automatique du Débogueur : Erreur de syntaxe détectée.");
+      await showAlert("Une requête exige une ouverture automatique du Débogueur : Erreur de syntaxe détectée.", "Erreur");
       setDebuggerRawText(parsed.rawText);
       setIsDebuggerOpen(true);
     }
   };
 
   // Réception et traitement d'une requête syntaxique IA (Coller depuis presse-papier)
-  const handleImportSyntaxRequest = (clipboardText) => {
+  const handleImportSyntaxRequest = async (clipboardText) => {
     // 1. Découpage du bloc en requêtes distinctes (Multistack)
     const requests = splitMultistackRequest(clipboardText);
 
@@ -648,9 +719,9 @@ export default function App() {
         setPendingRequests(newPending);
         setActiveStackIndex(0);
         loadRequestIntoUI(newPending[0].parsed, 0, newPending);
-        alert(`📦 MODE MULTISTACK : ${newPending.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`);
+        await showAlert(`📦 MODE MULTISTACK : ${newPending.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`, "Information");
       } else {
-        alert("Aucune requête syntaxique valide trouvée dans la pile Multistack.");
+        await showAlert("Aucune requête syntaxique valide trouvée dans la pile Multistack.", "Erreur");
       }
     } else {
       // MODE UNITAIRE CLASSIQUE
@@ -660,7 +731,7 @@ export default function App() {
         if (parsed.isValid) {
           const testOccs = store.currentText.indexOf(parsed.findText);
           if (testOccs === -1) {
-            alert("Le texte recherché est introuvable. Ouverture automatique du Débogueur.");
+            await showAlert("Le texte recherché est introuvable. Ouverture automatique du Débogueur.", "Erreur");
             setDebuggerRawText(clipboardText);
             setIsDebuggerOpen(true);
           } else {
@@ -674,17 +745,17 @@ export default function App() {
             
             setCommentText(parsed.comment || "");
             setCurrentLabel(parsed.label || "");
-            alert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.");
+            await showAlert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.");
           }
         } else {
-          alert("Erreur syntaxique détectée dans la requête. Ouverture automatique du Débogueur.");
+          await showAlert("Erreur syntaxique détectée dans la requête. Ouverture automatique du Débogueur.", "Erreur");
           setDebuggerRawText(clipboardText);
           setIsDebuggerOpen(true);
         }
       } else {
         // Fallback Texte Brut
         setFindText(clipboardText);
-        alert("Texte brut importé dans la zone de recherche (FIND).");
+        await showAlert("Texte brut importé dans la zone de recherche (FIND).");
       }
     }
   };
@@ -703,48 +774,52 @@ export default function App() {
 
   // Moteur d'exécution automatique de la pile (Multistack)
   useEffect(() => {
-    if (isPlayingStack) {
-      if (pendingRequests.length === 0 || activeStackIndex === -1 || activeStackIndex >= pendingRequests.length) {
-        setIsPlayingStack(false);
-        return;
-      }
-      
-      const req = pendingRequests[activeStackIndex];
-      
-      // Sécurité : on vérifie que les textboxes correspondent bien à la requête active
-      if (findText !== req.parsed.findText) {
-        return; // on attend le prochain render
-      }
+    const playStackStep = async () => {
+      if (isPlayingStack) {
+        if (pendingRequests.length === 0 || activeStackIndex === -1 || activeStackIndex >= pendingRequests.length) {
+          setIsPlayingStack(false);
+          return;
+        }
+        
+        const req = pendingRequests[activeStackIndex];
+        
+        // Sécurité : on vérifie que les textboxes correspondent bien à la requête active
+        if (findText !== req.parsed.findText) {
+          return; // on attend le prochain render
+        }
 
-      if (req.status === 'error') {
-        setIsPlayingStack(false);
-        alert(`Arrêt de l'exécution de la pile : erreur détectée à l'index ${activeStackIndex + 1}.`);
-        return;
-      }
-      
-      if (occurrencesCount === 0) {
-        setIsPlayingStack(false);
-        alert(`Arrêt de l'exécution : l'occurrence est introuvable pour la requête n°${activeStackIndex + 1}.`);
-        return;
-      }
-      
-      if (multiMode && occurrencesCount > 1 && multiIndices.length !== occurrencesCount) {
-        setIsPlayingStack(false);
-        alert(`Arrêt de l'exécution : mode multi avec cherry-picking requis à l'index ${activeStackIndex + 1}. Veuillez sélectionner les occurrences ciblées.`);
-        return;
-      }
+        if (req.status === 'error') {
+          setIsPlayingStack(false);
+          await showAlert(`Arrêt de l'exécution de la pile : erreur détectée à l'index ${activeStackIndex + 1}.`, "Erreur");
+          return;
+        }
+        
+        if (occurrencesCount === 0) {
+          setIsPlayingStack(false);
+          await showAlert(`Arrêt de l'exécution : l'occurrence est introuvable pour la requête n°${activeStackIndex + 1}.`, "Erreur");
+          return;
+        }
+        
+        if (multiMode && occurrencesCount > 1 && multiIndices.length !== occurrencesCount) {
+          setIsPlayingStack(false);
+          await showAlert(`Arrêt de l'exécution : mode multi avec cherry-picking requis à l'index ${activeStackIndex + 1}. Veuillez sélectionner les occurrences ciblées.`, "Avertissement");
+          return;
+        }
 
-      // Si tout est ok, on applique avec un délai pour l'animation
-      const timer = setTimeout(() => {
-        handleReplace();
-      }, 500); 
-      
-      return () => clearTimeout(timer);
-    }
+        // Si tout est ok, on applique avec un délai pour l'animation
+        const timer = setTimeout(() => {
+          handleReplace();
+        }, 500); 
+        
+        return () => clearTimeout(timer);
+      }
+    };
+    
+    playStackStep();
   }, [isPlayingStack, activeStackIndex, pendingRequests, occurrencesCount, multiMode, multiIndices, findText]);
 
-  const handleClearStack = () => {
-    if (confirm("Voulez-vous vider la pile Multistack actuelle ?")) {
+  const handleClearStack = async () => {
+    if (await showConfirm("Voulez-vous vider la pile Multistack actuelle ?")) {
       setPendingRequests([]);
       setActiveStackIndex(-1);
       setFindText("");
@@ -762,20 +837,20 @@ export default function App() {
     loadRequestIntoUI(newReqs[index].parsed, index, newReqs);
   };
 
-  const handleAuditIA = () => {
+  const handleAuditIA = async () => {
     const failed = pendingRequests.filter(r => r.status === 'error');
     if (failed.length === 0) {
-      alert("Aucune erreur à auditer.");
+      await showAlert("Aucune erreur à auditer.", "Information");
       return;
     }
     const auditText = failed.map((req, i) => `--- REQUETE EN ERREUR ${i+1} ---\n${req.raw}\n\n--- CAUSE PROBABLE ---\nTexte cible introuvable ou altéré par une modification précédente.`).join('\n\n');
     navigator.clipboard.writeText(auditText)
-      .then(() => alert("Audit copié dans le presse-papier pour l'IA !"))
-      .catch(() => alert("Erreur de copie de l'audit."));
+      .then(async () => await showAlert("Audit copié dans le presse-papier pour l'IA !"))
+      .catch(async () => await showAlert("Erreur de copie de l'audit.", "Erreur"));
   };
 
   // Application de la requête réparée depuis la modale de Débogage
-  const handleApplyDebuggerRequest = ({ findText: f, replaceText: r, label, multiMode: m, multiIndices: idxs, smartMode }) => {
+  const handleApplyDebuggerRequest = async ({ findText: f, replaceText: r, label, multiMode: m, multiIndices: idxs, smartMode }) => {
     // 1. On charge la requête dans le formulaire gauche
     setFindText(f);
     setReplaceText(r);
@@ -809,28 +884,28 @@ export default function App() {
     setFindText("");
     setReplaceText("");
     setCommentText("");
-    alert(label ? `Opération "${label}" appliquée avec succès !` : "Requête déboguée appliquée avec succès !");
+    await showAlert(label ? `Opération "${label}" appliquée avec succès !` : "Requête déboguée appliquée avec succès !");
   };
 
   // Copie de la requête depuis la modale sans appliquer
-  const handleAcceptAndCopy = ({ findText: f, replaceText: r, multiMode: m, multiIndices: idxs, smartMode }) => {
+  const handleAcceptAndCopy = async ({ findText: f, replaceText: r, multiMode: m, multiIndices: idxs, smartMode }) => {
     setFindText(f);
     setReplaceText(r);
     setMultiMode(m);
     setMultiIndices(idxs);
     setIgnoreSpaces(smartMode || false);
     setCommentText(""); // Le débogueur n'a pas encore de champ commentaire
-    alert("Les textes ont été copiés dans les champs FIND et REPLACE. Vous pouvez les vérifier et appliquer manuellement.");
+    await showAlert("Les textes ont été copiés dans les champs FIND et REPLACE. Vous pouvez les vérifier et appliquer manuellement.");
   };
 
   // Exportation du projet au format JSON
-  const handleExportProject = () => {
+  const handleExportProject = async () => {
     if (store.history.length === 0) {
-      alert("Rien à exporter. L'historique est vide.");
+      await showAlert("Rien à exporter. L'historique est vide.", "Avertissement");
       return;
     }
     if (!store.projectName.trim()) {
-      alert("Veuillez donner un nom au projet en haut de l'écran avant de sauvegarder.");
+      await showAlert("Veuillez donner un nom au projet en haut de l'écran avant de sauvegarder.", "Avertissement");
       return;
     }
 
@@ -851,6 +926,7 @@ export default function App() {
     URL.revokeObjectURL(url);
     
     store.pushInfoRecord("Export JSON", "Projet exporté au format JSON");
+    setLastSavedHistoryLength(store.history.length + 1); // +1 car pushInfoRecord ajoute un élément
   };
 
   // Déclencheur d'ouverture de fichier pour l'import JSON
@@ -863,14 +939,14 @@ export default function App() {
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = JSON.parse(event.target.result);
           if (!data.projectName || !Array.isArray(data.history)) {
-            alert("Format JSON incorrect. Fichier invalide.");
+            await showAlert("Format JSON incorrect. Fichier invalide.", "Erreur");
             return;
           }
-          if (store.history.length > 0 && !confirm("ATTENTION : L'importation d'un projet va écraser tout votre historique en cours. Continuer ?")) {
+          if (store.history.length > 0 && !(await showConfirm("ATTENTION : L'importation d'un projet va écraser tout votre historique en cours. Continuer ?"))) {
             return;
           }
           
@@ -879,9 +955,10 @@ export default function App() {
           }
           
           store.importProject(data.projectName, data.history);
-          alert(`Projet "${data.projectName}" importé avec succès !`);
+          setLastSavedHistoryLength(data.history.length);
+          await showAlert(`Projet "${data.projectName}" importé avec succès !`);
         } catch (err) {
-          alert("Erreur lors de la lecture du fichier JSON.");
+          await showAlert("Erreur lors de la lecture du fichier JSON.", "Erreur");
         }
       };
       reader.readAsText(file);
@@ -902,6 +979,16 @@ export default function App() {
       setRightWidth(w);
     }
   };
+
+  const projectSizeBytes = useMemo(() => {
+    if (!store.projectName) return 0;
+    const exportData = {
+      projectName: store.projectName,
+      history: store.history,
+      versionConfig: store.versionConfig
+    };
+    return new Blob([JSON.stringify(exportData)]).size;
+  }, [store.projectName, store.history, store.versionConfig]);
 
   return (
     <div 
@@ -946,6 +1033,7 @@ export default function App() {
         onClear={() => { setFindText(""); setReplaceText(""); }}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenDebugger={handleImportSyntaxRequest}
+        onDirectOpenDebugger={handleDirectOpenDebugger}
         syntaxConfig={syntaxConfig}
         width={leftWidth}
         onPlayStack={handlePlayStack}
@@ -960,6 +1048,8 @@ export default function App() {
         setIsFindActive={setIsFindActive}
         isReplaceActive={isReplaceActive}
         setIsReplaceActive={setIsReplaceActive}
+        isFindEscapeHatchActive={isFindEscapeHatchActive}
+        onForceFindEscapeHatch={() => handleEscapeHatchDoubleClick('find')}
       />
 
       <Splitter direction="vertical" onResize={handleResizeLeft} />
@@ -970,7 +1060,14 @@ export default function App() {
         {/* En-tête Éditeur Central */}
         <div className="flex justify-between items-start gap-4 border-b border-border-dark pb-2.5 flex-shrink-0">
           <div className="flex flex-col flex-1 h-[75px] justify-center">
-            <div className="text-2xl select-none font-bold mt-1 truncate" title={`CODE SOURCE - ${store.projectName || 'SANS_NOM'} - ${store.currentVersion}`}>
+            <div 
+              className="text-2xl select-none font-bold mt-1 truncate cursor-pointer hover:opacity-80 transition-opacity" 
+              title={`Double-clic pour renommer le projet. CODE SOURCE - ${store.projectName || 'SANS_NOM'} - ${store.currentVersion}`}
+              onDoubleClick={() => {
+                setVersionModalInitialTab('rename');
+                setIsVersionModalOpen(true);
+              }}
+            >
               CODE SOURCE - <span className="text-[#FF4500] uppercase font-mono">{store.projectName || 'SANS_NOM'}</span> - <span className="text-hl-yellow text-3xl ml-1 font-black font-mono">{store.currentVersion}</span>
             </div>
           </div>
@@ -1102,6 +1199,8 @@ export default function App() {
           globalSearchOccIndex={globalSearchOccIndex}
           setGlobalSearchOccIndex={setGlobalSearchOccIndex}
           globalSearchMarks={globalSearchResult.marks}
+          isGlobalEscapeHatchActive={isGlobalEscapeHatchActive}
+          onForceGlobalEscapeHatch={() => handleEscapeHatchDoubleClick('global')}
         />
       </div>
 
@@ -1110,6 +1209,10 @@ export default function App() {
       {/* 3. PANNEAU DROIT (HISTORIQUE) */}
       <SidebarRight
         history={store.history}
+        projectSizeBytes={projectSizeBytes}
+        projectName={store.projectName}
+        isProjectEmpty={isProjectEmpty}
+        isProjectDirty={isProjectDirty}
         selectedIndex={store.selectedIndex}
         onSelectIndex={(idx) => {
           store.setSelectedIndex(idx);
@@ -1117,20 +1220,24 @@ export default function App() {
         }}
         onSaveProject={handleExportProject}
         onLoadProject={handleTriggerImport}
-        onResetProject={() => {
-          if (confirm("Voulez-vous vraiment effacer tout le projet et l'historique ?")) {
+        onResetProject={async () => {
+          if (await showConfirm("Voulez-vous vraiment effacer tout le projet et l'historique ?")) {
             store.resetStore();
+            setLastSavedHistoryLength(0);
             setFindText("");
             setReplaceText("");
           }
         }}
-        onBranchOut={() => setIsVersionModalOpen(true)}
+        onBranchOut={() => {
+          setVersionModalInitialTab('increment');
+          setIsVersionModalOpen(true);
+        }}
         onEditRecord={handleEditRecord}
         onGoToRecord={handleGoToRecord}
-        onCopyAsRequest={(index) => {
+        onCopyAsRequest={async (index) => {
           const rec = store.history[index];
           if (!rec || rec.type === 'snapshot' || rec.type === 'info') {
-            alert("Attention : il est impossible de générer une requête pour ce type d'élément (snapshot ou info).");
+            await showAlert("Attention : il est impossible de générer une requête pour ce type d'élément (snapshot ou info).", "Avertissement");
             return;
           }
           const multiTag = rec.multiMode 
@@ -1141,13 +1248,13 @@ export default function App() {
           const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
           const reqText = `${header}\n${syntaxConfig.FIND}\n${rec.findStr}\n${syntaxConfig.REPLACE}\n${rec.replaceStr}\n${syntaxConfig.END}`;
           navigator.clipboard.writeText(reqText)
-            .then(() => alert("La requête a bien été copiée dans le presse-papier."))
-            .catch(() => alert("Erreur lors de la copie."));
+            .then(async () => await showAlert("La requête a bien été copiée dans le presse-papier."))
+            .catch(async () => await showAlert("Erreur lors de la copie.", "Erreur"));
         }}
-        onUndoStrict={(index) => {
+        onUndoStrict={async (index) => {
           const rec = store.history[index];
           if (!rec || rec.type !== 'replace') {
-            alert("Impossible d'annuler ce type d'élément.");
+            await showAlert("Impossible d'annuler ce type d'élément.", "Erreur");
             return;
           }
           // Tentative d'annulation : on inverse Find et Replace
@@ -1160,7 +1267,7 @@ export default function App() {
           
           if (foundAt !== -1) {
             // Cas simple : le texte du Replace existe encore tel quel dans le code
-            if (confirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nLe texte produit par cette requête a été retrouvé intact dans le code source. L'annulation va rétablir le texte d'origine.`)) {
+            if (await showConfirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nLe texte produit par cette requête a été retrouvé intact dans le code source. L'annulation va rétablir le texte d'origine.`)) {
               store.pushReplace(
                 inverseFindStr,
                 inverseReplaceStr,
@@ -1198,15 +1305,15 @@ export default function App() {
               message += `\n\nLe texte a été modifié par des opérations ultérieures non identifiées automatiquement. Remontez le fil de l'historique pour annuler progressivement.`;
             }
             
-            alert(message);
+            await showAlert(message, "Avertissement");
           }
         }}
-        onCompress={(index) => {
+        onCompress={async (index) => {
           if (index <= 0) {
-            alert("Impossible de compresser : cet item est déjà le premier de la pile.");
+            await showAlert("Impossible de compresser : cet item est déjà le premier de la pile.", "Avertissement");
             return;
           }
-          if (confirm(`⚠️ ATTENTION — Opération irréversible !\n\nCette action va supprimer définitivement les ${index} entrées antérieures à l'item sélectionné et les remplacer par un snapshot unique.\n\nTout l'historique antérieur sera perdu. Continuer ?`)) {
+          if (await showConfirm(`⚠️ ATTENTION — Opération irréversible !\n\nCette action va supprimer définitivement les ${index} entrées antérieures à l'item sélectionné et les remplacer par un snapshot unique.\n\nTout l'historique antérieur sera perdu. Continuer ?`)) {
             store.compressHistory(index);
           }
         }}
@@ -1232,13 +1339,17 @@ export default function App() {
         onApply={handleApplyDebuggerRequest}
         onAcceptAndCopy={handleAcceptAndCopy}
         syntaxConfig={syntaxConfig}
+        searchLimits={searchLimits}
+        setSearchLimits={setSearchLimits}
       />
 
       {isVersionModalOpen && (
         <VersionTagModal
           isOpen={isVersionModalOpen}
+          initialTab={versionModalInitialTab}
           onClose={() => {
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
             if (isVersionModalInitMode) {
               setInitialTextPayload(null); // Annulation de l'import
             }
@@ -1252,6 +1363,7 @@ export default function App() {
             if (newProjectName !== undefined) store.setProjectName(newProjectName);
             store.setVersionConfig(config);
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
             if (isVersionModalInitMode && initialTextPayload !== null) {
               const pName = newProjectName !== undefined ? newProjectName : store.projectName;
               store.pushSnapshot(
@@ -1261,6 +1373,7 @@ export default function App() {
                 initialTextSource ? initialTextSource.source : "Système",
                 `Init projet — Initialisation du projet : ${pName}`
               );
+              setLastSavedHistoryLength(1); // À l'initialisation, la longueur est de 1
               setInitialTextPayload(null);
               setInitialTextSource(null);
             }
@@ -1269,6 +1382,7 @@ export default function App() {
             if (newProjectName !== undefined) store.setProjectName(newProjectName);
             store.createNewBranch(targetIndex, freezeArchive);
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
           }}
           onRename={(configRanks, autoIndex, newProjectName, oldProjectName, freezeArchive) => {
             if (newProjectName !== undefined) store.setProjectName(newProjectName);
@@ -1276,16 +1390,19 @@ export default function App() {
             store.setVersionConfig(properConfig);
             store.createNewBranch('rename', freezeArchive, oldProjectName, newProjectName, configRanks);
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
           }}
           onBranchReset={(config, autoIndex, newProjectName, freezeArchive) => {
             if (newProjectName !== undefined) store.setProjectName(newProjectName);
             store.createNewBranch('0', freezeArchive);
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
           }}
           onBranchFromParent={(config, autoIndex, newProjectName, freezeArchive) => {
             if (newProjectName !== undefined) store.setProjectName(newProjectName);
             store.createNewBranch('M', freezeArchive);
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
           }}
           onChangePattern={(configRanks, autoIndex, newProjectName, oldPatternPreview, freezeArchive) => {
             if (newProjectName !== undefined) store.setProjectName(newProjectName);
@@ -1293,6 +1410,7 @@ export default function App() {
             store.setVersionConfig(properConfig);
             store.createNewBranch('changePattern', freezeArchive, "", "", properConfig, oldPatternPreview);
             setIsVersionModalOpen(false);
+            setIsVersionModalInitMode(false);
           }}
         />
       )}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useDraggable } from '../hooks/useDraggable.js';
+import { useMessageBox } from '../context/MessageBoxContext.jsx';
 
 /**
  * Modale d'édition d'un enregistrement de l'historique.
@@ -7,6 +9,9 @@ import React, { useState, useEffect } from 'react';
 export default function EditRecordModal({ isOpen, onClose, record, index, onSave, syntaxConfig }) {
   const [label, setLabel] = useState("");
   const [comment, setComment] = useState("");
+  const { showAlert } = useMessageBox();
+
+  const { modalRef, dragHandlers, style } = useDraggable();
 
   useEffect(() => {
     if (isOpen && record) {
@@ -48,19 +53,29 @@ export default function EditRecordModal({ isOpen, onClose, record, index, onSave
     rawRequest = "Aucune requête associée (Snapshot).";
   }
 
-  const handleCopyRaw = () => {
-    navigator.clipboard.writeText(rawRequest)
-      .then(() => alert("Requête copiée dans le presse-papier !"))
-      .catch(() => alert("Erreur lors de la copie."));
+  const handleCopyRaw = async () => {
+    try {
+      await navigator.clipboard.writeText(rawRequest);
+      await showAlert("Requête copiée dans le presse-papier !");
+    } catch (e) {
+      await showAlert("Erreur lors de la copie.", "Erreur");
+    }
   };
 
   return (
-    <div className="absolute inset-0 z-[1000] bg-black bg-opacity-70 flex items-center justify-center p-4">
-      <div className="bg-bg-panel border border-border-dark rounded-md shadow-2xl w-[600px] flex flex-col font-segoe select-none overflow-hidden">
+    <div className="absolute inset-0 z-[1000] bg-black bg-opacity-70 flex items-center justify-center p-4 pointer-events-none">
+      <div 
+        ref={modalRef}
+        style={style}
+        className="bg-bg-panel border border-border-dark rounded-md shadow-2xl w-[600px] flex flex-col font-segoe select-none overflow-hidden pointer-events-auto"
+      >
         
         {/* Header */}
-        <div className="bg-bg-dark border-b border-border-dark p-3 flex justify-between items-center flex-shrink-0">
-          <h2 className="text-primary-blue font-black uppercase tracking-wide text-sm">
+        <div 
+          className="bg-bg-dark border-b border-border-dark p-3 flex justify-between items-center flex-shrink-0 cursor-move"
+          {...dragHandlers}
+        >
+          <h2 className="text-primary-blue font-black uppercase tracking-wide text-sm pointer-events-none">
             Édition Historique — Version {record.version}
           </h2>
           <button 

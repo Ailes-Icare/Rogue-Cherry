@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DEFAULT_SYNTAX } from '../utils/textParser.js';
+import { useDraggable } from '../hooks/useDraggable.js';
+import { useMessageBox } from '../context/MessageBoxContext.jsx';
 
 /**
  * Modale de configuration personnalisée pour les balises de requêtes IA.
@@ -16,6 +18,7 @@ export default function SettingsModal({ isOpen, onClose, syntaxConfig, onSave })
   const [findTag, setFindTag] = useState(DEFAULT_SYNTAX.FIND);
   const [replaceTag, setReplaceTag] = useState(DEFAULT_SYNTAX.REPLACE);
   const [endTag, setEndTag] = useState(DEFAULT_SYNTAX.END);
+  const { showAlert } = useMessageBox();
 
   // Synchronisation avec l'état parent à l'ouverture
   useEffect(() => {
@@ -27,6 +30,8 @@ export default function SettingsModal({ isOpen, onClose, syntaxConfig, onSave })
     }
   }, [isOpen, syntaxConfig]);
 
+  const { modalRef, dragHandlers, style } = useDraggable();
+
   if (!isOpen) return null;
 
   const handleReset = () => {
@@ -36,10 +41,10 @@ export default function SettingsModal({ isOpen, onClose, syntaxConfig, onSave })
     setEndTag(DEFAULT_SYNTAX.END);
   };
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
     // Vérification que les balises ne sont pas vides
     if (!startTag.trim() || !findTag.trim() || !replaceTag.trim() || !endTag.trim()) {
-      alert("Erreur : Les balises ne peuvent pas être vides.");
+      await showAlert("Les balises ne peuvent pas être vides.", "Erreur");
       return;
     }
     onSave({
@@ -52,12 +57,19 @@ export default function SettingsModal({ isOpen, onClose, syntaxConfig, onSave })
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-[1050] flex justify-center items-center p-4">
-      <div className="bg-bg-panel w-full max-w-[400px] border border-primary-blue rounded-md shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/75 z-[1050] flex justify-center items-center p-4 pointer-events-none">
+      <div 
+        ref={modalRef}
+        style={style}
+        className="bg-bg-panel w-full max-w-[400px] border border-primary-blue rounded-md shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
+      >
         
         {/* Header */}
-        <div className="flex justify-between items-center p-3.5 bg-bg-dark border-b border-border-dark">
-          <span className="text-[1.15em] font-bold text-[#20b2aa] uppercase">⚙️ PARAMÈTRES SYNTAXE</span>
+        <div 
+          className="flex justify-between items-center p-3.5 bg-bg-dark border-b border-border-dark cursor-move"
+          {...dragHandlers}
+        >
+          <span className="text-[1.15em] font-bold text-[#20b2aa] uppercase pointer-events-none">⚙️ PARAMÈTRES SYNTAXE</span>
           <button 
             onClick={onClose} 
             className="bg-cherry-red hover:bg-cherry-red-hover text-white font-bold px-2 py-0.5 rounded text-xs transition duration-150"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatVersionString, incrementRank, parseVersionStringToRanks } from '../utils/versionEngine.js';
+import { useDraggable } from '../hooks/useDraggable.js';
 
 export default function VersionTagModal({ 
   isOpen, 
@@ -14,7 +15,8 @@ export default function VersionTagModal({
   projectName = "",
   onChangeProjectName,
   onRename,
-  onChangePattern
+  onChangePattern,
+  initialTab = 'increment'
 }) {
   const [ranks, setRanks] = useState([]);
   const [autoIndex, setAutoIndex] = useState(0);
@@ -22,11 +24,13 @@ export default function VersionTagModal({
   const [localProjectName, setLocalProjectName] = useState("");
   const [localPrefix, setLocalPrefix] = useState("");
   const [initialPrefixState, setInitialPrefixState] = useState("");
-  const [interactionMode, setInteractionMode] = useState('increment'); // 'increment', 'rename', 'changePattern'
+  const [interactionMode, setInteractionMode] = useState(initialTab); // 'increment', 'rename', 'changePattern'
   const [freezeArchive, setFreezeArchive] = useState(false);
   const [initialRanksSnapshot, setInitialRanksSnapshot] = useState(null); // Snapshot des rangs à l'ouverture
   const [initialAutoIndex, setInitialAutoIndex] = useState(0); // Snapshot de autoIndex à l'ouverture
   const [showBranchWarning, setShowBranchWarning] = useState(false); // Avertissement si modifs en cours + clic branche
+
+  const { modalRef, dragHandlers, style } = useDraggable();
 
   // Synchronisation à l'ouverture
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function VersionTagModal({
         setAutoIndex(initialConfig.autoIncrementIndex);
       }
       setLocalProjectName(projectName);
-      setInteractionMode('increment'); // Réinitialise l'onglet par défaut
+      setInteractionMode(initialTab); // Réinitialise l'onglet par défaut selon la props
       setFreezeArchive(false); // Reset checkbox
       setShowBranchWarning(false);
       // Sauvegarder un snapshot des rangs et autoIndex à l'ouverture pour détecter les changements en mode changePattern
@@ -201,10 +205,17 @@ export default function VersionTagModal({
         } 
       }}
     >
-      <div className="bg-bg-panel border border-border-dark w-[650px] shadow-2xl rounded-md overflow-hidden flex flex-col font-sans">
+      <div 
+        ref={modalRef}
+        style={style}
+        className="bg-bg-panel border border-border-dark w-[650px] shadow-2xl rounded-md overflow-hidden flex flex-col font-sans pointer-events-auto"
+      >
         
         {/* EN-TÊTE */}
-        <div className="bg-[#2d2d30] px-4 py-3 border-b border-border-dark flex justify-between items-center select-none">
+        <div 
+          className="bg-[#2d2d30] px-4 py-3 border-b border-border-dark flex justify-between items-center select-none cursor-move"
+          {...dragHandlers}
+        >
           <div className="font-bold text-[#d4d4d4] flex items-center gap-2">
             🏷️ {mode === 'init' ? "INITIALISATION DE LA VERSION" : mode === 'branch' ? "CRÉATION DE BRANCHE" : "MISE À JOUR DE VERSION"}
           </div>
@@ -439,119 +450,100 @@ export default function VersionTagModal({
         </div>
 
         {/* PIED DE MODALE */}
-        <div className="bg-[#2d2d30] px-4 py-3 border-t border-border-dark flex justify-between items-center select-none">
+        <div className="bg-[#2d2d30] px-4 py-3 border-t border-border-dark flex flex-col gap-3 select-none">
           
-          <div className="flex gap-2 items-center">
-            {mode !== 'init' && (
-              <label className="flex items-center gap-2 text-xs font-bold text-[#d4d4d4] cursor-pointer hover:text-white mr-4">
-                <input 
-                  type="checkbox" 
-                  checked={freezeArchive} 
-                  onChange={(e) => setFreezeArchive(e.target.checked)} 
-                  className="accent-primary-blue w-4 h-4 cursor-pointer"
-                />
-                FIGER L'ARCHIVE (SAVE)
-              </label>
-            )}
+          <div className="flex justify-between items-center w-full">
+            <div className="flex items-center gap-4">
+              {mode !== 'init' && (
+                <label className="flex items-center gap-2 text-xs font-bold text-[#d4d4d4] cursor-pointer hover:text-white">
+                  <input 
+                    type="checkbox" 
+                    checked={freezeArchive} 
+                    onChange={(e) => setFreezeArchive(e.target.checked)} 
+                    className="accent-primary-blue w-4 h-4 cursor-pointer"
+                  />
+                  FIGER L'ARCHIVE (SAVE)
+                </label>
+              )}
+              {showBranchWarning && (
+                <div className="text-xs text-cherry-red font-bold animate-pulse">⚠️ Utilisez "Valider" pour conserver vos modifications.</div>
+              )}
+            </div>
 
-            {mode === 'branch' && interactionMode !== 'rename' && interactionMode !== 'changePattern' && (
-              <>
+            <div className="flex gap-2 items-center">
+              {mode !== 'init' && (
                 <button 
                   type="button"
-                  onClick={() => onBranchReset(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive)}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-cherry-red hover:bg-cherry-red-hover rounded shadow-md transition"
+                  onClick={onClose}
+                  className="px-4 py-2 text-xs font-bold text-[#d4d4d4] bg-[#444] border border-[#555] hover:bg-[#555] rounded shadow-md transition uppercase"
                 >
-                  Remettre à zéro
+                  ANNULER
                 </button>
+              )}
+              {mode === 'init' && (
+                <button 
+                  id="btn-validate-init"
+                  type="button"
+                  onClick={handleSaveInit}
+                  className="px-6 py-2 text-xs font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition uppercase"
+                >
+                  VALIDER ET IMPORTER LE CODE
+                </button>
+              )}
+              {mode !== 'init' && interactionMode === 'rename' && isRenameDirty && (
                 <button 
                   type="button"
-                  onClick={() => onBranchFromParent(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive)}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#0e2941] border border-primary-blue hover:bg-primary-blue rounded shadow-md transition"
+                  onClick={handleActionRename}
+                  className="px-6 py-2 text-xs font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition animate-pulse uppercase"
                 >
-                  Repartir de la branche
+                  VALIDER LE RENOMMAGE
                 </button>
-              </>
-            )}
-
-            {mode === 'branch' && interactionMode === 'changePattern' && (
-              <>
+              )}
+              {mode !== 'init' && interactionMode === 'changePattern' && isPatternDirty && (
                 <button 
                   type="button"
-                  onClick={() => {
-                    if (isPatternDirty) {
-                      setShowBranchWarning(true);
-                      setTimeout(() => setShowBranchWarning(false), 4000);
-                    } else {
-                      onBranchReset(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive);
-                    }
-                  }}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-cherry-red hover:bg-cherry-red-hover rounded shadow-md transition"
+                  onClick={handleActionChangePattern}
+                  className="px-6 py-2 text-xs font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition animate-pulse uppercase"
                 >
-                  Remettre à zéro
+                  VALIDER LE CHANGEMENT DE MOTIF
                 </button>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    if (isPatternDirty) {
-                      setShowBranchWarning(true);
-                      setTimeout(() => setShowBranchWarning(false), 4000);
-                    } else {
-                      onBranchFromParent(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive);
-                    }
-                  }}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#0e2941] border border-primary-blue hover:bg-primary-blue rounded shadow-md transition"
-                >
-                  Repartir de la branche
-                </button>
-              </>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="flex gap-3 items-center">
-            {showBranchWarning && (
-              <div className="text-xs text-cherry-red font-bold animate-pulse">⚠️ Vos modifications de motif seront perdues ! Utilisez "Valider" pour les conserver.</div>
-            )}
+          {mode === 'branch' && (
+            <div className="flex justify-end gap-3 items-center border-t border-[#444] pt-3">
+              <button 
+                type="button"
+                onClick={() => {
+                  if (interactionMode === 'changePattern' && isPatternDirty) {
+                    setShowBranchWarning(true);
+                    setTimeout(() => setShowBranchWarning(false), 4000);
+                  } else {
+                    onBranchReset(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive);
+                  }
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-cherry-red hover:bg-cherry-red-hover rounded shadow-md transition uppercase"
+              >
+                REMETTRE LA BRANCHE À ZÉRO
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (interactionMode === 'changePattern' && isPatternDirty) {
+                    setShowBranchWarning(true);
+                    setTimeout(() => setShowBranchWarning(false), 4000);
+                  } else {
+                    onBranchFromParent(getProcessedRanks(), autoIndex, localProjectName.trim(), freezeArchive);
+                  }
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-[#0e2941] border border-primary-blue hover:bg-primary-blue rounded shadow-md transition uppercase"
+              >
+                REPARTIR DE LA BRANCHE ACTUELLE
+              </button>
+            </div>
+          )}
 
-            {mode !== 'init' && interactionMode === 'rename' && isRenameDirty && (
-              <button 
-                type="button"
-                onClick={handleActionRename}
-                className="px-6 py-1.5 text-sm font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition animate-pulse"
-              >
-                VALIDER LE RENOMMAGE
-              </button>
-            )}
-
-            {mode !== 'init' && interactionMode === 'changePattern' && isPatternDirty && (
-              <button 
-                type="button"
-                onClick={handleActionChangePattern}
-                className="px-6 py-1.5 text-sm font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition animate-pulse"
-              >
-                VALIDER LE CHANGEMENT DE MOTIF
-              </button>
-            )}
-
-            {mode !== 'init' && (
-              <button 
-                type="button"
-                onClick={onClose}
-                className="px-4 py-1.5 text-sm font-bold text-[#d4d4d4] bg-transparent border border-[#555] rounded hover:bg-[#444] transition"
-              >
-                Annuler
-              </button>
-            )}
-            {mode === 'init' && (
-              <button 
-                id="btn-validate-init"
-                type="button"
-                onClick={handleSaveInit}
-                className="px-6 py-1.5 text-sm font-bold text-white bg-primary-blue hover:bg-primary-blue-hover rounded shadow-md transition"
-              >
-                VALIDER ET IMPORTER LE CODE
-              </button>
-            )}
-          </div>
         </div>
 
       </div>

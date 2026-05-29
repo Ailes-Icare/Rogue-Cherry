@@ -1,11 +1,37 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { escapeHtml, normalizeText } from '../utils/helpers.js';
+import { escapeHtml, normalizeText, renderInvisiblesHtml } from '../utils/helpers.js';
+
+const EyeIcon = ({ active }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={`w-4 h-4 transition-colors ${active ? 'text-[#FFD700]' : 'text-[#888] hover:text-[#bbb]'}`}
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+    {!active && <line x1="1" y1="1" x2="23" y2="23"></line>}
+  </svg>
+);
 
 /**
  * Fragment de ligne surligné de façon chirurgicale.
  */
-function renderLineContent(text, lineMarks) {
-  if (!lineMarks || lineMarks.length === 0) return text;
+function renderLineContent(text, lineMarks, showInvisibles = false) {
+  if (!lineMarks || lineMarks.length === 0) {
+    if (!showInvisibles) return text;
+    const parts = [];
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === ' ') parts.push(<span key={`sp-0-${i}`} className="hc-space"> </span>);
+      else if (text[i] === '\t') parts.push(<span key={`tb-0-${i}`} className="hc-tab">\t</span>);
+      else parts.push(text[i]);
+    }
+    return parts;
+  }
   
   const chars = Array.from(text).map(c => ({ char: c, classes: new Set() }));
   const zeroMarks = {};
@@ -31,6 +57,17 @@ function renderLineContent(text, lineMarks) {
 
   const pushCurrent = (occIdx) => {
     if (currentText) {
+      let content = currentText;
+      if (showInvisibles) {
+        const parts = [];
+        for (let i = 0; i < currentText.length; i++) {
+          if (currentText[i] === ' ') parts.push(<span key={`sp-${elementIndex}-${i}`} className="hc-space"> </span>);
+          else if (currentText[i] === '\t') parts.push(<span key={`tb-${elementIndex}-${i}`} className="hc-tab">\t</span>);
+          else parts.push(currentText[i]);
+        }
+        content = parts;
+      }
+
       if (currentClasses) {
         elements.push(
           <mark 
@@ -43,11 +80,11 @@ function renderLineContent(text, lineMarks) {
               }
             }}
           >
-            {currentText}
+            {content}
           </mark>
         );
       } else {
-        elements.push(currentText);
+        elements.push(<React.Fragment key={`chunk-${elementIndex++}`}>{content}</React.Fragment>);
       }
       currentText = "";
     }
@@ -83,8 +120,8 @@ function renderLineContent(text, lineMarks) {
 /**
  * Ligne individuelle de code mémoïsée pour éviter les re-rendus globaux inefficaces.
  */
-const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine, isActiveOccLine, isTargeted, onClick }) => {
-  const lineContent = useMemo(() => renderLineContent(text, marks), [text, marks]);
+const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine, isActiveOccLine, isTargeted, onClick, showInvisibles }) => {
+  const lineContent = useMemo(() => renderLineContent(text, marks, showInvisibles), [text, marks, showInvisibles]);
 
   return (
     <div 
@@ -113,8 +150,13 @@ const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine,
       </div>
 
       {/* Rendu du texte de la ligne */}
-      <div className="flex-1 pl-3 whitespace-pre text-left overflow-x-auto min-w-0 select-text selection:bg-[#264f78]">
-        {text === "" ? "\n" : lineContent}
+      <div className="flex-1 pl-3 whitespace-pre text-left overflow-x-auto overflow-y-hidden min-w-0 select-text selection:bg-[#264f78]">
+        {text === "" ? (showInvisibles ? <span className="hc-nl"></span> : "\n") : (
+          <>
+            {lineContent}
+            {showInvisibles && <span className="hc-nl"></span>}
+          </>
+        )}
       </div>
     </div>
   );
@@ -144,9 +186,14 @@ export default function CodeEditor({
   setGlobalSearchSmartMode,
   globalSearchOccIndex = 0,
   setGlobalSearchOccIndex,
-  globalSearchMarks = []
+  globalSearchMarks = [],
+  isGlobalEscapeHatchActive = false,
+  onForceGlobalEscapeHatch,
+  onOpenLineChoiceModal,
+  triggerGoToLine
 }) {
   const [localEditText, setLocalEditText] = useState(text);
+  const [showInvisibles, setShowInvisibles] = useState(false);
   const containerRef = useRef(null);
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
@@ -158,20 +205,45 @@ export default function CodeEditor({
   const [targetHighlightLine, setTargetHighlightLine] = useState(null);
   const targetHighlightTimerRef = useRef(null);
 
-  const [goToLineVisible, setGoToLineVisible] = useState(false);
-  const [goToLinePos, setGoToLinePos] = useState({ x: 0, y: 0 });
-  const [goToLineValue, setGoToLineValue] = useState("");
-
   const handleStatusBarDoubleClick = (e) => {
-    setGoToLinePos({ x: e.clientX, y: e.clientY });
-    setGoToLineValue("");
-    setGoToLineVisible(true);
+    const rect = e.currentTarget.getBoundingClientRect();
+    
+    // Calcul de la ligne du milieu
+    let middleLine = 1;
+    const scrollContainer = isEditable ? textareaRef.current : editorWrapperRef.current;
+    if (scrollContainer) {
+      const scrollTop = scrollContainer.scrollTop;
+      const clientHeight = scrollContainer.clientHeight;
+      const scrollHeight = scrollContainer.scrollHeight;
+      const scrollBottom = scrollTop + clientHeight;
+
+      if (scrollTop === 0) {
+        middleLine = 1;
+      } else if (Math.abs(scrollHeight - scrollBottom) <= 2) {
+        middleLine = linesCount;
+      } else {
+        const lineHeight = 1.5 * fontSize;
+        const firstVisible = Math.floor(scrollTop / lineHeight);
+        const visibleLines = Math.floor(clientHeight / lineHeight);
+        middleLine = firstVisible + Math.floor(visibleLines / 2) + 1;
+      }
+      middleLine = Math.max(1, Math.min(linesCount, middleLine));
+    }
+
+    if (onOpenLineChoiceModal) {
+      onOpenLineChoiceModal({
+        pos: { x: rect.left, y: rect.top - 80 },
+        maxLines: linesCount,
+        linesArray: null,
+        title: `Aller à la ligne (1 - ${linesCount})`,
+        initialValue: middleLine.toString()
+      });
+    }
   };
 
-  const handleGoToLine = () => {
-    const lineNum = parseInt(goToLineValue, 10);
-    if (!isNaN(lineNum) && lineNum >= 1 && lineNum <= linesCount) {
-      const targetLineIndex = lineNum - 1;
+  useEffect(() => {
+    if (triggerGoToLine) {
+      const targetLineIndex = triggerGoToLine.line - 1;
       setTargetHighlightLine(targetLineIndex);
       
       if (targetHighlightTimerRef.current) clearTimeout(targetHighlightTimerRef.current);
@@ -192,9 +264,8 @@ export default function CodeEditor({
           }
         }
       }
-      setGoToLineVisible(false);
     }
-  };
+  }, [triggerGoToLine]);
 
   // Expose onToggleOccurrence to the global window for the memoized lines
   useEffect(() => {
@@ -264,7 +335,7 @@ export default function CodeEditor({
             });
 
             // Détection du statut d'occurrence pour la gouttière
-            if (mark.type.includes('hl-find') || mark.type === 'hl-yellow') {
+            if (mark.type.includes('hl-find') || mark.type.includes('hl-yellow')) {
               isOccLine = true;
               if (mark.occIndex === activeOccIndex) {
                 isActiveOccLine = true;
@@ -347,7 +418,15 @@ export default function CodeEditor({
               className="bg-transparent text-white text-xs outline-none w-64"
               spellCheck="false"
             />
-            {globalSearchBarText && (
+            {isGlobalEscapeHatchActive ? (
+              <div 
+                className="text-[10px] text-center font-bold text-[#ff9800] bg-[#332200] border border-[#ff9800] rounded p-1 ml-2 cursor-pointer hover:bg-[#442200] transition-colors"
+                onDoubleClick={onForceGlobalEscapeHatch}
+                title="Double-cliquez pour ignorer cette sécurité et forcer la recherche (risque de lag)"
+              >
+                ⚠️ Texte trop court (double-cliquez pour forcer)
+              </div>
+            ) : globalSearchBarText && (
               <>
                 <label className="flex items-center gap-1.5 cursor-pointer ml-2 text-[#ccc]">
                   <input 
@@ -441,23 +520,43 @@ export default function CodeEditor({
                 );
               })}
             </div>
-            <textarea
-              ref={textareaRef}
-              value={localEditText}
-              onChange={handleTextareaChange}
-              onScroll={(e) => {
-                if (gutterRef.current) {
-                  gutterRef.current.scrollTop = e.target.scrollTop;
-                }
-              }}
-              spellCheck="false"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              wrap="off"
-              className="flex-1 p-3 bg-bg-dark text-text-light font-mono border-none outline-none resize-none overflow-auto whitespace-pre"
-              style={{ fontSize: 'inherit', lineHeight: 1.5 }}
-            />
+            <div className="flex-1 relative overflow-hidden">
+              {showInvisibles && (
+                <div 
+                  className="absolute inset-0 pointer-events-none whitespace-pre p-3 text-text-light font-mono overflow-hidden"
+                  style={{ fontSize: 'inherit', lineHeight: 1.5, color: 'transparent' }}
+                  ref={(el) => {
+                    if (el && textareaRef.current) {
+                      el.scrollTop = textareaRef.current.scrollTop;
+                      el.scrollLeft = textareaRef.current.scrollLeft;
+                    }
+                    window._editorBackdropRef = el;
+                  }}
+                  dangerouslySetInnerHTML={{ __html: renderInvisiblesHtml(localEditText, true) }}
+                />
+              )}
+              <textarea
+                ref={textareaRef}
+                value={localEditText}
+                onChange={handleTextareaChange}
+                onScroll={(e) => {
+                  if (gutterRef.current) {
+                    gutterRef.current.scrollTop = e.target.scrollTop;
+                  }
+                  if (window._editorBackdropRef) {
+                    window._editorBackdropRef.scrollTop = e.target.scrollTop;
+                    window._editorBackdropRef.scrollLeft = e.target.scrollLeft;
+                  }
+                }}
+                spellCheck="false"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                wrap="off"
+                className={`w-full h-full p-3 bg-transparent font-mono border-none outline-none resize-none overflow-auto whitespace-pre ${showInvisibles ? 'text-transparent caret-white' : 'text-text-light'}`}
+                style={{ fontSize: 'inherit', lineHeight: 1.5 }}
+              />
+            </div>
           </div>
         ) : (
           // Mode Lecture Seule : Rendu mémoïsé par lignes ultra-performant
@@ -480,6 +579,7 @@ export default function CodeEditor({
                   isActiveOccLine={line.isActiveOccLine}
                   isGutterModified={line.isGutterModified}
                   isTargeted={targetHighlightLine === line.number - 1}
+                  showInvisibles={showInvisibles}
                 />
               ))
             )}
@@ -494,48 +594,20 @@ export default function CodeEditor({
         title="Double-clic pour aller à une ligne spécifique"
       >
         <span>{statusBarInfo || 'Prêt'}</span>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
           <span>{linesCount} Lignes</span>
           <span>{charsCount} Caractères</span>
           <span>UTF-8</span>
+          <button
+            className="hover:bg-black/20 p-1 rounded transition-colors"
+            onClick={(e) => { e.stopPropagation(); setShowInvisibles(!showInvisibles); }}
+            title="Affiche ou cache les caractères invisibles dans le texte principal"
+          >
+            <EyeIcon active={showInvisibles} />
+          </button>
         </div>
       </div>
 
-      {/* Mini-Modal Aller à la Ligne */}
-      {goToLineVisible && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setGoToLineVisible(false)} 
-          />
-          <div 
-            className="fixed z-50 bg-[#252526] border border-border-dark p-3 rounded shadow-xl flex flex-col gap-2 animate-fadeIn"
-            style={{ left: Math.min(goToLinePos.x, window.innerWidth - 250), top: Math.max(10, goToLinePos.y - 80) }}
-          >
-            <span className="text-[11px] text-[#ccc] font-bold uppercase tracking-wider">Aller à la ligne (1 - {linesCount})</span>
-            <div className="flex gap-1.5 items-center">
-              <input 
-                type="number" 
-                min={1} 
-                max={linesCount}
-                value={goToLineValue}
-                onChange={(e) => setGoToLineValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleGoToLine();
-                  if (e.key === 'Escape') setGoToLineVisible(false);
-                }}
-                autoFocus
-                className="bg-bg-dark text-text-light border border-border-dark px-2 py-1 text-xs outline-none focus:border-primary-blue w-24 rounded-sm font-mono"
-              />
-              <div className="flex flex-col gap-0.5">
-                <button onClick={() => setGoToLineValue(v => Math.min(linesCount, (parseInt(v)||1) + 1))} className="px-1.5 bg-[#333] hover:bg-[#444] text-white rounded-[2px] text-[8px] leading-none py-0.5">▲</button>
-                <button onClick={() => setGoToLineValue(v => Math.max(1, (parseInt(v)||1) - 1))} className="px-1.5 bg-[#333] hover:bg-[#444] text-white rounded-[2px] text-[8px] leading-none py-0.5">▼</button>
-              </div>
-              <button onClick={handleGoToLine} className="ml-1 px-3 py-1 bg-primary-blue hover:bg-primary-blue-hover transition text-white rounded-sm text-xs font-bold">GO</button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
