@@ -144,18 +144,15 @@ export function applyDeltaOnText(text, findStr, replaceStr, multiMode, multiIndi
  * 
  * @param {Array} history - La pile d'historique.
  * @param {number} targetIndex - L'index cible.
- * @param {string} fileId - L'identifiant interne du fichier à reconstruire.
  * @returns {string} Le texte source reconstruit.
  */
-export function rebuildTextAt(history, targetIndex, fileId = "main") {
+export function rebuildTextAt(history, targetIndex) {
   if (targetIndex < 0 || targetIndex >= history.length) return "";
   
-  // 1. Trouver le snapshot (point d'ancrage) le plus proche en arrière POUR CE FICHIER
+  // 1. Trouver le snapshot (point d'ancrage) le plus proche en arrière
   let snapshotIdx = -1;
   for (let i = targetIndex; i >= 0; i--) {
-    const item = history[i];
-    const itemFileId = item.fileId || "main";
-    if (item.type === "snapshot" && itemFileId === fileId) {
+    if (history[i].type === "snapshot") {
       snapshotIdx = i;
       break;
     }
@@ -168,11 +165,10 @@ export function rebuildTextAt(history, targetIndex, fileId = "main") {
   // 2. Extraire le texte de départ
   let currentText = history[snapshotIdx].rawText;
   
-  // 3. Rejouer séquentiellement de snapshotIdx + 1 à targetIndex POUR CE FICHIER
+  // 3. Rejouer séquentiellement de snapshotIdx + 1 à targetIndex
   for (let i = snapshotIdx + 1; i <= targetIndex; i++) {
     const op = history[i];
-    const opFileId = op.fileId || "main";
-    if (op.type === "replace" && opFileId === fileId) {
+    if (op.type === "replace") {
       currentText = applyDeltaOnText(
         currentText,
         op.findStr,
@@ -191,37 +187,19 @@ export function rebuildTextAt(history, targetIndex, fileId = "main") {
  * Custom Hook React pour le State Management de l'historique et du Time-Travel.
  */
 export function useHistoryStore() {
-  // --- V9 STATE MANAGEMENT ---
-  const [projects, setProjects] = useState([{
-    id: 'default',
-    projectName: "",
+  const [projectName, setProjectName] = useState("");
+  const [storeState, setStoreState] = useState({
     history: [],
-    selectedIndex: -1,
-    files: [], // Array de { internalName: string, originalName: string, fileHandle: object }
-    activeFileId: null
-  }]);
-  const [activeProjectId, setActiveProjectId] = useState('default');
+    selectedIndex: -1
+  });
   const [versionConfig, setVersionConfig] = useState(DEFAULT_VERSION_CONFIG);
 
-  // --- PROXY PROPERTIES ---
-  const activeProject = projects.find(p => p.id === activeProjectId) || projects[0];
-  const { history, selectedIndex, projectName, activeFileId, files } = activeProject;
-
-  const updateActiveProject = (updater) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === activeProjectId) {
-         return typeof updater === 'function' ? { ...p, ...updater(p) } : { ...p, ...updater };
-      }
-      return p;
-    }));
-  };
-
-  const setProjectName = (name) => updateActiveProject({ projectName: name });
+  const { history, selectedIndex } = storeState;
 
   // Mémoïsation pour éviter de recalculer le texte complet à chaque re-rendu de l'application
   const currentText = useMemo(() => {
-    return rebuildTextAt(history, selectedIndex, activeFileId || "main");
-  }, [history, selectedIndex, activeFileId]);
+    return rebuildTextAt(history, selectedIndex);
+  }, [history, selectedIndex]);
 
   // Récupération de la version courante
   const currentVersion = useMemo(() => {
@@ -233,17 +211,10 @@ export function useHistoryStore() {
    * Initialise le store avec un projet et son historique existants (import).
    */
   const importProject = (name, historyArray) => {
-    const upgradedHistory = historyArray.map(item => ({
-      ...item,
-      fileId: item.fileId || "main"
-    }));
-    
-    updateActiveProject({
-      projectName: name,
-      history: upgradedHistory,
-      selectedIndex: upgradedHistory.length - 1,
-      activeFileId: "main",
-      files: [{ internalName: "main", originalName: "main", fileHandle: null }]
+    setProjectName(name);
+    setStoreState({
+      history: historyArray,
+      selectedIndex: historyArray.length - 1
     });
   };
 
@@ -275,17 +246,14 @@ export function useHistoryStore() {
       timestamp,
       rawText: normalizedRawText,
       source: customSource || (customVersion ? (actionName.includes("Fichier") ? actionName : "Import") : "Système"),
-      comment: comment,
-      fileId: activeFileId || "main"
+      comment: comment
     };
 
-    updateActiveProject(prev => {
+    setStoreState(prev => {
       const newHistory = [...prev.history, record];
       return {
         history: newHistory,
-        selectedIndex: newHistory.length - 1,
-        activeFileId: prev.activeFileId || "main",
-        files: prev.files.length === 0 ? [{ internalName: "main", originalName: "main", fileHandle: null }] : prev.files
+        selectedIndex: newHistory.length - 1
       };
     });
     return record;
@@ -331,13 +299,12 @@ export function useHistoryStore() {
       splitChars,
       ignoreSpaces,
       comment,
-      source: source,
-      fileId: activeFileId || "main"
+      source: source
     };
 
     // Si on insère à un index intermédiaire (Time-Travel puis application d'une nouvelle branche),
     // on coupe l'historique à l'index sélectionné avant de pousser.
-    updateActiveProject(prev => {
+    setStoreState(prev => {
       const cleanHistory = prev.history.slice(0, prev.selectedIndex + 1);
       
       // Sécurisation : Il faut recalculer dynamiquement la version et le label basés sur `cleanHistory` 
@@ -395,7 +362,7 @@ export function useHistoryStore() {
       source
     };
 
-    updateActiveProject(prev => {
+    setStoreState(prev => {
       const newHistory = [...prev.history, record];
       // On n'incrémente PAS le selectedIndex pour que le time-travel pointe toujours sur la vraie dernière modif !
       // Mais wait, si on n'incrémente pas selectedIndex, le record sera effacé au prochain pushReplace...
@@ -421,7 +388,7 @@ export function useHistoryStore() {
 
     if (targetRankIndex === -1) {
       // Pur retour en arrière (annulation complète du futur)
-      updateActiveProject(prev => {
+      setStoreState(prev => {
         const cleanHistory = prev.history.slice(0, prev.selectedIndex + 1);
         return {
           history: cleanHistory,
@@ -481,7 +448,7 @@ export function useHistoryStore() {
     const nextVer = formatVersionString(nextRanks);
 
     // Ajout linéaire du Snapshot de saut de version à la fin de l'historique
-    updateActiveProject(prev => {
+    setStoreState(prev => {
       const isAtTip = prev.selectedIndex === prev.history.length - 1;
       
       if (targetRankIndex !== 'rename' && targetRankIndex !== 'changePattern') {
@@ -518,7 +485,7 @@ export function useHistoryStore() {
    * Rétablit l'état tel qu'il était avant cette opération.
    */
   const popLastRecord = () => {
-    updateActiveProject(prev => {
+    setStoreState(prev => {
       if (prev.history.length === 0) return prev;
       const newHistory = prev.history.slice(0, prev.history.length - 1);
       return {
@@ -535,11 +502,11 @@ export function useHistoryStore() {
    * @param {number} targetIndex - L'index à partir duquel conserver l'historique.
    */
   const compressHistory = (targetIndex) => {
-    updateActiveProject(prev => {
+    setStoreState(prev => {
       if (targetIndex <= 0 || targetIndex >= prev.history.length) return prev;
       
       // Reconstruire le texte juste avant l'index cible
-      const textAtTarget = rebuildTextAt(prev.history, targetIndex - 1, prev.activeFileId || "main");
+      const textAtTarget = rebuildTextAt(prev.history, targetIndex - 1);
       
       // Créer un snapshot de remplacement
       const compressionSnapshot = {
@@ -567,19 +534,20 @@ export function useHistoryStore() {
    * Réinitialise le store à zéro.
    */
   const resetStore = () => {
-    updateActiveProject({ projectName: "", history: [], selectedIndex: -1, files: [], activeFileId: null });
+    setProjectName("");
+    setStoreState({ history: [], selectedIndex: -1 });
   };
 
   // Rétrocompatibilité pour les exports
   const setHistory = (newHist) => {
-    updateActiveProject(prev => ({
+    setStoreState(prev => ({
       ...prev,
       history: typeof newHist === 'function' ? newHist(prev.history) : newHist
     }));
   };
 
   const setSelectedIndex = (index) => {
-    updateActiveProject(prev => ({
+    setStoreState(prev => ({
       ...prev,
       selectedIndex: typeof index === 'function' ? index(prev.selectedIndex) : index
     }));
@@ -604,12 +572,12 @@ export function useHistoryStore() {
     compressHistory,
     setSelectedIndex: (idx) => {
       // Sécurité : on empêche la sélection des items informatifs
-      if (history[idx] && history[idx].type === 'info') return;
-      updateActiveProject(prev => ({ ...prev, selectedIndex: idx }));
+      if (storeState.history[idx] && storeState.history[idx].type === 'info') return;
+      setStoreState(prev => ({ ...prev, selectedIndex: idx }));
     },
     resetStore,
     updateRecord: (index, actionName, comment) => {
-      updateActiveProject(prev => {
+      setStoreState(prev => {
         const newHistory = [...prev.history];
         if (newHistory[index]) {
           newHistory[index] = { ...newHistory[index], action: actionName, comment };

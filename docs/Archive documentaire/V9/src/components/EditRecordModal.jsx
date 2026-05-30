@@ -42,15 +42,8 @@ export default function EditRecordModal({ isOpen, onClose, record, index, onSave
       } else {
         modifiers += ` [MULTI:TRUE]`;
       }
-    } else {
-      modifiers += ` [MULTI:FALSE]`;
     }
-    
-    if (record.ignoreSpaces) {
-      modifiers += ` [SMART:TRUE]`;
-    } else {
-      modifiers += ` [SMART:FALSE]`;
-    }
+    if (record.ignoreSpaces) modifiers += ` [SMART:TRUE]`;
 
     rawRequest = `${syntaxConfig.START}${modifiers}\n`;
     if (record.comment) {

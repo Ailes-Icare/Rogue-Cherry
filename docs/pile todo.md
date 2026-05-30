@@ -1,5 +1,5 @@
 rappel à mon intention : npm run build
-rappel à ton intention : 
+rappel à ton intention : $env:PATH = "C:\Program Files\nodejs;" + $env:PATH; & "C:\Program Files\nodejs\npm.cmd" run build
 
 #README / CONSIGNE :
 - tu lira ce fichier dans l'ordre.
@@ -27,32 +27,6 @@ tu n'aura le droit que d'ajouter un chapitre directement a la suite pour informe
 Pour chacun des blocs de phrases qui expliquent la story ou les fonctions attendues, je veux que tu rajoutes ces phrases à la suite de ma demande initiale. Tu peux les séparer dans un sous-chapitre en lui donnant un titre du type « Précision ultérieure : ».
 Il existe également des cas où des tâches n'auront pas été écrites à la main par moi dans la to-do liste et émergeront de nos discussions. Dans ce cas, tu procèdes au même exercice : extraire les phrases qui concernent l'émergence d'une nouvelle story et donc d'une nouvelle consigne, en faire un verbatim exact sans modification, et avec ce bloc de texte, initier un nouveau point de to-do list ainsi qu'un élément archivé correspondant. Lorsque tu fais cela, informe-moi et invite-moi à relire la pile to-do pour vérifier que ce que tu as écrit est bien conforme aux attendus. 
 fait le toutefois seulement dans le cas ou ce que je dis objective un point oublié, clarifie une contradiction, constitue un changement d'idée, et ne polue pas les archives avec des recherche de bug, ou des cas ou le problème est lié a un oubli ou une mécompréhenssion de ta part, m'obligeant a redire ce qui avait deja été explicité.
-
-#VERSION 8 : derniers ajouts
-
-##V8 - ajout n°11 : 
-Amélioration UI / UX générale / finale
-### 11.1
-lorsqu'on colle une requete (en utilisant le bouton), si une modale d'alerte (msgbox) apparait, il faut qu'elle apparaisse au plus proche de l'utilisateur (au dessus ou au dessous des boutons, fonction de où se trouve les boutons de l'interface utilisateur)
-### 11.2
-utiliser les SVG dans brand : 
-- double cherry vector (image vectorielle du logo stylisé)
-- double cherry vector px (une image facon pixel art dérivé de la seconde)
-- Vector purple : la cerise violette seule du grand logo
-- vector red : la cerise rouge du grand logo
-- Rogue Cherry GH : le logo actuel officiel avec le titre (noir)
-- Rogue cherry GHB : la meme avec le titre en blanc
-- Favicon.svg : le favicon en svg, en grand
-- dossier favicon : contient tout les fichier favicon standard.
-#### Taches :
-- ajouter le favicon au projet en tant que logo de la page, et l'intégrer partout ou cela est utile.
-- centré en fond de la zone de texte principale, ajouter le logo "GHB", de telle sorte que la hauteur de l'icone soit la moitié de celle du texte. mettre en arrière plan (derrière le texte) et en transparence (30%)
-- creer un bouton a la suite de "up ver". y mettre le double cherry px en icone.
-- ce bouton ouvre un "splash screen". en haut a gauche, afficher le logo double cherry vector (non pixelisé) avec le nom du logiciel, la version actuelle en gros titre. en dessous, afficher le texte "faites du cherry picking dans un texte pour cibler au sniper ce que vous voulez changer, et rien d'autre, avec l'aide de votre assistant IA préféré." au dessous, mettre a gauche en haut le logo vector red, puis un texte qui épouse la forme (contourne) le logo. (en haut = en haut du bloc de texte) et en bas a droite mettre le logo vector purple. écrire un texte pour habiller entre ces deux textes : "demandez à votre IA de vous dire comment modifier le texte de votre choix. dites lui ce que vous voulez changer, en lui donnant le texte source, et en lui expliquant également comment elle doit formuler une "requette rogue cherry" pour faire ces modifs. l'IA ne retouchera jamais d'elle meme le texte, au risque de le réécrire entièrement et de faire des bêtise, ou de finir par perdre son contexte a force de réécrire de long texte. elle se contentera de vous fournir une instruction informatique qui explique ce qu'il faut chercher, pour le remplacer par quoi. integrez le texte source et la requete dans rogue cherry, controlez au besoin ce qui est réellement modifié, et laissez faire !". au desous de ce bloc (en haut a gauche le red, en bas a droite le purple, et le texte complet pour combler le reste du rectangle de façon a ce qu'il épouse la forme des deux logo), ajoute un autre bandeau de texte, isolé, qui donne la licence (pour l'instant mets en une cohérente pour ce projet, l'adresse du git hub, l'adresse du readme du projet, l'année) 
-- ajouter le favicon en haut a gauche de toutes modale (sauf la splashscreen et l'écran principal)
-### 11.3
-modifie le titre "code source" en "texte source"
-### 11.4
 
 
 #AJOUTE ICI DES FEATURES SI ON EN IDENTIFIE D'AUTRES AVANT LA V9
@@ -134,6 +108,11 @@ donc "enregistrer tout json" est en fait la meme chose, mais cela sauvegarde le 
 le json contiendra un mini commentaire en début de fichier pour expliquer ce que c'est
 
 NOTA : cet export est idéal pour donner à une IA en entrée, avec la "consigne requete" pour qu'elle sache exactement le contenu des différents fichier et leur désignation, pour construire ensuite proprement les requetes.
+
+### Précision ultérieure :
+- "c'est exactement ce que j'avais prévu. Mais attention, il faudra aussi gérer le cas des "fichier portant le meme nom" et donc intégrer un suffixe spécifique pour les différencier dans ce cas la, qui n'a pas d'existance réelle dans la réalité des fichier, mais qui deviendra au sein de rogue cherry le nom du fichier. il y a un laius dans mon plan initial qui traite du besoin de pouvoir creer automatiquement un texte qu'on puisse copier / coller a une IA qui contient les textes a modifier et leur nom : donc leur nom avec éventuel suffixe. c'est la l'interet principal."
+- "par contre, j'ignore si cela est possible, mais quand on ouvre un fichier à la main (et donc qu'on l'ajoute au projet) ne serais t'il pas possible de sauvegarder aussi l'arborescence ?"
+- Note technique actée : La sauvegarde de l'arborescence absolue est bloquée par la sécurité du navigateur. Pour compenser, l'API File System Access permettra de conserver un "fileHandle" (pointeur) vers le fichier d'origine à l'import, permettant d'écraser silencieusement le fichier d'origine lors de la sauvegarde sans redemander le chemin. Le prompt de sortie IA intégrera ces identifiants uniques "internalName".
 
 ##ROADMAP : 
 

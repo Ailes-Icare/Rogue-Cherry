@@ -26,126 +26,87 @@ export function getSimilarity(str1, str2) {
  * un diff de recherche/remplacement parfait (utile pour le mode Cadenas).
  */
 /**
- * Compare deux versions d'un texte manuellement modifié et génère 
- * un tableau de deltas fantômes (trouver -> remplacer) en se basant
- * sur l'algorithme LCS pour regrouper intelligemment les changements 
- * épars, même en cas d'ajouts ou de suppressions de lignes.
+ * Calcule un ou plusieurs deltas (find/replace) entre deux versions de texte.
+ * Sépare en plusieurs requêtes si les modifications sont éloignées de plus de GAP_THRESHOLD lignes.
  * 
- * @param {string} oldText - Le texte original avant modification
- * @param {string} newText - Le texte après modification manuelle
- * @returns {Array<Object>|null} - [{ findStr, replaceStr }, ...]
+ * @param {string} oldText - Texte avant modification.
+ * @param {string} newText - Texte après modification.
+ * @returns {Array<{findStr: string, replaceStr: string}>|null} Tableau de deltas, ou null si identiques.
  */
 export function computeGhostDelta(oldText, newText) {
   if (oldText === newText) return null;
-
-  const oldLinesRaw = oldText.split('\n');
-  const newLinesRaw = newText.split('\n');
   
-  // Alignement LCS intelligent
-  // On utilise split('\\n') direct pour préserver les \\r s'il y en a
-  const l1 = oldLinesRaw;
-  const l2 = newLinesRaw;
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
   
-  const lines1 = l1.map(l => {
-    let trim = l.trimStart();
-    if (trim.endsWith('\r')) trim = trim.slice(0, -1);
-    return { trim, state: -1 };
-  });
-  const lines2 = l2.map(l => {
-    let trim = l.trimStart();
-    if (trim.endsWith('\r')) trim = trim.slice(0, -1);
-    return { trim, state: -1 };
-  });
-
-  const lineDp = Array(lines1.length + 1).fill(0).map(() => Array(lines2.length + 1).fill(0));
-  for (let i = 1; i <= lines1.length; i++) {
-    for (let j = 1; j <= lines2.length; j++) {
-      if (lines1[i - 1].trim === lines2[j - 1].trim) {
-        lineDp[i][j] = lineDp[i - 1][j - 1] + 1;
-      } else {
-        lineDp[i][j] = Math.max(lineDp[i - 1][j], lineDp[i][j - 1]);
-      }
+  // --- Étape 1 : Identifier TOUTES les lignes modifiées ---
+  // On ne peut comparer ligne-par-ligne QUE si le nombre de lignes est identique.
+  // Si le nombre de lignes diffère, on tombe dans le cas d'un seul gros delta global.
+  
+  if (oldLines.length !== newLines.length) {
+    // Cas spécial : ajout ou suppression de lignes → un seul delta global
+    // Cas spécial : ajout ou suppression de lignes → un seul delta global
+    const result = _buildSingleDelta(oldLines, newLines, oldText);
+    return [result];
+  }
+  
+  // Même nombre de lignes : on peut identifier précisément chaque ligne modifiée
+  const changedLineIndices = [];
+  for (let i = 0; i < oldLines.length; i++) {
+    if (oldLines[i] !== newLines[i]) {
+      changedLineIndices.push(i);
     }
   }
-
-  let i = lines1.length, j = lines2.length;
-  while (i > 0 && j > 0) {
-    if (lines1[i - 1].trim === lines2[j - 1].trim) {
-      lines1[i - 1].state = 0; // Inchangé
-      lines2[j - 1].state = 0;
-      i--; j--;
-    } else if (lineDp[i - 1][j] > lineDp[i][j - 1]) {
-      i--;
-    } else {
-      j--;
-    }
-  }
-
-  const diffBlocks = [];
-  let cur1 = 0, cur2 = 0;
-  while (cur1 < lines1.length || cur2 < lines2.length) {
-    let next1 = cur1; while (next1 < lines1.length && lines1[next1].state !== 0) next1++;
-    let next2 = cur2; while (next2 < lines2.length && lines2[next2].state !== 0) next2++;
-    
-    if (next1 > cur1 || next2 > cur2) {
-      diffBlocks.push({
-        start1: cur1, end1: next1 > cur1 ? next1 - 1 : cur1,
-        start2: cur2, end2: next2 > cur2 ? next2 - 1 : cur2
-      });
-    }
-    cur1 = next1 + 1; cur2 = next2 + 1;
-  }
-
-  if (diffBlocks.length === 0) return null;
-
+  
+  
+  if (changedLineIndices.length === 0) return null;
+  
+  // --- Étape 2 : Regrouper les modifications proches ---
   const GAP_THRESHOLD = 8;
   const CONTEXT_LINES = 2;
-  const groups = [];
+  const groups = []; // Chaque groupe = { startLine, endLine } (indices des lignes modifiées)
   
-  let currentGroup = { ...diffBlocks[0] };
-  for (let k = 1; k < diffBlocks.length; k++) {
-    const gap = diffBlocks[k].start1 - currentGroup.end1;
+  let currentGroup = { start: changedLineIndices[0], end: changedLineIndices[0] };
+  
+  for (let i = 1; i < changedLineIndices.length; i++) {
+    const gap = changedLineIndices[i] - currentGroup.end;
     if (gap <= GAP_THRESHOLD) {
-      currentGroup.end1 = diffBlocks[k].end1;
-      currentGroup.end2 = diffBlocks[k].end2;
+      // Proche du groupe actuel → on l'intègre
+      currentGroup.end = changedLineIndices[i];
     } else {
+      // Trop éloigné → nouveau groupe
       groups.push({ ...currentGroup });
-      currentGroup = { ...diffBlocks[k] };
+      currentGroup = { start: changedLineIndices[i], end: changedLineIndices[i] };
     }
   }
   groups.push(currentGroup);
-
+  
+  // --- Étape 3 : Construire un delta par groupe ---
   const deltas = [];
+  
   for (const group of groups) {
-    const ctxStartOld = Math.max(0, group.start1 - CONTEXT_LINES);
-    const ctxEndOld = Math.min(oldLinesRaw.length - 1, group.end1 + CONTEXT_LINES);
+    const ctxStart = Math.max(0, group.start - CONTEXT_LINES);
+    const ctxEnd = Math.min(oldLines.length - 1, group.end + CONTEXT_LINES);
     
-    const contextTopLines = group.start1 - ctxStartOld;
-    const ctxStartNew = Math.max(0, group.start2 - contextTopLines);
+    let findStr = oldLines.slice(ctxStart, ctxEnd + 1).join('\n');
+    let replaceStr = newLines.slice(ctxStart, ctxEnd + 1).join('\n');
     
-    const contextBottomLines = ctxEndOld - group.end1;
-    const ctxEndNew = Math.min(newLinesRaw.length - 1, group.end2 + contextBottomLines);
-    
-    let findStr = oldLinesRaw.slice(ctxStartOld, ctxEndOld + 1).join('\n');
-    let replaceStr = newLinesRaw.slice(ctxStartNew, ctxEndNew + 1).join('\n');
-    
-    let expandStartOld = ctxStartOld;
-    let expandEndOld = ctxEndOld;
-    let expandStartNew = ctxStartNew;
-    let expandEndNew = ctxEndNew;
+    // Vérification d'unicité de findStr dans oldText
+    let expandStart = ctxStart;
+    let expandEnd = ctxEnd;
     
     let firstOcc = oldText.indexOf(findStr);
     let lastOcc = oldText.lastIndexOf(findStr);
     
-    while (firstOcc !== -1 && firstOcc !== lastOcc && (expandStartOld > 0 || expandEndOld < oldLinesRaw.length - 1)) {
-      if (expandStartOld > 0) { expandStartOld--; expandStartNew--; }
-      else { expandEndOld++; expandEndNew++; }
+    while (firstOcc !== lastOcc && (expandStart > 0 || expandEnd < oldLines.length - 1)) {
+      if (expandStart > 0) {
+        expandStart--;
+      } else {
+        expandEnd = Math.min(oldLines.length - 1, expandEnd + 1);
+      }
       
-      expandEndOld = Math.min(oldLinesRaw.length - 1, expandEndOld);
-      expandEndNew = Math.min(newLinesRaw.length - 1, expandEndNew);
-      
-      findStr = oldLinesRaw.slice(expandStartOld, expandEndOld + 1).join('\n');
-      replaceStr = newLinesRaw.slice(expandStartNew, expandEndNew + 1).join('\n');
+      findStr = oldLines.slice(expandStart, expandEnd + 1).join('\n');
+      replaceStr = newLines.slice(expandStart, expandEnd + 1).join('\n');
       
       firstOcc = oldText.indexOf(findStr);
       lastOcc = oldText.lastIndexOf(findStr);
@@ -155,6 +116,52 @@ export function computeGhostDelta(oldText, newText) {
   }
   
   return deltas;
+}
+
+/**
+ * Construit un delta unique quand le nombre de lignes diffère entre old et new.
+ */
+function _buildSingleDelta(oldLines, newLines, oldText) {
+  let firstDiff = 0;
+  while (firstDiff < oldLines.length && firstDiff < newLines.length && oldLines[firstDiff] === newLines[firstDiff]) {
+    firstDiff++;
+  }
+  
+  let oldLastDiff = oldLines.length - 1;
+  let newLastDiff = newLines.length - 1;
+  while (oldLastDiff >= firstDiff && newLastDiff >= firstDiff && oldLines[oldLastDiff] === newLines[newLastDiff]) {
+    oldLastDiff--;
+    newLastDiff--;
+  }
+  
+  const CONTEXT_LINES = 2;
+  let ctxStart = Math.max(0, firstDiff - CONTEXT_LINES);
+  let ctxEndOld = Math.min(oldLines.length - 1, oldLastDiff + CONTEXT_LINES);
+  let ctxEndNew = Math.min(newLines.length - 1, newLastDiff + CONTEXT_LINES);
+  
+  let findStr = oldLines.slice(ctxStart, ctxEndOld + 1).join('\n');
+  let replaceStr = newLines.slice(ctxStart, ctxEndNew + 1).join('\n');
+  
+  // Unicité
+  let firstOcc = oldText.indexOf(findStr);
+  let lastOcc = oldText.lastIndexOf(findStr);
+  
+  while (firstOcc !== lastOcc && (ctxStart > 0 || ctxEndOld < oldLines.length - 1)) {
+    if (ctxStart > 0) ctxStart--;
+    else ctxEndOld = Math.min(oldLines.length - 1, ctxEndOld + 1);
+    
+    // Ajuster ctxEndNew symétriquement pour les lignes de contexte APRÈS la zone de diff
+    ctxEndNew = newLastDiff + (ctxEndOld - oldLastDiff);
+    ctxEndNew = Math.min(newLines.length - 1, ctxEndNew);
+    
+    findStr = oldLines.slice(ctxStart, ctxEndOld + 1).join('\n');
+    replaceStr = newLines.slice(ctxStart, ctxEndNew + 1).join('\n');
+    
+    firstOcc = oldText.indexOf(findStr);
+    lastOcc = oldText.lastIndexOf(findStr);
+  }
+  
+  return { findStr, replaceStr };
 }
 
 /**
@@ -179,7 +186,7 @@ export function computeLiveDiff(str1, str2, splitChars = false) {
 
   // --- COUPE-CIRCUIT DE SÉCURITÉ ANTI-EXPLOSION D'ESPACE ---
   // Évite que la matrice DP (Dynamic Programming) du LCS ne fige le thread sur des blocs gigantesques.
-  const DIFF_MAX_CHARS = 1000000; // Augmenté pour supporter de gros fichiers
+  const DIFF_MAX_CHARS = 5000;
   if (str1.length > DIFF_MAX_CHARS || str2.length > DIFF_MAX_CHARS) {
     return {
       marksT1: [{ start: 0, length: str1.length, type: 'hl-line-mod' }],
@@ -273,48 +280,16 @@ export function computeLiveDiff(str1, str2, splitChars = false) {
   }
 
   // --- ALIGNEMENT DES LIGNES (LCS PREMIÈRE PASSE) ---
-  const l1 = str1.split('\n');
-  const l2 = str2.split('\n');
+  const l1 = normalizeText(str1).split('\n');
+  const l2 = normalizeText(str2).split('\n');
   
-  const lines1 = l1.map(l => {
-    let trim = l.trimStart();
-    if (trim.endsWith('\r')) trim = trim.slice(0, -1);
-    return { raw: l, trim, state: -1, link: -1 };
-  });
-  const lines2 = l2.map(l => {
-    let trim = l.trimStart();
-    if (trim.endsWith('\r')) trim = trim.slice(0, -1);
-    return { raw: l, trim, state: -1, link: -1 };
-  });
+  const lines1 = l1.map(l => ({ raw: l, trim: l.trimStart(), state: -1, link: -1 }));
+  const lines2 = l2.map(l => ({ raw: l, trim: l.trimStart(), state: -1, link: -1 }));
 
-  // OPTIMISATION CRITIQUE : Rogner les lignes identiques au début et à la fin (DraftSurge Fast-Forward)
-  let startSkip = 0;
-  while (startSkip < lines1.length && startSkip < lines2.length && lines1[startSkip].trim === lines2[startSkip].trim) {
-    lines1[startSkip].state = 0;
-    lines2[startSkip].state = 0;
-    lines1[startSkip].link = startSkip;
-    lines2[startSkip].link = startSkip;
-    startSkip++;
-  }
-
-  let endSkip1 = lines1.length - 1;
-  let endSkip2 = lines2.length - 1;
-  while (endSkip1 >= startSkip && endSkip2 >= startSkip && lines1[endSkip1].trim === lines2[endSkip2].trim) {
-    lines1[endSkip1].state = 0;
-    lines2[endSkip2].state = 0;
-    lines1[endSkip1].link = endSkip2;
-    lines2[endSkip2].link = endSkip1;
-    endSkip1--;
-    endSkip2--;
-  }
-
-  const midLines1 = lines1.slice(startSkip, endSkip1 + 1);
-  const midLines2 = lines2.slice(startSkip, endSkip2 + 1);
-
-  const lineDp = Array(midLines1.length + 1).fill(0).map(() => new Int32Array(midLines2.length + 1));
-  for (let i = 1; i <= midLines1.length; i++) {
-    for (let j = 1; j <= midLines2.length; j++) {
-      if (midLines1[i - 1].trim === midLines2[j - 1].trim) {
+  const lineDp = Array(lines1.length + 1).fill(0).map(() => Array(lines2.length + 1).fill(0));
+  for (let i = 1; i <= lines1.length; i++) {
+    for (let j = 1; j <= lines2.length; j++) {
+      if (lines1[i - 1].trim === lines2[j - 1].trim) {
         lineDp[i][j] = lineDp[i - 1][j - 1] + 1;
       } else {
         lineDp[i][j] = Math.max(lineDp[i - 1][j], lineDp[i][j - 1]);
@@ -322,13 +297,13 @@ export function computeLiveDiff(str1, str2, splitChars = false) {
     }
   }
 
-  let i = midLines1.length, j = midLines2.length;
+  let i = lines1.length, j = lines2.length;
   while (i > 0 && j > 0) {
-    if (midLines1[i - 1].trim === midLines2[j - 1].trim) {
-      midLines1[i - 1].state = 0; // Égalité
-      midLines2[j - 1].state = 0;
-      midLines1[i - 1].link = startSkip + j - 1;
-      midLines2[j - 1].link = startSkip + i - 1;
+    if (lines1[i - 1].trim === lines2[j - 1].trim) {
+      lines1[i - 1].state = 0; // Égalité
+      lines2[j - 1].state = 0;
+      lines1[i - 1].link = j - 1;
+      lines2[j - 1].link = i - 1;
       i--; j--;
     } else if (lineDp[i - 1][j] > lineDp[i][j - 1]) {
       i--;
@@ -417,8 +392,12 @@ export function computeLiveDiff(str1, str2, splitChars = false) {
     const nl2 = isLast && !str2.endsWith('\n') ? 0 : 1;
 
     if (row.state === 0) { 
+      if (!row.trimBg) {
+        marksT1.push({ start: c1, length: row.raw1.length, type: 'hl-line-mod' });
+        marksT2.push({ start: c2, length: row.raw2.length, type: 'hl-line-mod' });
+      }
       c1 += row.raw1.length + nl1; c2 += row.raw2.length + nl2;
-    }
+    } 
     else if (row.state === 1) { 
       marksT1.push({ start: c1, length: row.raw1.length, type: 'hl-del-txt' });
       marksT2.push({ start: c2, length: 0, type: 'hl-del' });

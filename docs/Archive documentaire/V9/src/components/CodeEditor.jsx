@@ -267,7 +267,7 @@ export default function CodeEditor({
           const lineHeight = 1.5 * fontSize;
           textareaRef.current.scrollTop = lineIndex * lineHeight;
         } else if (!isEditable && containerRef.current) {
-          const targetLineNode = containerRef.current.children[0]?.children[lineIndex];
+          const targetLineNode = containerRef.current.children[lineIndex];
           if (targetLineNode) {
              targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -401,7 +401,7 @@ export default function CodeEditor({
         }
       } else {
         if (containerRef.current) {
-          const targetLineNode = containerRef.current.children[0]?.children[targetLineIndex];
+          const targetLineNode = containerRef.current.children[targetLineIndex];
           if (targetLineNode) {
             targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -525,7 +525,7 @@ export default function CodeEditor({
         const lineIndex = prevText.split('\n').length - 1;
         
         const editorDOM = containerRef.current;
-        const targetLineNode = editorDOM.children[0]?.children[lineIndex];
+        const targetLineNode = editorDOM.children[lineIndex];
         if (targetLineNode) {
           targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -535,72 +535,23 @@ export default function CodeEditor({
 
   // Scroll ciblé arbitraire (ex: depuis l'historique)
   useEffect(() => {
-    if (scrollTargetIndex !== null && containerRef.current && !isEditable) {
+    if (scrollTargetIndex !== null && containerRef.current) {
       const prevText = text.substring(0, scrollTargetIndex);
       const lineIndex = prevText.split('\n').length - 1;
-      const targetLineNode = containerRef.current.children[0]?.children[lineIndex];
+      const targetLineNode = containerRef.current.children[lineIndex];
       if (targetLineNode) {
         targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
-  }, [scrollTargetIndex, text, isEditable]);
+  }, [scrollTargetIndex, text]);
 
   const handleTextareaChange = (e) => {
     setLocalEditText(normalizeText(e.target.value));
   };
 
-  const savedScrollRef = useRef(0);
-  
-  const handleToggleEditableInternal = () => {
-    if (isEditable) {
-      savedScrollRef.current = textareaRef.current?.scrollTop || 0;
-    } else {
-      savedScrollRef.current = editorWrapperRef.current?.scrollTop || 0;
-    }
-    if (onToggleEditable) onToggleEditable();
-  };
-
-  useEffect(() => {
-    if (isEditable) {
-      // Un délai pour s'assurer que le textarea est monté et rendu
-      setTimeout(() => {
-        if (textareaRef.current) {
-          const ta = textareaRef.current;
-          // 1. Placer le curseur au MILIEU de l'écran visible pour que le navigateur 
-          // considère que le curseur est déjà dans une "safe zone" et évite de scroller violemment.
-          const lineHeight = 1.5 * fontSize;
-          const middleVisibleLine = Math.floor((savedScrollRef.current + (ta.clientHeight / 2)) / lineHeight);
-          
-          const lines = text.split('\n');
-          let charIndex = 0;
-          for(let i=0; i<Math.min(middleVisibleLine, lines.length); i++) {
-            charIndex += lines[i].length + 1; 
-          }
-          
-          ta.focus({ preventScroll: true });
-          ta.setSelectionRange(charIndex, charIndex);
-
-          // 2. Écrasement brutal dans le prochain cycle d'affichage (requestAnimationFrame)
-          // pour battre la tentative asynchrone du navigateur de repositionner l'écran
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (textareaRef.current) textareaRef.current.scrollTop = savedScrollRef.current;
-            });
-          });
-        }
-      }, 0);
-    } else {
-      setTimeout(() => {
-        if (editorWrapperRef.current) {
-          editorWrapperRef.current.scrollTop = savedScrollRef.current;
-        }
-      }, 0);
-    }
-  }, [isEditable, fontSize, text]);
-
   const handleSaveFreeEdit = () => {
     onTextChange(localEditText);
-    handleToggleEditableInternal(); // Reverrouiller le cadenas
+    onToggleEditable(); // Reverrouiller le cadenas
   };
 
   return (
@@ -870,20 +821,6 @@ export default function CodeEditor({
                 ref={textareaRef}
                 value={localEditText}
                 onChange={handleTextareaChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Tab') {
-                    e.preventDefault();
-                    const start = e.target.selectionStart;
-                    const end = e.target.selectionEnd;
-                    const newText = localEditText.substring(0, start) + "\t" + localEditText.substring(end);
-                    setLocalEditText(newText);
-                    setTimeout(() => {
-                      if (textareaRef.current) {
-                        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 1;
-                      }
-                    }, 0);
-                  }
-                }}
                 onScroll={(e) => {
                   if (gutterRef.current) {
                     gutterRef.current.scrollTop = e.target.scrollTop;
@@ -963,7 +900,7 @@ export default function CodeEditor({
           {!isEditable ? (
             <>
               <button 
-                onClick={(e) => { e.stopPropagation(); handleToggleEditableInternal(); }}
+                onClick={(e) => { e.stopPropagation(); onToggleEditable(); }}
                 className="hover:opacity-80 transition text-base"
                 title="Déverrouiller l'édition libre du texte source"
               >
@@ -982,7 +919,7 @@ export default function CodeEditor({
                 🔓 <span>ENREGISTRER</span>
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); setLocalEditText(text); handleToggleEditableInternal(); }} 
+                onClick={(e) => { e.stopPropagation(); setLocalEditText(text); onToggleEditable(); }} 
                 className="bg-black/20 hover:bg-black/40 text-white px-2 py-0.5 rounded text-[10px]"
                 title="Annuler les modifications en cours"
               >

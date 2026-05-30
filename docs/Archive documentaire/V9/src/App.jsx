@@ -377,43 +377,102 @@ export default function App() {
     });
   }, [findText, occurrences, occurrencesCount, multiMode, multiIndices, activeOccIndex]);
 
-  // --- RECONSTRUCTION DES MARQUEURS HISTORIQUES ACCUMULÉS ---
-  const accumulatedHistoryIndex = useMemo(() => {
-    let idx = store.selectedIndex;
-    while (idx > 0) {
-      const rec = store.history[idx];
-      if (rec.type === 'snapshot' || rec.action === "Sauvegarde" || rec.action === "Export JSON" || rec.action === "Export Presse-papier") {
-        break;
-      }
-      idx--;
-    }
-    return idx;
-  }, [store.history, store.selectedIndex]);
-
+  // --- RECONSTRUCTION DES MARQUEURS HISTORIQUES ACCUMULÉS (DRAFTSURGE) ---
   const historyMarks = useMemo(() => {
     if (store.selectedIndex <= 0) return [];
-    if (accumulatedHistoryIndex === store.selectedIndex) return [];
 
-    const virtualTextBefore = rebuildTextAt(store.history, accumulatedHistoryIndex, store.activeFileId);
-    const virtualTextAfter = store.currentText;
+    // On cherche le dernier snapshot avant l'index sélectionné
+    let snapshotIdx = -1;
+    for (let i = store.selectedIndex; i >= 0; i--) {
+      if (store.history[i].type === 'snapshot') {
+        snapshotIdx = i;
+        break;
+      }
+    }
 
-    const { marksT2 } = computeLiveDiff(virtualTextBefore, virtualTextAfter, false);
-    
-    return marksT2;
-  }, [store.history, store.selectedIndex, store.activeFileId, store.currentText, accumulatedHistoryIndex]);
+    if (snapshotIdx === -1 || snapshotIdx === store.selectedIndex) return [];
 
-  // Marqueurs spécifiques pour la navigation vers l'élément sélectionné
-  const selectedRecordMarks = useMemo(() => {
-    if (store.selectedIndex <= 0) return [];
-    const currentRec = store.history[store.selectedIndex];
-    if (!currentRec || currentRec.type !== 'replace') return [];
+    let allAccumulatedMarks = []; // Contiendra toutes les marques accumulées
 
-    const virtualTextBefore = rebuildTextAt(store.history, store.selectedIndex - 1, store.activeFileId);
-    const virtualTextAfter = rebuildTextAt(store.history, store.selectedIndex, store.activeFileId);
+    // On rejoue les opérations depuis le snapshot jusqu'à l'index sélectionné
+    let virtualText = rebuildTextAt(store.history, snapshotIdx);
 
-    const { marksT2 } = computeLiveDiff(virtualTextBefore, virtualTextAfter, currentRec.splitChars);
-    return marksT2;
-  }, [store.history, store.selectedIndex, store.activeFileId]);
+    for (let hIndex = snapshotIdx + 1; hIndex <= store.selectedIndex; hIndex++) {
+      const rec = store.history[hIndex];
+      if (rec.type !== 'replace') {
+        if (rec.type === 'snapshot') {
+          // Si on croise un snapshot, on purge les marques
+          allAccumulatedMarks = [];
+          virtualText = rec.newText || "";
+        }
+        continue;
+      }
+
+      if (!virtualText || !rec.findStr) continue;
+
+      let indices = [];
+      let idx = virtualText.indexOf(rec.findStr);
+      // La recherche stricte d'index est sûre car le Smart Replace enregistre
+      // le 'findStr' exact du code original, et non la requête IA.
+      while (idx !== -1) {
+        indices.push(idx);
+        idx = virtualText.indexOf(rec.findStr, idx + Math.max(1, rec.findStr.length));
+      }
+
+      let indicesToReplace = [];
+      if (rec.multiMode) {
+        if (rec.multiIndices && rec.multiIndices.length > 0) {
+          indicesToReplace = [...rec.multiIndices].sort((a, b) => b - a); // Ordre inverse crucial pour le décalage
+        } else {
+          // Si mode multi actif SANS ciblage spécifique, c'est un Replace All.
+          indicesToReplace = indices.map((_, idx) => idx).sort((a, b) => b - a);
+        }
+      } else {
+        if (indices.length > 0) indicesToReplace = [0];
+      }
+
+      const { marksT2: baseMarksT2 } = computeLiveDiff(rec.findStr, rec.replaceStr, rec.splitChars);
+      let shiftLen = (rec.replaceStr.length - rec.findStr.length);
+      
+      let nextVirtualText = virtualText;
+
+      // Pour chaque occurrence remplacée (traitée de la fin vers le début du texte)
+      for (let i = 0; i < indicesToReplace.length; i++) {
+        let occIndex = indicesToReplace[i];
+        let tIndex = indices[occIndex]; 
+        
+        // --- 1. Décalage des ANCIENNES marques accumulées ---
+        // Toutes les marques situées APRÈS tIndex doivent être décalées
+        allAccumulatedMarks = allAccumulatedMarks.map(m => {
+          if (m.start >= tIndex + rec.findStr.length) {
+            return { ...m, start: m.start + shiftLen };
+          } else if (m.start >= tIndex && m.start < tIndex + rec.findStr.length) {
+            // Une ancienne marque est écrasée par la nouvelle modification
+            return null;
+          }
+          return m;
+        }).filter(m => m !== null);
+
+        // --- 2. Ajout des NOUVELLES marques de cette opération ---
+        let mapped = baseMarksT2.map(m => ({
+          start: m.start + tIndex,
+          length: m.length,
+          type: m.type
+        }));
+        allAccumulatedMarks.push(...mapped);
+
+        // --- 3. Application de l'opération sur le virtualText ---
+        nextVirtualText = 
+          nextVirtualText.substring(0, tIndex) + 
+          rec.replaceStr + 
+          nextVirtualText.substring(tIndex + rec.findStr.length);
+      }
+      
+      virtualText = nextVirtualText;
+    }
+
+    return allAccumulatedMarks;
+  }, [store.history, store.selectedIndex]);
 
   // === ETAT DU PROJET (Clean/Dirty) ===
   const isProjectClean = useMemo(() => {
@@ -605,24 +664,22 @@ export default function App() {
       return;
     }
     
-    // Génération automatique des deltas fantômes ciblés
-    const deltas = computeGhostDelta(textBeforeFreeEdit.current, newText);
+    // Génération automatique du delta fantôme ciblé
+    const delta = computeGhostDelta(textBeforeFreeEdit.current, newText);
     
-    if (deltas && deltas.length > 0) {
-      deltas.forEach(delta => {
-        store.pushReplace(
-          delta.findStr, 
-          delta.replaceStr, 
-          false, 
-          [], 
-          false, 
-          "Manual Edit",
-          false,
-          null,
-          null,
-          "user"
-        );
-      });
+    if (delta) {
+      store.pushReplace(
+        delta.findStr, 
+        delta.replaceStr, 
+        false, 
+        [], 
+        false, 
+        "Manual Edit",
+        false,
+        null,
+        null,
+        "user"
+      );
     }
     
     setIsEditable(false);
@@ -652,25 +709,13 @@ export default function App() {
 
   // Centrage de l'écran sur une modification de l'historique
   const handleGoToRecord = async () => {
-    if (selectedRecordMarks && selectedRecordMarks.length > 0) {
-      // On cible spécifiquement la première modification de la requête active
-      setHistoryScrollTarget(selectedRecordMarks[0].start);
+    if (historyMarks && historyMarks.length > 0) {
+      // On prend la première marque générée par l'historique actif
+      setHistoryScrollTarget(historyMarks[0].start);
     } else {
       await showAlert("Impossible de localiser cette modification dans le code actuel.", "Erreur");
     }
   };
-
-  // Auto-scroll natif lors du clic ou changement de version dans l'historique
-  const [lastAutoScrollIndex, setLastAutoScrollIndex] = useState(-1);
-  useEffect(() => {
-    if (store.selectedIndex !== lastAutoScrollIndex && store.selectedIndex > 0) {
-      setLastAutoScrollIndex(store.selectedIndex);
-      if (selectedRecordMarks && selectedRecordMarks.length > 0) {
-        setHistoryScrollTarget(selectedRecordMarks[0].start);
-      }
-    }
-  }, [store.selectedIndex, selectedRecordMarks, lastAutoScrollIndex]);
-
 
   // Application du remplacement unitaire ou multiple
   const handleReplace = async () => {
@@ -939,9 +984,7 @@ export default function App() {
     loadRequestIntoUI(newReqs[index].parsed, index, newReqs);
   };
 
-  const handleCherryPickAudit = async () => { if (!store.currentText || occurrencesCount === 0 || multiIndices.length === 0) { await showAlert('Aucune occurrence cochée à auditer.', 'Information'); return; } const lines = store.currentText.split('\n'); let auditText = '--- AUDIT DES OCCURRENCES COCHÉES ---\n\n'; const sortedIndices = [...multiIndices].sort((a, b) => a - b); sortedIndices.forEach(idx => { const occ = occurrences[idx]; if (!occ) return; let currentLength = 0; let targetLineStart = -1; let targetLineEnd = -1; for (let i = 0; i < lines.length; i++) { const lineLen = lines[i].length + 1; if (currentLength + lineLen > occ.start && targetLineStart === -1) { targetLineStart = i; } if (currentLength + lineLen > occ.start + occ.length && targetLineEnd === -1) { targetLineEnd = i; break; } currentLength += lineLen; } if (targetLineEnd === -1) targetLineEnd = lines.length - 1; const contextLines = 3; const startContext = Math.max(0, targetLineStart - contextLines); const endContext = Math.min(lines.length - 1, targetLineEnd + contextLines); auditText += `--- OCCURRENCE [Index: ${idx}] ---\n`; auditText += lines.slice(startContext, endContext + 1).join('\n'); auditText += '\n\n'; }); navigator.clipboard.writeText(auditText).then(async () => await showAlert('Audit des occurrences copié dans le presse-papier !')).catch(async () => await showAlert("Erreur de copie de l'audit.", 'Erreur')); };
-
-  const handleAuditIA = async () => {
+  const handleCherryPickAudit = async () => { if (!store.currentText || occurrencesCount === 0 || multiIndices.length === 0) { await showAlert('Aucune occurrence cochée à auditer.', 'Information'); return; } const lines = store.currentText.split('\n'); let auditText = '--- AUDIT DES OCCURRENCES COCHÉES ---\n\n'; const sortedIndices = [...multiIndices].sort((a, b) => a - b); sortedIndices.forEach(idx => { const occ = occurrences[idx]; if (!occ) return; let currentLength = 0; let targetLineStart = -1; let targetLineEnd = -1; for (let i = 0; i < lines.length; i++) { const lineLen = lines[i].length + 1; if (currentLength + lineLen > occ.start && targetLineStart === -1) { targetLineStart = i; } if (currentLength + lineLen > occ.start + occ.length && targetLineEnd === -1) { targetLineEnd = i; break; } currentLength += lineLen; } if (targetLineEnd === -1) targetLineEnd = lines.length - 1; const contextLines = 3; const startContext = Math.max(0, targetLineStart - contextLines); const endContext = Math.min(lines.length - 1, targetLineEnd + contextLines); auditText += --- OCCURRENCE [Index: ] ---\n; auditText += lines.slice(startContext, endContext + 1).join('\n'); auditText += '\n\n'; }); navigator.clipboard.writeText(auditText).then(async () => await showAlert('Audit des occurrences copié dans le presse-papier !')).catch(async () => await showAlert(\'Erreur de copie de l\'audit.\', 'Erreur')); };\n\n  const handleAuditIA = async () => {
     const failed = pendingRequests.filter(r => r.status === 'error');
     if (failed.length === 0) {
       await showAlert("Aucune erreur à auditer.", "Information");

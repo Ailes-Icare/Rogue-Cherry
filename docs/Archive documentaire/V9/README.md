@@ -1,7 +1,7 @@
 # Rogue-Cherry
 🍒 **ROGUE CHERRY** Semantic Injection. Zero Dependency.
 
-> 🛡️ **Environment:** Restricted-Safe | ⚡ **Dependencies:** Zero-JS-Library | 🍒 **Release:** V1.0 Stable (React V8)
+> 🛡️ **Environment:** Restricted-Safe | ⚡ **Dependencies:** Zero-JS-Library | 🛰️ **Status:** Alpha V2 (V7.4.9)
 
 ---
 
@@ -160,172 +160,7 @@ En un clic, Rogue Cherry extrait les occurrences sélectionnées accompagnées d
 
 ---
 
-## 7. RÉFÉRENCE COMPLÈTE : LA SYNTAXE DE REQUÊTE 📐
-
-Chaque requête est un bloc de texte autonome. Voici la structure complète :
-
-```
-##SYNTAX_COPIE## [LABEL:MonLabel] [MULTI:0,2] [SMART:FALSE]
-##Commentaire## Description optionnelle de l'intention de l'IA.
-##FIND##
-Texte exact à rechercher dans votre document.
-##REPLACE##
-Texte de remplacement.
-##END_COPIE##
-```
-
-### 7.1 Les 4 Balises Obligatoires
-
-| Balise | Rôle |
-|---|---|
-| `##SYNTAX_COPIE##` | Ouvre la requête. L'en-tête et les attributs suivent sur la même ligne. |
-| `##FIND##` | Marque le début du bloc de recherche (sensible aux espaces et retours à la ligne). |
-| `##REPLACE##` | Marque le début du bloc de remplacement. |
-| `##END_COPIE##` | Ferme la requête. Tout ce qui suit est ignoré. |
-
-> Ces balises sont personnalisables via la Modale de Paramètres. Pour traiter un document *contenant* ces balises, voir `[REQMODIFIER]` ci-dessous.
-
-### 7.2 Les Attributs d'En-Tête (tous optionnels)
-
-#### `[LABEL:MonLabel]`
-Nom court de la modification, affiché dans l'historique. Si absent, l'outil génère `User Input X`.
-```
-##SYNTAX_COPIE## [LABEL:REFACTOR-LoginForm]
-```
-
-#### `[MULTI:...]` — Ciblage des Occurrences
-
-Contrôle quel(les) occurrence(s) du texte FIND sont remplacées :
-
-| Valeur | Comportement |
-|---|---|
-| `[MULTI:FALSE]` *(défaut)* | Remplace uniquement la **1ère** occurrence. Mode le plus sûr. |
-| `[MULTI:TRUE]` | Remplace **toutes** les occurrences sans exception. |
-| `[MULTI:0,2,5]` | Cherry-Picking : remplace uniquement les occurrences aux index 0, 2 et 5 **(Base-0 : 0 = 1ère)**. |
-| `[MULTI:NO 1,3]` | Cherry-Picking Inversé : remplace **tout sauf** les occurrences 1 et 3. |
-
-> ⚠️ **Règle absolue :** Les index sont en **Base-0**. L'occurrence `[MULTI:0]` cible la 1ère, `[MULTI:1]` la 2ème, etc. L'IA doit en être explicitement informée via le prompt "Ask to AI".
-
-#### `[SMART:TRUE]`
-Active la correspondance floue : la recherche devient insensible à la casse et tolérante aux espaces multiples. Idéal lorsque l'IA a reformaté l'indentation ou changé la casse.
-```
-##SYNTAX_COPIE## [SMART:TRUE]
-##FIND##
-function  myFunc(  arg )   {   // La sur-indentation ne bloque plus la recherche
-```
-
-#### `##Commentaire##`
-Note interne de l'IA, stockée dans l'historique des versions. N'affecte pas la modification.
-```
-##SYNTAX_COPIE## [LABEL:FIX-BUG-42]
-##Commentaire## Correction du débordement de tampon identifié lors de la revue de sécurité du 30/05.
-```
-
-### 7.3 Les Séparateurs Spéciaux
-
-#### `##[MULTISTACK REQUEST]##` — Requêtes en Lot
-Permet d'envoyer plusieurs requêtes dans un seul bloc. L'outil les traite séquentiellement :
-```
-##SYNTAX_COPIE## [LABEL:FIX-1]
-##FIND##
-...
-##END_COPIE##
-
-##[MULTISTACK REQUEST]##
-
-##SYNTAX_COPIE## [LABEL:FIX-2]
-##FIND##
-...
-##END_COPIE##
-```
-
-#### `[REQMODIFIER]` — Mode Furtif (Balises Personnalisées à la Volée)
-Permet de définir des balises alternatives pour une requête unique. Indispensable si votre document *contient* les balises standard de Rogue Cherry (ex: patcher la doc de l'outil lui-même) :
-```
-[REQMODIFIER]
-@@DEBUT@@
-@@CHERCHER@@
-@@REMPLACER@@
-@@FIN@@
-@@DEBUT@@ [LABEL:PATCH-DOC]
-@@CHERCHER@@
-Texte contenant ##FIND## sans déclencher le parseur
-@@REMPLACER@@
-Texte corrigé
-@@FIN@@
-```
-
-### 7.4 Exemple de Requête Multistack Complète
-
-Voir le fichier `docs/exemple requete rogue cherry.txt` pour un exemple réel et commenté couvrant les 4 modes : MULTI:TRUE, MULTI:FALSE, SMART:TRUE et Cherry-Picking.
-
----
-
-## 8. TUTORIEL : PREMIER DÉMARRAGE EN 5 MINUTES 🎯
-
-### Étape 1 — Charger votre document
-Cliquez sur 📂 (Ouvrir un fichier) ou 📋 (Coller depuis le presse-papier). Un assistant vous demande le nom du projet et le format de version (ex: V1.0.0). Votre texte apparaît dans l'éditeur central.
-
-### Étape 2 — Générer votre premier prompt IA
-Cliquez sur **"Ask to AI 🤖"** (bouton bleu, colonne gauche). Un prompt complet est copié dans votre presse-papier. Collez-le dans votre assistant IA favori, suivi de votre texte et de vos instructions de modification.
-
-### Étape 3 — Coller la réponse de l'IA
-L'IA retourne une ou plusieurs requêtes formatées. Collez-les directement dans le champ de gauche. Rogue Cherry les détecte automatiquement et remplit les champs FIND/REPLACE.
-
-### Étape 4 — Vérifier et appliquer
-- Le texte cible s'affiche surligné en **jaune** dans l'éditeur.
-- Vérifiez visuellement que c'est bien la bonne zone.
-- Si l'IA a ciblé plusieurs occurrences, utilisez la ComboList pour décocher celles à ignorer.
-- Cliquez **REMPLACER** ✅.
-
-### Étape 5 — Historiser et exporter
-- Chaque modification est tracée dans le panneau droit (Historique).
-- Cliquez sur le label de version pour créer un jalon (ex: V1.1.0).
-- Cliquez 💾 pour sauvegarder le projet complet (texte + historique) en JSON.
-- Cliquez 📤 pour exporter uniquement le texte final modifié.
-
-> **En cas d'erreur :** Le SmartDebugger s'ouvre automatiquement si la requête est mal formée. Corrigez-y la requête et cliquez "Appliquer" pour relancer sans quitter l'outil.
-
----
-
-## 9. FAQ TACTIQUE 🎖️
-
-**Q : L'IA ne génère pas la bonne syntaxe ou oublie des balises. Comment la former ?**
-Utilisez le bouton **"Ask to AI 🤖"** dans Rogue Cherry. Il génère un prompt d'instruction complet avec la syntaxe exacte, les attributs disponibles et leurs cas d'emploi. Collez ce prompt en début de conversation avec votre IA.
-
----
-
-**Q : L'outil affiche "0 occurrence trouvée". Pourquoi ?**
-Les causes fréquentes : (1) L'IA a légèrement modifié l'indentation ou les espaces. Activez `[SMART:TRUE]`. (2) Il y a un caractère invisible (espace insécable, tabulation) qui ne correspond pas. Ouvrez le SmartDebugger (clic sur "Déboguer") et activez la vue **Rayons-X** (icône œil). (3) Le texte FIND dépasse la zone réellement présente dans le document : la Heatmap indiquera en orange/rouge la correspondance partielle la plus proche.
-
----
-
-**Q : Quelle est la différence entre `[MULTI:TRUE]` et `[MULTI:0,1,2]` ?**
-`MULTI:TRUE` remplace toutes les occurrences sans exception (arme lourde). `MULTI:0,1,2` est du Cherry-Picking : seules les occurrences aux index 0, 1 et 2 sont remplacées, les autres restent intactes. À préférer sur tout document de production.
-
----
-
-**Q : Mon document fait 20 000 lignes. L'outil peut-il le gérer ?**
-Oui. Le moteur de rendu utilise un système de **Windowing** (virtualisation) qui ne charge que les lignes visibles à l'écran. Pour les recherches courtes sur de grands documents, un mécanisme de sécurité anti-lag s'active automatiquement et vous propose d'ajuster les seuils ou de forcer la recherche.
-
----
-
-**Q : Je veux annuler une modification appliquée il y a 5 étapes. Comment faire ?**
-Dans le panneau d'historique (droite), cliquez sur l'entrée souhaitée. Le texte est reconstruit automatiquement à cet état. Utilisez ensuite **"New Branch"** pour repartir de ce point sans perdre l'historique existant.
-
----
-
-**Q : Mon document contient les balises `##FIND##` ou `##SYNTAX_COPIE##`. Comment le modifier sans collision ?**
-Utilisez le mode `[REQMODIFIER]` (voir section 7.3). Il vous permet de définir des balises alternatives uniquement pour cette requête, sans modifier la configuration globale.
-
----
-
-**Q : L'IA a ciblé 8 occurrences avec `[MULTI:TRUE]` mais je ne veux en remplacer que 3. Que faire ?**
-Deux options : (1) Demandez à l'IA de réécrire la requête avec `[MULTI:0,2,5]` (les 3 index exacts). (2) Dans l'interface, décochez manuellement les 5 occurrences à ignorer dans la ComboList, puis cliquez sur **"AUDIT IA 🤖"** pour faire confirmer vos 3 cibles à l'IA avant d'appliquer.
-
----
-
-## 10. DÉPLOIEMENT & BUILD SINGLE-FILE (V8.0 REACT) 🛰️
+## 7. DÉPLOIEMENT & BUILD SINGLE-FILE (V8.0 REACT) 🛰️
 
 Depuis sa version V8.0, Rogue Cherry est passé à une architecture **React 18 + Vite + Tailwind CSS** modulaire et de très haute performance pour résoudre définitivement les fuites de mémoire.
 
@@ -361,7 +196,7 @@ Pour générer ce fichier unique :
 
 ---
 
-## 11. CHARTE VISUELLE
+## 8. CHARTE VISUELLE
 
 L'interface de Rogue Cherry est codée pour projeter sa fonction :
 
