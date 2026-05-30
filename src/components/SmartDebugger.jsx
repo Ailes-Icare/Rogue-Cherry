@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Splitter from './Splitter.jsx';
+import faviconSvg from '../assets/brand/FAVICON.svg';
 import { parseSyntaxRequest } from '../utils/textParser.js';
 import { renderInvisiblesHtml, normalizeText } from '../utils/helpers.js';
 import { computeSearchHeatmap, computeLiveDiff } from '../utils/diffEngine.js';
@@ -7,6 +8,7 @@ import { useZoomable } from '../hooks/useZoomable.js';
 import { applyDeltaOnText } from '../hooks/useHistoryStore.js';
 import { useDraggable } from '../hooks/useDraggable.js';
 import { useMessageBox } from '../context/MessageBoxContext.jsx';
+import LineChoiceModal from './LineChoiceModal.jsx';
 
 const EyeIcon = ({ active }) => (
   <svg 
@@ -17,7 +19,7 @@ const EyeIcon = ({ active }) => (
     strokeWidth="2" 
     strokeLinecap="round" 
     strokeLinejoin="round" 
-    className={`w-4 h-4 transition-colors ${active ? 'text-[#FFD700]' : 'text-[#888] hover:text-[#bbb]'}`}
+    className={`w-4 h-4 transition-colors ${active ? 'text-[#FFD700]' : 'text-[#d4d4d4] hover:text-white'}`}
   >
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
     <circle cx="12" cy="12" r="3"></circle>
@@ -56,11 +58,17 @@ function renderLineContent(text, lineMarks, showInvisibles = false) {
     let content = chunk;
     if (showInvisibles) {
       const parts = [];
+      let buf = "";
       for (let i = 0; i < chunk.length; i++) {
-        if (chunk[i] === ' ') parts.push(<span key={`sp-${Math.random()}`} className="hc-space"> </span>);
-        else if (chunk[i] === '\t') parts.push(<span key={`tb-${Math.random()}`} className="hc-tab">\t</span>);
-        else parts.push(chunk[i]);
+        if (chunk[i] === ' ' || chunk[i] === '\t') {
+          if (buf) { parts.push(buf); buf = ""; }
+          if (chunk[i] === ' ') parts.push(<span key={`sp-${i}`} className="hc-space"> </span>);
+          else parts.push(<span key={`tb-${i}`} className="hc-tab">\t</span>);
+        } else {
+          buf += chunk[i];
+        }
       }
+      if (buf) parts.push(buf);
       content = parts;
     }
     if (isMark) {
@@ -94,6 +102,47 @@ function renderLineContent(text, lineMarks, showInvisibles = false) {
 }
 
 /**
+ * Ligne de miroir mémoïsée pour éviter les re-rendus massifs lors du scroll (Windowing).
+ */
+const MirrorLine = React.memo(({ line, showMirrorInvisibles, isVisible, isTargeted }) => {
+  const showInvisibles = showMirrorInvisibles && isVisible;
+
+  return (
+    <div 
+      className={`flex hover:bg-bg-panel-light/20 cursor-default select-text ${
+        line.isHighlightLine ? 'bg-[#59466D]/15' : ''
+      }`}
+    >
+      <div className="w-10 pr-2 text-right text-[#555] bg-bg-panel/40 border-r border-border-dark flex justify-between items-center select-none text-[9px] font-sans">
+        <span className="pl-0.5 flex items-center h-full">
+          {line.isActiveOccLine ? (
+            <span className="bg-primary-blue text-white w-3 h-3 flex items-center justify-center rounded-[2px] text-[8px]" title="Occurrence active">▶</span>
+          ) : line.isHighlightLine ? (
+            <span className={line.cssClass.includes('hl-yellow') ? 'text-gutter-mod/70' : 'text-[#FFD700]/70'} title="Occurrence trouvée">●</span>
+          ) : null}
+        </span>
+        <span className={`
+          ${isTargeted ? 'outline outline-1 outline-red-500 rounded-sm shadow-[0_0_5px_rgba(239,68,68,0.8)] z-10 relative bg-bg-dark text-white px-[2px]' : ''}
+        `}>
+          {line.number}
+        </span>
+      </div>
+      
+      <div className="flex-1 pl-2.5 whitespace-pre text-left overflow-x-auto overflow-y-hidden min-w-0 select-text">
+        {line.text === "" ? (showInvisibles ? <span className="hc-nl"></span> : "\n") : (
+          <>
+            {renderLineContent(line.text, line.marks, showInvisibles)}
+            {showInvisibles && <span className="hc-nl"></span>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+});
+
+MirrorLine.displayName = 'MirrorLine';
+
+/**
  * Modale de débogage intelligente pour requêtes IA défaillantes.
  */
 export default function SmartDebugger({
@@ -111,6 +160,7 @@ export default function SmartDebugger({
   const [rawText, setRawText] = useState(initialRawText || "");
   const [showInvisibles, setShowInvisibles] = useState(true);
   const [showMirrorInvisibles, setShowMirrorInvisibles] = useState(false);
+  const [mirrorVisibleRange, setMirrorVisibleRange] = useState([0, 200]);
   const [leftWidthPercent, setLeftWidthPercent] = useState(40); // Pourcentage de largeur de la colonne gauche
 
   // Nouveaux états V8
@@ -120,8 +170,18 @@ export default function SmartDebugger({
   const [isSearchSmartMode, setIsSearchSmartMode] = useState(false);
   const [searchOccIndex, setSearchOccIndex] = useState(0);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [isSearchSuspended, setIsSearchSuspended] = useState(false);
+  const [targetHighlightLine, setTargetHighlightLine] = useState(null);
+  const targetHighlightTimerRef = useRef(null);
+  const findClickTimeoutRef = useRef(null);
+  const [lineChoiceModalConfig, setLineChoiceModalConfig] = useState(null);
+  
+  const [searchFontSize, setSearchFontSize] = useState(14);
+  const [searchHeight, setSearchHeight] = useState(100);
+  const searchContainerRef = useRef(null);
 
-  // Références de synchronisation de défilement des double-calques
+  const searchLines = searchBarText ? searchBarText.split('\n') : [];
+  const isSearchMultiline = searchLines.length > 1;
   const rawBackdropRef = useRef(null);
   const rawTextareaRef = useRef(null);
   const findBackdropRef = useRef(null);
@@ -131,6 +191,7 @@ export default function SmartDebugger({
 
   // Référence pour le défilement du miroir
   const zoomRefMirror = useZoomable(10); // Remplace mirrorScrollRef
+  const mirrorContainerRef = useRef(null);
 
   const zoomRefRaw = useZoomable(14);
   const zoomRefFind = useZoomable(14);
@@ -170,6 +231,19 @@ export default function SmartDebugger({
     handleScrollReplace();
   }, [rawText, showInvisibles, isOpen]);
 
+  // Calcul du windowing pour le miroir lors de l'activation
+  useEffect(() => {
+    if (showMirrorInvisibles && zoomRefMirror.current) {
+      const el = zoomRefMirror.current;
+      const computedStyle = window.getComputedStyle(el);
+      const fontSize = parseFloat(computedStyle.fontSize) || 10;
+      const lineHeight = 1.625 * fontSize;
+      const startLine = Math.floor(el.scrollTop / lineHeight);
+      const endLine = Math.floor((el.scrollTop + el.clientHeight) / lineHeight);
+      setMirrorVisibleRange([Math.max(0, startLine - 100), endLine + 100]);
+    }
+  }, [showMirrorInvisibles]);
+
   // Analyse syntaxique réactive en direct
   const parsedRequest = useMemo(() => {
     return parseSyntaxRequest(rawText, syntaxConfig);
@@ -197,6 +271,15 @@ export default function SmartDebugger({
     setRawText(newRaw);
   };
 
+  const handleCopyAndDeleteSearch = () => {
+    if (searchBarText) {
+      handleFindChange(searchBarText);
+      navigator.clipboard.writeText(searchBarText).catch(console.error);
+      setSearchBarText("");
+      setIsSearchSuspended(false);
+    }
+  };
+
   // Bascule du Smart Mode depuis la Checkbox
   const handleSmartChange = (checked) => {
     if (!parsedRequest.isValid) return;
@@ -209,8 +292,9 @@ export default function SmartDebugger({
   };
 
   // Recherche live dichotomique heatmap par rapport à la zone FIND extraite ou barre de recherche
-  const activeSearchText = searchBarText || (parsedRequest && parsedRequest.isValid ? parsedRequest.findText : "");
-  const activeSmartMode = searchBarText ? isSearchSmartMode : ((parsedRequest && parsedRequest.isValid) ? parsedRequest.smartMode : false);
+  const isGlobalSearchActive = Boolean(searchBarText && !isSearchSuspended);
+  const activeSearchText = isGlobalSearchActive ? searchBarText : (parsedRequest && parsedRequest.isValid && isFindActive ? parsedRequest.findText : "");
+  const activeSmartMode = isGlobalSearchActive ? isSearchSmartMode : ((parsedRequest && parsedRequest.isValid) ? parsedRequest.smartMode : false);
 
   const [forceSearchOverride, setForceSearchOverride] = useState(false);
   
@@ -302,7 +386,7 @@ export default function SmartDebugger({
     return searchResult.marks;
   }, [searchBarText, isReplaceActive, parsedRequest, searchResult.foundRatio, sourceText, displayedSourceText, searchResult.marks]);
 
-  // Précalcule les lignes pour le miroir de code source droit
+  // Précalcule les lignes pour le miroir de texte source droit
   const mirrorLineRecords = useMemo(() => {
     if (!displayedSourceText) return [];
     const lines = displayedSourceText.split('\n');
@@ -316,6 +400,7 @@ export default function SmartDebugger({
       
       const lineMarks = [];
       let isHighlightLine = false;
+      let isActiveOccLine = false;
       let cssClass = '';
 
       marks.forEach(mark => {
@@ -328,10 +413,16 @@ export default function SmartDebugger({
             lineMarks.push({
               start: localStart,
               length: localEnd - localStart,
-              type: mark.type
+              type: mark.type,
+              occIndex: mark.occIndex
             });
             isHighlightLine = true;
-            cssClass = mark.type;
+            if (mark.occIndex === searchOccIndex) {
+              isActiveOccLine = true;
+              cssClass = mark.type;
+            } else if (!cssClass) {
+              cssClass = mark.type;
+            }
           }
         }
       });
@@ -343,24 +434,33 @@ export default function SmartDebugger({
         text: lineText,
         marks: lineMarks,
         isHighlightLine,
+        isActiveOccLine,
         cssClass
       };
     });
-  }, [sourceText, searchResult]);
+  }, [sourceText, searchResult, displayedSourceText, mirrorMarks, searchOccIndex]);
 
-  // Scroll automatique vers la meilleure occurrence trouvée
+  // Scroll automatique et mise en évidence (liseret rouge) vers la meilleure occurrence trouvée
   useEffect(() => {
-    if (searchResult.marks.length > 0 && zoomRefMirror.current) {
+    if (searchResult.marks.length > 0 && mirrorContainerRef.current) {
       const safeIndex = Math.min(searchOccIndex, searchResult.marks.length - 1);
       const targetMark = searchResult.marks[safeIndex];
+      if (!targetMark) return;
       const prevText = displayedSourceText.substring(0, targetMark.start);
       const lineIndex = prevText.split('\n').length - 1;
       
-      const mirrorContainer = zoomRefMirror.current;
+      const mirrorContainer = mirrorContainerRef.current;
+      // Note: children inclut potentiellement d'autres éléments, il vaut mieux cibler l'index de la ligne
       const targetLineNode = mirrorContainer.children[lineIndex];
       if (targetLineNode) {
         targetLineNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+      
+      setTargetHighlightLine(lineIndex + 1);
+      if (targetHighlightTimerRef.current) clearTimeout(targetHighlightTimerRef.current);
+      targetHighlightTimerRef.current = setTimeout(() => {
+        setTargetHighlightLine(null);
+      }, 1500);
     }
   }, [searchResult, displayedSourceText, searchOccIndex]);
 
@@ -430,6 +530,7 @@ export default function SmartDebugger({
           {...dragHandlers}
         >
           <div className="flex items-center gap-3">
+            <img src={faviconSvg} alt="" className="w-12 h-12 -ml-2 -mt-1 drop-shadow-md" />
             <span className="text-[1.25em] font-extrabold text-[#FF8C00] uppercase tracking-wide">
               🛠️ DÉBOGUEUR DE REQUÊTE IA
             </span>
@@ -453,29 +554,40 @@ export default function SmartDebugger({
           {/* Colonne Gauche (Requête Brute et Zones extraites) */}
           <div 
             style={{ width: `${leftWidthPercent}%` }}
-            className="flex flex-col gap-3 flex-shrink-0 min-w-[200px]"
+            className={`flex flex-col gap-3 flex-shrink-0 min-w-[200px] transition-opacity ${isGlobalSearchActive ? 'opacity-40 grayscale pointer-events-none' : ''}`}
           >
             
             {/* Ligne En-tête Requête brute */}
             <div className="flex justify-between items-center flex-shrink-0">
               <span className="text-xs text-[#aaa] font-bold uppercase">Requête Brute (Éditable)</span>
-              <div className="flex gap-3 text-xxs text-[#888] font-bold">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={showInvisibles} 
-                    onChange={(e) => setShowInvisibles(e.target.checked)} 
-                    className="w-3.5 h-3.5 cursor-pointer"
-                  />
-                  <span>Invisibles</span>
-                </label>
+              <div className="flex gap-3 items-center">
+                <button 
+                  onClick={() => handleSmartChange(!parsedRequest.smartMode)}
+                  disabled={!parsedRequest.isValid}
+                  className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded font-bold text-[11px] transition-colors uppercase border ${
+                    parsedRequest.isValid && parsedRequest.smartMode 
+                      ? 'bg-[#FFD700] text-black border-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.4)]' 
+                      : 'bg-bg-dark text-[#888] border-border-dark hover:text-white hover:border-[#666] disabled:opacity-50 disabled:cursor-not-allowed'
+                  }`}
+                  title="Smart Mode (ignore la casse et les espaces dans la Requête Brute)"
+                >
+                  <span>💡</span>
+                  <span>SMART</span>
+                </button>
+                <button
+                  className="hover:bg-black/20 p-0.5 rounded transition-colors"
+                  onClick={() => setShowInvisibles(!showInvisibles)}
+                  title="Affiche ou cache les caractères invisibles"
+                >
+                  <EyeIcon active={showInvisibles} />
+                </button>
               </div>
             </div>
 
             {/* Zone Requête Brute - Double calque */}
             <div 
               ref={zoomRefRaw}
-              className="h-[160px] border border-dashed border-primary-blue bg-bg-dark rounded-sm relative overflow-hidden flex-shrink-0"
+              className={`h-[160px] border border-dashed border-primary-blue bg-bg-dark rounded-sm relative overflow-hidden flex-shrink-0 ${isGlobalSearchActive ? 'cursor-not-allowed' : ''}`}
               style={{ fontSize: 'var(--zoom-size, 14px)' }}
             >
               <div 
@@ -489,11 +601,12 @@ export default function SmartDebugger({
                 value={rawText}
                 onChange={(e) => setRawText(normalizeText(e.target.value))}
                 onScroll={handleScrollRaw}
+                readOnly={isGlobalSearchActive}
                 spellCheck="false"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
-                className="overlay-layer text-left"
+                className={`overlay-layer text-left ${isGlobalSearchActive ? 'cursor-not-allowed' : ''}`}
                 style={{ fontSize: 'inherit' }}
               />
             </div>
@@ -512,7 +625,7 @@ export default function SmartDebugger({
                 <div className="flex items-center gap-1">
                   <div 
                     className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold transition-colors select-none flex items-center gap-1.5 ${
-                       searchBarText
+                       isGlobalSearchActive
                          ? 'bg-[#331111] text-[#883333] cursor-not-allowed border border-[#552222]'
                          : isReplaceActive 
                             ? 'bg-[#FF8C00]/20 text-[#FF8C00]/50 cursor-not-allowed'
@@ -520,27 +633,56 @@ export default function SmartDebugger({
                                 ? (isFindActive ? 'bg-[#00FF7F] text-black shadow-[0_0_8px_rgba(0,255,127,0.6)] cursor-pointer' : 'bg-[#555] text-[#00FF7F] cursor-pointer')
                                 : (isFindActive ? 'bg-[#FF8C00] text-black cursor-pointer' : 'bg-[#555] text-[#FF8C00] cursor-pointer')
                     }`}
-                    title={searchBarText ? 'Désactivé (Search globale active)' : isReplaceActive ? 'Désactivé (Replace actif)' : 'Double-clic pour activer/désactiver le scan de heatmap'}
-                    onDoubleClick={() => !searchBarText && !isReplaceActive && setIsFindActive(!isFindActive)}
+                    title={isGlobalSearchActive ? 'Désactivé (Search globale active)' : isReplaceActive ? 'Désactivé (Replace actif)' : 'Simple-clic pour ouvrir, double-clic pour activer/désactiver'}
+                    onClick={(e) => {
+                      if (isGlobalSearchActive || isReplaceActive) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      
+                      if (findClickTimeoutRef.current) {
+                        clearTimeout(findClickTimeoutRef.current);
+                        findClickTimeoutRef.current = null;
+                        setIsFindActive(prev => !prev);
+                      } else {
+                        findClickTimeoutRef.current = setTimeout(() => {
+                          findClickTimeoutRef.current = null;
+                          if (isFindActive && parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1) {
+                            setLineChoiceModalConfig({ 
+                              type: 'find',
+                              pos: { x: rect.left, y: rect.bottom + 5 },
+                              maxLines: searchResult.marks.length,
+                              initialValue: searchOccIndex + 1
+                            });
+                          }
+                        }, 250);
+                      }
+                    }}
                   >
-                    <span>
-                      {searchBarText || isReplaceActive 
-                        ? 'FIND' 
-                        : (parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1)
-                            ? `FIND (${searchResult.marks.length}) : Occ ${searchOccIndex + 1}/${searchResult.marks.length} ; réf. ${searchOccIndex}`
-                            : 'FIND'}
-                    </span>
-                    {!searchBarText && !isReplaceActive && parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1 && (
-                      <span className="flex items-center gap-0.5 ml-1 border-l border-black/30 pl-1">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.max(0, searchOccIndex - 1)); }}
-                          className="hover:opacity-70 leading-none text-[9px]"
-                          title="La référence est l'index base-0 de l'occurrence (occurrence 1 = réf. 0). Utilisez cette valeur dans [MULTI:1,3] pour cibler des occurrences spécifiques via le Cherry-Picking."
-                        >▲</button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.min(searchResult.marks.length - 1, searchOccIndex + 1)); }}
-                          className="hover:opacity-70 leading-none text-[9px]"
-                        >▼</button>
+                    {(parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1 && isFindActive) ? (
+                      <>
+                        <span>FIND</span>
+                        <span className="flex items-center gap-1 ml-2 border-l border-black/30 pl-2">
+                          <span className="font-mono text-[#000]">
+                            {searchOccIndex + 1}/{searchResult.marks.length}
+                          </span>
+                          <div className="flex gap-0.5">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.max(0, searchOccIndex - 1)); }}
+                              className="hover:text-white px-1 font-bold transition-colors text-xs"
+                            >▲</button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.min(searchResult.marks.length - 1, searchOccIndex + 1)); }}
+                              className="hover:text-white px-1 font-bold transition-colors text-xs"
+                            >▼</button>
+                          </div>
+                        </span>
+                      </>
+                    ) : (
+                      <span>
+                        {isGlobalSearchActive || isReplaceActive 
+                          ? 'FIND' 
+                          : (parsedRequest.isValid && searchResult.foundRatio === 1 && searchResult.marks.length > 1)
+                              ? `FIND (${searchResult.marks.length})`
+                              : 'FIND'}
                       </span>
                     )}
                   </div>
@@ -561,11 +703,11 @@ export default function SmartDebugger({
                   ref={findTextareaRef}
                   value={parsedRequest.findText || ""}
                   onChange={(e) => handleFindChange(normalizeText(e.target.value))}
-                  readOnly={!parsedRequest.isValid}
+                  readOnly={!parsedRequest.isValid || isGlobalSearchActive}
                   onScroll={handleScrollFind}
                   spellCheck="false"
-                  className={`overlay-layer text-left ${searchBarText || isReplaceActive ? 'opacity-30 cursor-not-allowed' : 'opacity-75 cursor-default'}`}
-                  style={{ fontSize: 'inherit', backgroundColor: searchBarText ? '#331111' : 'transparent' }}
+                  className={`overlay-layer text-left ${isGlobalSearchActive || isReplaceActive ? 'opacity-30 cursor-not-allowed' : 'opacity-75 cursor-default'}`}
+                  style={{ fontSize: 'inherit', backgroundColor: isGlobalSearchActive ? '#331111' : 'transparent' }}
                 />
               </div>
             </div>
@@ -582,7 +724,7 @@ export default function SmartDebugger({
                   }`}
                   title={!(parsedRequest.isValid && searchResult.foundRatio === 1) ? "Requis: Find à 100%" : "Double-clic pour activer/désactiver la prévisualisation"}
                   onDoubleClick={() => {
-                    if (parsedRequest.isValid && searchResult.foundRatio === 1) setIsReplaceActive(!isReplaceActive);
+                    if (!isGlobalSearchActive && parsedRequest.isValid && searchResult.foundRatio === 1) setIsReplaceActive(!isReplaceActive);
                   }}
                 >
                   REPLACE
@@ -603,11 +745,11 @@ export default function SmartDebugger({
                   ref={replaceTextareaRef}
                   value={parsedRequest.replaceText || ""}
                   onChange={(e) => handleReplaceChange(normalizeText(e.target.value))}
-                  readOnly={!parsedRequest.isValid}
+                  readOnly={!parsedRequest.isValid || isGlobalSearchActive}
                   onScroll={handleScrollReplace}
                   spellCheck="false"
-                  className="overlay-layer text-left opacity-75 cursor-default"
-                  style={{ fontSize: 'inherit' }}
+                  className={`overlay-layer text-left ${isGlobalSearchActive ? 'opacity-30 cursor-not-allowed' : 'opacity-75 cursor-default'}`}
+                  style={{ fontSize: 'inherit', backgroundColor: isGlobalSearchActive ? '#331111' : 'transparent' }}
                 />
               </div>
             </div>
@@ -617,96 +759,218 @@ export default function SmartDebugger({
           {/* Séparateur central */}
           <Splitter direction="vertical" onResize={handleResize} />
 
-          {/* Colonne Droite (Miroir Code Source et Heatmap) */}
+          {/* Colonne Droite (Miroir Texte Source et Heatmap) */}
           <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
             
-            {/* Nouvelle Barre de Recherche globale */}
-            <div className={`bg-bg-panel border rounded-sm flex flex-col overflow-hidden transition-colors ${searchBarText ? 'border-[#FFD700]' : 'border-border-dark'}`}>
-              <div className="flex items-center gap-2 p-1.5 border-b border-border-dark bg-bg-dark">
-                <span className="text-primary-blue ml-1">🔍</span>
-                <textarea
-                  value={searchBarText}
-                  onChange={(e) => setSearchBarText(e.target.value)}
-                  placeholder="Recherche dynamique (désactive FIND...)"
-                  className="flex-1 bg-transparent text-white text-xs outline-none resize-none transition-all"
-                  style={{ height: searchBarText && isSearchExpanded ? '80px' : '20px' }}
-                  spellCheck="false"
-                />
-                {searchBarText && (
-                  <button
-                    onClick={() => setIsSearchExpanded(!isSearchExpanded)}
-                    className="text-[10px] text-[#aaa] hover:text-white transition"
-                    title={isSearchExpanded ? 'Réduire la zone de recherche' : 'Agrandir la zone de recherche'}
-                  >{isSearchExpanded ? '▲' : '▼'}</button>
-                )}
+            {/* Barre de Recherche Globale */}
+            <div className={`flex ${isSearchMultiline ? 'items-start pb-0' : 'items-stretch'} gap-2 py-1`}>
+              {searchBarText && (
+                <div className={`flex items-center gap-3 transition-opacity ${isSearchSuspended ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                  <button 
+                    onClick={() => setIsSearchSmartMode(!isSearchSmartMode)}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-1 rounded font-bold text-[15px] transition-colors uppercase border ${
+                      isSearchSmartMode 
+                        ? 'bg-[#FFD700] text-black border-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.4)]' 
+                        : 'bg-bg-dark text-[#888] border-border-dark hover:text-white hover:border-[#666]'
+                    }`}
+                    title="Smart Search (ignore la casse et les espaces)"
+                  >
+                    <span>💡</span>
+                    <span className="hidden sm:inline">SMART</span>
+                  </button>
+                  
+                  <div className="text-[15px] uppercase font-bold text-[#aaa] flex items-center gap-2 select-none">
+                    Similitude : 
+                    <span className={`px-1.5 py-0.5 rounded font-mono text-[15px] ${
+                      searchResult.foundRatio === 1 ? 'bg-[#4caf50] text-black shadow-[0_0_5px_rgba(76,175,80,0.5)]' : 
+                      searchResult.foundRatio > 0.5 ? 'text-[#FFD700]' : 
+                      'text-[#ff5555]'
+                    }`}>
+                      {(searchResult.foundRatio * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Conteneur Textarea + Gouttière */}
+              <div 
+                className={`flex-1 flex border rounded transition-colors bg-bg-dark overflow-hidden ${
+                  searchBarText 
+                    ? (isSearchSuspended ? 'border-[#666]' : (searchResult.foundRatio === 1 ? 'border-[#4caf50]' : 'border-[#FFD700]')) 
+                    : 'border-border-dark'
+                }`}
+                style={isSearchMultiline ? { height: `${searchHeight}px` } : {}}
+              >
+                {/* Gouttière */}
+                <div 
+                  className={`flex flex-col w-12 border-r border-border-dark select-none text-[10px] py-1 transition-all relative ${
+                    isSearchSuspended 
+                      ? 'bg-[#FFD700] text-black shadow-[0_0_8px_rgba(255,215,0,0.5)] cursor-pointer' 
+                      : (searchBarText ? 'bg-[#1e1e1e] text-[#666] cursor-pointer hover:bg-[#333]' : 'bg-[#1e1e1e] text-[#666]')
+                  }`}
+                  style={{ overflow: 'hidden' }}
+                  title={searchBarText ? "Double-cliquez pour suspendre/réactiver la recherche" : ""}
+                  onDoubleClick={() => {
+                    if (searchBarText) {
+                      setIsSearchSuspended(!isSearchSuspended);
+                    }
+                  }}
+                  id="smart-search-gutter"
+                >
+                  <div className="absolute top-0 left-0 w-full flex justify-center items-center py-1 z-10 pointer-events-none" style={{ height: `${searchFontSize * 1.5}px` }}>
+                    <span className="text-primary-blue text-sm">🔍</span>
+                  </div>
+                  {isSearchMultiline ? (
+                    searchLines.map((_, i) => (
+                      <div key={i} className="flex justify-center items-center h-[1.5em]" style={{ fontSize: `${searchFontSize}px` }}>
+                        {i === 0 ? <span className="text-transparent">1</span> : i + 1}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex justify-center items-center h-full">
+                      <span className="text-transparent">1</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Textarea Multiligne Adaptatif */}
+                <div className={`flex-1 relative flex transition-opacity ${isSearchSuspended ? 'opacity-50 grayscale' : ''}`}>
+                  <textarea
+                    ref={searchContainerRef}
+                    onScroll={(e) => {
+                      const gutter = document.getElementById('smart-search-gutter');
+                      if (gutter) gutter.scrollTop = e.target.scrollTop;
+                    }}
+                    onWheel={(e) => {
+                      if (e.ctrlKey) {
+                        e.preventDefault();
+                        if (e.deltaY < 0) {
+                          setSearchFontSize(Math.min(40, searchFontSize + 1));
+                        } else {
+                          setSearchFontSize(Math.max(8, searchFontSize - 1));
+                        }
+                      }
+                    }}
+                    value={searchBarText}
+                    onChange={(e) => {
+                      if (!isSearchSuspended) {
+                        setSearchBarText(normalizeText(e.target.value));
+                      }
+                    }}
+                    readOnly={isSearchSuspended}
+                    placeholder="Recherche dynamique globale..."
+                    className={`w-full bg-transparent text-white outline-none py-1 px-3 font-mono resize-none custom-scrollbar ${isSearchMultiline ? 'h-full' : ''}`}
+                    style={{ fontSize: `${searchFontSize}px`, lineHeight: 1.5, height: isSearchMultiline ? '100%' : 'auto' }}
+                    spellCheck="false"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    wrap="off"
+                    rows={isSearchMultiline ? undefined : 1}
+                  />
+                </div>
               </div>
+
               {isEscapeHatchActive ? (
                 <div 
-                  className="text-[10px] text-center font-bold text-[#ff9800] bg-[#332200] border-t border-[#ff9800] p-1 cursor-pointer hover:bg-[#442200] transition-colors"
+                  className="text-[10px] text-center font-bold text-[#ff9800] bg-[#332200] border border-[#ff9800] rounded p-1 ml-2 cursor-pointer hover:bg-[#442200] transition-colors flex items-center"
                   onDoubleClick={handleEscapeHatchDoubleClick}
                   title="Double-cliquez pour ignorer cette sécurité et forcer la recherche (risque de lag)"
                 >
                   ⚠️ Texte trop court (double-cliquez pour forcer)
                 </div>
-              ) : searchBarText && (
-                <div className="flex justify-between items-center px-2 py-1 bg-bg-dark text-xs text-[#ccc]">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={isSearchSmartMode}
-                      onChange={(e) => setIsSearchSmartMode(e.target.checked)}
-                      className="cursor-pointer"
-                    />
-                    Smart Mode
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[#FFD700]">
-                      {searchResult.marks.length > 0 ? `${searchOccIndex + 1}/${searchResult.marks.length}` : '0/0'}
-                    </span>
-                    <button 
-                      onClick={() => setSearchOccIndex(Math.max(0, searchOccIndex - 1))}
-                      disabled={searchResult.marks.length === 0}
-                      className="hover:text-white disabled:opacity-50"
-                    >
-                      ▲
-                    </button>
-                    <button 
-                      onClick={() => setSearchOccIndex(Math.min(searchResult.marks.length - 1, searchOccIndex + 1))}
-                      disabled={searchResult.marks.length === 0}
-                      className="hover:text-white disabled:opacity-50"
-                    >
-                      ▼
-                    </button>
-                  </div>
+              ) : searchBarText ? (
+                <div className={`flex items-stretch gap-3 ml-2 border-l border-border-dark pl-3 ${isSearchMultiline ? 'py-1' : ''}`}>
+                  {searchResult.marks.length > 0 && !isSearchSuspended && (
+                    <div className="flex items-center gap-2 justify-center min-w-[120px]">
+                      <span 
+                        className="font-mono text-[15px] font-bold cursor-pointer hover:text-white transition-colors text-[#FFD700]"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation(); 
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setLineChoiceModalConfig({ 
+                            type: 'search',
+                            pos: { x: rect.left, y: rect.bottom + 5 },
+                            maxLines: searchResult.marks.length,
+                            initialValue: searchOccIndex + 1
+                          });
+                        }}
+                        title="Double-cliquez pour aller à une occurrence spécifique"
+                      >
+                        - {searchOccIndex + 1} / <span className="text-[#FF4500]">{searchResult.marks.length}</span>
+                      </span>
+                      <div className="flex gap-1 items-stretch">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.max(0, searchOccIndex - 1)); }}
+                          className="bg-bg-dark hover:bg-border-dark border border-border-dark text-[#888] hover:text-white px-2 py-1 rounded text-[15px]"
+                        >▲</button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setSearchOccIndex(Math.min(searchResult.marks.length - 1, searchOccIndex + 1)); }}
+                          className="bg-bg-dark hover:bg-border-dark border border-border-dark text-[#888] hover:text-white px-2 py-1 rounded text-[15px]"
+                        >▼</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bouton Copier et Supprimer */}
+                  <button
+                    onClick={handleCopyAndDeleteSearch}
+                    className={`px-3 py-1 rounded text-[15px] font-bold transition-all uppercase flex items-center justify-center gap-1.5 ${
+                      searchResult.foundRatio === 1
+                        ? 'bg-[#4caf50] hover:bg-[#45a049] text-black shadow-[0_0_8px_rgba(76,175,80,0.5)]'
+                        : 'bg-bg-dark border border-border-dark text-[#666] hover:text-[#888]'
+                    }`}
+                    title="Copier le texte dans la zone FIND et effacer la recherche"
+                  >
+                    <span>📋</span> <span className="hidden lg:inline">Copier & Supprimer</span>
+                  </button>
                 </div>
-              )}
+              ) : null}
             </div>
 
-            {/* Barre de conformité Heatmap */}
-            <div className="bg-[#1e1e1e] p-2 border border-border-dark flex justify-between items-center rounded-sm flex-shrink-0 select-none">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-white font-bold uppercase tracking-wider">Conformité Heatmap :</span>
-                <span className={`font-black ${
-                  searchResult.foundRatio === 1.0 
-                    ? 'text-gutter-mod' 
-                    : searchResult.foundRatio >= 0.8 
-                      ? 'text-hl-yellow' 
-                      : searchResult.foundRatio >= 0.5 
-                        ? 'text-[#FF8C00]' 
-                        : 'text-cherry-red'
-                }`}>
-                  {(searchResult.foundRatio * 100).toFixed(0)}%
-                </span>
-              </div>
-              <div className="text-[11px] text-[#888] font-mono">
-                {searchResult.marks.length} segment(s) apparié(s)
-              </div>
-            </div>
+            {isSearchMultiline && (
+              <Splitter 
+                direction="horizontal" 
+                onResize={(clientY) => {
+                  if (searchContainerRef.current) {
+                    const top = searchContainerRef.current.getBoundingClientRect().top;
+                    const maxHeight = window.innerHeight * 0.25;
+                    let newHeight = clientY - top - 10;
+                    if (newHeight < 60) newHeight = 60;
+                    if (newHeight > maxHeight) newHeight = maxHeight;
+                    setSearchHeight(newHeight);
+                  }
+                }}
+              />
+            )}
 
-            {/* Miroir de prévisualisation du code source complet */}
+            {/* Barre de conformité Heatmap (Visible uniquement quand la recherche globale est désactivée) */}
+            {!searchBarText && (
+              <div className="bg-[#1e1e1e] p-2 border border-border-dark flex justify-between items-center rounded-sm flex-shrink-0 select-none">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-white font-bold uppercase tracking-wider">Conformité Heatmap :</span>
+                  <span className={`font-black ${
+                    searchResult.foundRatio === 1.0 
+                      ? 'text-gutter-mod' 
+                      : searchResult.foundRatio >= 0.8 
+                        ? 'text-hl-yellow' 
+                        : searchResult.foundRatio >= 0.5 
+                          ? 'text-[#FF8C00]' 
+                          : 'text-cherry-red'
+                  }`}>
+                    {(searchResult.foundRatio * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#888] font-mono">
+                  {searchResult.marks.length} segment(s) apparié(s)
+                </div>
+              </div>
+            )}
+
+            {/* Miroir de prévisualisation du texte source complet */}
             <div className="flex-1 border border-border-dark bg-bg-dark rounded-sm overflow-hidden flex flex-col">
               <div className="bg-bg-panel px-3 py-1 border-b border-border-dark flex justify-between items-center text-[10px] text-[#888] font-bold uppercase tracking-wider text-left select-none">
-                <span>Miroir de Prévisualisation du Code Source (T3)</span>
+                <span>Miroir de Prévisualisation du Texte Source (T3)</span>
                 <button
                   className="hover:bg-black/20 p-0.5 rounded transition-colors"
                   onClick={(e) => { e.stopPropagation(); setShowMirrorInvisibles(!showMirrorInvisibles); }}
@@ -717,38 +981,44 @@ export default function SmartDebugger({
               </div>
               
               <div 
-                ref={zoomRefMirror}
+                ref={(el) => {
+                  zoomRefMirror(el);
+                  mirrorContainerRef.current = el;
+                }}
                 className="flex-1 overflow-auto py-2 font-consolas leading-relaxed select-text select-none"
                 style={{ fontSize: 'var(--zoom-size, 10px)' }}
+                onScroll={(e) => {
+                  if (showMirrorInvisibles) {
+                    const el = e.target;
+                    const computedStyle = window.getComputedStyle(el);
+                    const fontSize = parseFloat(computedStyle.fontSize) || 10;
+                    const lineHeight = 1.625 * fontSize;
+                    const startLine = Math.floor(el.scrollTop / lineHeight);
+                    const endLine = Math.floor((el.scrollTop + el.clientHeight) / lineHeight);
+                    
+                    const newStart = Math.max(0, startLine - 100);
+                    const newEnd = endLine + 100;
+                    
+                    setMirrorVisibleRange(prev => {
+                      if (Math.abs(prev[0] - newStart) > 20 || Math.abs(prev[1] - newEnd) > 20) {
+                        return [newStart, newEnd];
+                      }
+                      return prev;
+                    });
+                  }
+                }}
               >
                 {mirrorLineRecords.length === 0 ? (
-                  <div className="p-4 text-center text-[#555] italic">Code source vide.</div>
+                  <div className="p-4 text-center text-[#555] italic">Texte source vide.</div>
                 ) : (
                   mirrorLineRecords.map((line) => (
-                    <div 
-                      key={line.number}
-                      className={`flex hover:bg-bg-panel-light/20 cursor-default select-text ${
-                        line.isHighlightLine ? 'bg-[#59466D]/15' : ''
-                      }`}
-                    >
-                      {/* Numéro de ligne gouttière du Miroir */}
-                      <div className="w-10 pr-2 text-right text-[#555] bg-bg-panel/40 border-r border-border-dark flex justify-between items-center select-none text-[9px] font-sans">
-                        <span className="pl-0.5">
-                          {line.isHighlightLine && <span className={line.cssClass.includes('hl-yellow') ? 'text-gutter-mod' : 'text-[#FF8C00]'}>▶</span>}
-                        </span>
-                        <span>{line.number}</span>
-                      </div>
-                      
-                      {/* Ligne de texte avec surbrillance heatmap */}
-                      <div className="flex-1 pl-2.5 whitespace-pre text-left overflow-x-auto overflow-y-hidden min-w-0 select-text">
-                        {line.text === "" ? (showMirrorInvisibles ? <span className="hc-nl"></span> : "\n") : (
-                          <>
-                            {renderLineContent(line.text, line.marks, showMirrorInvisibles)}
-                            {showMirrorInvisibles && <span className="hc-nl"></span>}
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    <MirrorLine 
+                      key={line.number} 
+                      line={line} 
+                      showMirrorInvisibles={showMirrorInvisibles}
+                      isVisible={line.number - 1 >= mirrorVisibleRange[0] && line.number - 1 <= mirrorVisibleRange[1]}
+                      isTargeted={line.number === targetHighlightLine}
+                    />
                   ))
                 )}
               </div>
@@ -757,20 +1027,6 @@ export default function SmartDebugger({
 
           </div>
 
-        </div>
-
-        {/* Option Smart Replace et Footer */}
-        <div className="flex justify-between items-center bg-bg-dark border-t border-border-dark px-4 py-2">
-          <label className="flex items-center gap-2 cursor-pointer text-xs text-[#ccc] font-medium">
-            <input 
-              type="checkbox" 
-              checked={parsedRequest.isValid ? parsedRequest.smartMode : false}
-              onChange={(e) => handleSmartChange(e.target.checked)}
-              disabled={!parsedRequest.isValid}
-              className="w-4 h-4 cursor-pointer"
-            />
-            Concilier les espaces (Smart Mode)
-          </label>
         </div>
 
         {/* Footer de la Modale */}
@@ -810,6 +1066,23 @@ export default function SmartDebugger({
         </div>
 
       </div>
+      
+      {/* Modale de saut de ligne (Recherche ou Find) */}
+      {lineChoiceModalConfig && (
+        <div className="pointer-events-auto">
+          <LineChoiceModal
+            isVisible={true}
+            position={lineChoiceModalConfig.pos}
+            onClose={() => setLineChoiceModalConfig(null)}
+            maxLines={lineChoiceModalConfig.maxLines}
+            title={`Aller à l'occurrence (1 - ${lineChoiceModalConfig.maxLines})`}
+            initialValue={String(lineChoiceModalConfig.initialValue)}
+            onGoToLine={(targetLine, occIndex) => {
+              setSearchOccIndex(occIndex - 1);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

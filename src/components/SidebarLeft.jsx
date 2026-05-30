@@ -101,6 +101,7 @@ export default function SidebarLeft({
   onClearStack,
   onRevertRequest,
   onAuditIA,
+  onCherryPickAudit,
   activeOccIndex,
   onSetActiveOccIndex,
   isCodeEmpty,
@@ -112,7 +113,8 @@ export default function SidebarLeft({
   onOpenLineChoiceModal,
   occLinesArray,
   isFindEscapeHatchActive,
-  onForceFindEscapeHatch
+  onForceFindEscapeHatch,
+  disabled = false
 }) {
   const { showAlert } = useMessageBox();
   const [showInvisibles, setShowInvisibles] = useState(true);
@@ -247,7 +249,7 @@ ${syntaxConfig.END}
 
 Paramètres Optionnels d'en-tête (à rajouter sur la même ligne que ${syntaxConfig.START}) :
 - [LABEL:nom-de-la-modif] : Identifiant court pour nommer ta requête dans l'historique. Fortement recommandé.
-- [MULTI:TRUE], [MULTI:1,3] ou [MULTI:NO 1,2] : Active le remplacement multiple, le cherry-picking, ou le cherry-picking inversé (NO) qui exclut spécifiquement certains index.
+- [MULTI:TRUE], [MULTI:1,3] ou [MULTI:NO 1,2] : Active le remplacement multiple, le cherry-picking, ou le cherry-picking inversé (NO) qui exclut spécifiquement certains index. ATTENTION : Les index démarrent à 0 (0 = 1ère occurrence, 1 = 2ème, etc.).
 - [SMART:TRUE] : Demande l'activation du Smart Replace (Concilier espaces et majuscules) pour que le parseur ignore l'indentation d'origine et la casse (très utile pour l'édition de tableaux Markdown ou corriger la casse sans tout casser).
 
 Règles d'or MANDATORY :
@@ -352,19 +354,23 @@ Règles d'or MANDATORY :
     if (onAuditIA) onAuditIA();
   };
 
-  const handlePasteImport = async () => {
+  const handlePasteImport = async (e) => {
+    // Calcul de la position de la modale par rapport au bouton (décalage de 50px vers la droite et le bas)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const position = { x: rect.left + 50, y: Math.min(rect.top + 50, window.innerHeight - 200) };
+
     try {
       const clip = await navigator.clipboard.readText();
-      onOpenDebugger(clip);
-    } catch (e) {
-      await showAlert("Accès refusé au presse-papier ou presse-papier vide.", "Erreur");
+      onOpenDebugger(clip, position);
+    } catch (err) {
+      await showAlert("Accès refusé au presse-papier ou presse-papier vide.", "Erreur", position);
     }
   };
 
   return (
     <div 
-      style={{ width: `${width}px` }} 
-      className="flex-shrink-0 bg-bg-panel flex flex-col overflow-hidden select-none min-w-[200px]"
+      style={{ width: `${width}px`, flexShrink: 9999 }} 
+      className={`bg-[#262626] flex flex-col overflow-hidden select-none min-w-[280px] transition-all duration-300 ${disabled ? 'pointer-events-none grayscale opacity-50' : ''}`}
     >
       {/* SECTION SUPÉRIEURE (Redimensionnable) */}
       <div 
@@ -912,7 +918,7 @@ Règles d'or MANDATORY :
                   ☐
                 </button>
                 <button 
-                  onClick={handleAuditIA}
+                  onClick={onCherryPickAudit}
                   className="flex-1 bg-[#9E67BA] hover:bg-[#83509e] text-white text-[10px] font-bold py-1 rounded leading-none"
                   title="Générer un rapport d'audit dans le presse-papier"
                 >
@@ -924,7 +930,10 @@ Règles d'or MANDATORY :
         </div>
 
         <div className="flex justify-between items-center mt-3">
-          <span className="text-sm font-bold text-text-light/60">Rogue Cherry v8.11</span>
+          <div className="flex items-baseline gap-2 opacity-70 cursor-default">
+            <span className="text-lg sm:text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cherry-red to-purple-500 uppercase tracking-wider leading-none">Rogue Cherry</span>
+            <span className="text-xs font-bold text-text-light/60">V1 Release / 8.11</span>
+          </div>
           <button
             type="button"
             disabled={isCodeEmpty}

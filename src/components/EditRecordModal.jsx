@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDraggable } from '../hooks/useDraggable.js';
+import faviconSvg from '../assets/brand/FAVICON.svg';
 import { useMessageBox } from '../context/MessageBoxContext.jsx';
 
 /**
@@ -70,14 +71,17 @@ export default function EditRecordModal({ isOpen, onClose, record, index, onSave
         className="bg-bg-panel border border-border-dark rounded-md shadow-2xl w-[600px] flex flex-col font-segoe select-none overflow-hidden pointer-events-auto"
       >
         
-        {/* Header */}
+        {/* EN-TÊTE */}
         <div 
-          className="bg-bg-dark border-b border-border-dark p-3 flex justify-between items-center flex-shrink-0 cursor-move"
+          className="bg-[#2d2d30] px-4 py-3 border-b border-border-dark flex justify-between items-center select-none cursor-move"
           {...dragHandlers}
         >
-          <h2 className="text-primary-blue font-black uppercase tracking-wide text-sm pointer-events-none">
-            Édition Historique — Version {record.version}
-          </h2>
+          <div className="flex items-center gap-2">
+            <img src={faviconSvg} alt="" className="w-10 h-10 -ml-2 -mt-1 drop-shadow-md" />
+            <span className="text-white font-bold text-sm uppercase tracking-wider">
+              Édition Historique — Version {record.version}
+            </span>
+          </div>
           <button 
             onClick={onClose} 
             className="text-text-light hover:text-white transition w-6 h-6 flex items-center justify-center bg-disabled-dark rounded"

@@ -5,12 +5,15 @@ import SidebarRight from './components/SidebarRight.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import SmartDebugger from './components/SmartDebugger.jsx';
 import Splitter from './components/Splitter.jsx';
+import SplashScreen from './components/SplashScreen.jsx';
 import VersionTagModal from './components/VersionTagModal.jsx';
 import EditRecordModal from './components/EditRecordModal.jsx';
+import LineChoiceModal from './components/LineChoiceModal.jsx';
 import { useHistoryStore, applyDeltaOnText, rebuildTextAt } from './hooks/useHistoryStore.js';
 import { parseSyntaxRequest, splitMultistackRequest, DEFAULT_SYNTAX } from './utils/textParser.js';
 import { computeLiveDiff, computeGhostDelta, computeSearchHeatmap } from './utils/diffEngine.js';
 import { useMessageBox } from './context/MessageBoxContext.jsx';
+import pixelCherryLogo from './assets/brand/Double cherry vector px.svg';
 
 export default function App() {
   const { showAlert, showConfirm, showCustom } = useMessageBox();
@@ -32,13 +35,45 @@ export default function App() {
   
   // NOUVEAU: États actifs pour les zones FIND / REPLACE globales
   const [isFindActive, setIsFindActive] = useState(true);
+  const [isSmartDebuggerActive, setIsSmartDebuggerActive] = useState(false);
+  const [isSplashScreenOpen, setIsSplashScreenOpen] = useState(false);
   const [isReplaceActive, setIsReplaceActive] = useState(false);
   
   // NOUVEAU: Recherche globale (V8)
   const [globalSearchBarText, setGlobalSearchBarText] = useState("");
   const [globalSearchSmartMode, setGlobalSearchSmartMode] = useState(false);
   const [globalSearchOccIndex, setGlobalSearchOccIndex] = useState(0);
-  const isGlobalSearching = globalSearchBarText.trim().length > 0;
+  const [globalSearchSuspended, setGlobalSearchSuspended] = useState(false);
+  const [lineChoiceModalConfig, setLineChoiceModalConfig] = useState(null);
+
+  // Verrouillage de la SidebarLeft (Étape 5)
+  const [isSidebarDisabled, setIsSidebarDisabled] = useState(false);
+  const [savedFindActive, setSavedFindActive] = useState(null);
+  const sidebarRestoreTimerRef = useRef(null);
+  const isGlobalSearching = globalSearchBarText.trim().length > 0 && !globalSearchSuspended;
+  
+  // Logique de désactivation de la SidebarLeft
+  useEffect(() => {
+    if (isGlobalSearching) {
+      if (!isSidebarDisabled) {
+        setSavedFindActive(isFindActive);
+        setIsFindActive(false);
+        setIsSidebarDisabled(true);
+      }
+      if (sidebarRestoreTimerRef.current) {
+        clearTimeout(sidebarRestoreTimerRef.current);
+        sidebarRestoreTimerRef.current = null;
+      }
+    } else {
+      if (isSidebarDisabled && !sidebarRestoreTimerRef.current) {
+        sidebarRestoreTimerRef.current = setTimeout(() => {
+          setIsSidebarDisabled(false);
+          setIsFindActive(prev => savedFindActive !== null ? savedFindActive : prev);
+          sidebarRestoreTimerRef.current = null;
+        }, 2000);
+      }
+    }
+  }, [isGlobalSearching, isSidebarDisabled, isFindActive, savedFindActive]);
   
   // NOUVEAU: Limites et Echappement du Find Dynamique (Task 8.8)
   const [searchLimits, setSearchLimits] = useState({ maxLines: 500, minChars: 3 });
@@ -93,8 +128,76 @@ export default function App() {
   const [activeStackIndex, setActiveStackIndex] = useState(-1);
 
   // Largeurs dynamiques des panneaux latéraux
-  const [leftWidth, setLeftWidth] = useState(() => Math.max(300, Math.floor(window.innerWidth * 0.25)));
-  const [rightWidth, setRightWidth] = useState(() => Math.max(300, Math.floor(window.innerWidth * 0.25)));
+  const leftWidthRef = useRef(Math.max(280, Math.floor(window.innerWidth * 0.25)));
+  const rightWidthRef = useRef(Math.max(280, Math.floor(window.innerWidth * 0.25)));
+
+  const [leftWidth, _setLeftWidth] = useState(leftWidthRef.current);
+  const [rightWidth, _setRightWidth] = useState(rightWidthRef.current);
+
+  const setLeftWidth = (val) => {
+    let newVal = typeof val === 'function' ? val(leftWidthRef.current) : val;
+    leftWidthRef.current = newVal;
+    _setLeftWidth(newVal);
+  };
+
+  const setRightWidth = (val) => {
+    let newVal = typeof val === 'function' ? val(rightWidthRef.current) : val;
+    rightWidthRef.current = newVal;
+    _setRightWidth(newVal);
+  };
+
+  const lastWindowWidthRef = useRef(window.innerWidth);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      const currentWidth = window.innerWidth;
+      const delta = currentWidth - lastWindowWidthRef.current;
+      lastWindowWidthRef.current = currentWidth;
+
+      if (delta < 0) {
+        let shrinkNeeded = Math.abs(delta);
+        
+        let l = leftWidthRef.current;
+        let r = rightWidthRef.current;
+        
+        let lAvailable = Math.max(0, l - 280);
+        let rAvailable = Math.max(0, r - 280);
+        
+        let totalAvailable = lAvailable + rAvailable;
+        
+        if (totalAvailable > 0) {
+          let actualShrink = Math.min(shrinkNeeded, totalAvailable);
+          let lShrink = 0;
+          let rShrink = 0;
+          
+          if (lAvailable > 0 && rAvailable > 0) {
+            let half = actualShrink / 2;
+            if (lAvailable >= half && rAvailable >= half) {
+              lShrink = half;
+              rShrink = half;
+            } else if (lAvailable < half) {
+              lShrink = lAvailable;
+              rShrink = actualShrink - lShrink;
+            } else {
+              rShrink = rAvailable;
+              lShrink = actualShrink - rShrink;
+            }
+          } else if (lAvailable > 0) {
+            lShrink = actualShrink;
+          } else if (rAvailable > 0) {
+            rShrink = actualShrink;
+          }
+          
+          if (lShrink > 0) setLeftWidth(l - lShrink);
+          if (rShrink > 0) setRightWidth(r - rShrink);
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, []);
+
 
   // États d'affichages des modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -103,6 +206,50 @@ export default function App() {
   
   // Modale de Versioning Dynamique
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
+
+  // Splash Screen Click Handler
+  const splashClickTimeoutRef = useRef(null);
+
+  const buildCurrentRequestString = () => {
+    if (pendingRequests && pendingRequests.length > 0 && activeStackIndex >= 0 && activeStackIndex < pendingRequests.length) {
+      const activeReq = pendingRequests[activeStackIndex];
+      const raw = activeReq.parsed ? activeReq.parsed.rawText : (activeReq.rawText || "");
+      return raw || "";
+    }
+    
+    const multiTag = multiMode 
+      ? (multiIndices && multiIndices.length > 0 ? `[MULTI:${multiIndices.join(',')}]` : '[MULTI:TRUE]') 
+      : '[MULTI:FALSE]';
+    const smartTag = ignoreSpaces ? '[SMART:TRUE]' : '[SMART:FALSE]';
+    const labelTag = currentLabel ? `[LABEL:${currentLabel}]` : '';
+    const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
+    
+    let commentPart = "";
+    if (commentText) {
+      commentPart = `##Commentaire## ${commentText}\n`;
+    }
+    
+    return `${header}\n${commentPart}${syntaxConfig.FIND}\n${findText || ""}\n${syntaxConfig.REPLACE}\n${replaceText || ""}\n${syntaxConfig.END}`;
+  };
+
+  const handleSplashButtonClick = () => {
+    if (!store.currentText) {
+      setIsSplashScreenOpen(true);
+      return;
+    }
+
+    if (splashClickTimeoutRef.current) {
+      clearTimeout(splashClickTimeoutRef.current);
+      splashClickTimeoutRef.current = null;
+      setIsSplashScreenOpen(true);
+    } else {
+      splashClickTimeoutRef.current = setTimeout(() => {
+        splashClickTimeoutRef.current = null;
+        setDebuggerRawText(buildCurrentRequestString());
+        setIsDebuggerOpen(true);
+      }, 250);
+    }
+  };
   const [isVersionModalInitMode, setIsVersionModalInitMode] = useState(false);
   const [versionModalInitialTab, setVersionModalInitialTab] = useState('increment');
   const [initialTextPayload, setInitialTextPayload] = useState(null);
@@ -400,9 +547,9 @@ export default function App() {
   }, [store.currentText, globalSearchBarText, searchLimits, forceGlobalSearchOverride]);
 
   const globalSearchResult = useMemo(() => {
-    if (!globalSearchBarText || isGlobalEscapeHatchActive) return { marks: [], foundRatio: 0 };
+    if (!globalSearchBarText || isGlobalEscapeHatchActive || globalSearchSuspended) return { marks: [], foundRatio: 0 };
     return computeSearchHeatmap(store.currentText, globalSearchBarText, globalSearchSmartMode);
-  }, [store.currentText, globalSearchBarText, globalSearchSmartMode, isGlobalEscapeHatchActive]);
+  }, [store.currentText, globalSearchBarText, globalSearchSmartMode, isGlobalEscapeHatchActive, globalSearchSuspended]);
 
   useEffect(() => {
     if (globalSearchResult.marks.length > 0) {
@@ -414,7 +561,7 @@ export default function App() {
 
   // --- GESTIONNAIRES D'ACTIONS ---
 
-  // Importation directe du Code source
+  // Importation directe du Texte source
   const handleImportMainCode = () => {
     navigator.clipboard.readText()
       .then(async clipText => {
@@ -442,13 +589,13 @@ export default function App() {
 
   const handleCopyMainCode = async () => {
     if (!store.currentText) {
-      await showAlert("Aucun code source à copier.", "Avertissement");
+      await showAlert("Aucun texte source à copier.", "Avertissement");
       return;
     }
     navigator.clipboard.writeText(store.currentText)
       .then(async () => {
-        await showAlert("Code source copié dans le presse-papier !");
-        store.pushInfoRecord("Export Presse-papier", "Code source copié dans le presse-papier");
+        await showAlert("Texte source copié dans le presse-papier !");
+        store.pushInfoRecord("Export Presse-papier", "Texte source copié dans le presse-papier");
       })
       .catch(async () => await showAlert("Échec de la copie.", "Erreur"));
   };
@@ -541,7 +688,7 @@ export default function App() {
   // Lancement de la recherche manuelle
   const handleSearch = async () => {
     if (occurrencesCount === 0) {
-      await showAlert("Texte recherché introuvable dans le code source. Ouverture du Débogueur pour visualiser le décalage (Heatmap).", "Avertissement");
+      await showAlert("Texte recherché introuvable dans le texte source. Ouverture du Débogueur pour visualiser le décalage (Heatmap).", "Avertissement");
       const dummyRaw = `${syntaxConfig.START} [MULTI:FALSE]\n${syntaxConfig.FIND}\n${findText}\n${syntaxConfig.REPLACE}\n${replaceText}\n${syntaxConfig.END}`;
       setDebuggerRawText(dummyRaw);
       setIsDebuggerOpen(true);
@@ -666,7 +813,7 @@ export default function App() {
   };
 
   // Chargement d'une requête spécifique dans l'UI (Sas de sécurité)
-  const loadRequestIntoUI = async (parsed, index = activeStackIndex, currentReqs = pendingRequests) => {
+  const loadRequestIntoUI = async (parsed, index = activeStackIndex, currentReqs = pendingRequests, position = null) => {
     if (parsed.isValid) {
       skipMultiResetRef.current = true;
       let finalMultiIndices = resolveMultiIndices(parsed, store.currentText);
@@ -694,14 +841,14 @@ export default function App() {
         newReqs[index].status = 'error';
         setPendingRequests(newReqs);
       }
-      await showAlert("Une requête exige une ouverture automatique du Débogueur : Erreur de syntaxe détectée.", "Erreur");
+      await showAlert("Une requête exige une ouverture automatique du Débogueur : Erreur de syntaxe détectée.", "Erreur", position);
       setDebuggerRawText(parsed.rawText);
       setIsDebuggerOpen(true);
     }
   };
 
   // Réception et traitement d'une requête syntaxique IA (Coller depuis presse-papier)
-  const handleImportSyntaxRequest = async (clipboardText) => {
+  const handleImportSyntaxRequest = async (clipboardText, position = null) => {
     // 1. Découpage du bloc en requêtes distinctes (Multistack)
     const requests = splitMultistackRequest(clipboardText);
 
@@ -718,10 +865,10 @@ export default function App() {
         }));
         setPendingRequests(newPending);
         setActiveStackIndex(0);
-        loadRequestIntoUI(newPending[0].parsed, 0, newPending);
-        await showAlert(`📦 MODE MULTISTACK : ${newPending.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`, "Information");
+        loadRequestIntoUI(newPending[0].parsed, 0, newPending, position);
+        await showAlert(`📦 MODE MULTISTACK : ${newPending.length} requêtes détectées.\nLa première est chargée. Cliquez sur 'APPLIQUER' pour passer automatiquement à la suivante !`, "Information", position);
       } else {
-        await showAlert("Aucune requête syntaxique valide trouvée dans la pile Multistack.", "Erreur");
+        await showAlert("Aucune requête syntaxique valide trouvée dans la pile Multistack.", "Erreur", position);
       }
     } else {
       // MODE UNITAIRE CLASSIQUE
@@ -731,7 +878,7 @@ export default function App() {
         if (parsed.isValid) {
           const testOccs = store.currentText.indexOf(parsed.findText);
           if (testOccs === -1) {
-            await showAlert("Le texte recherché est introuvable. Ouverture automatique du Débogueur.", "Erreur");
+            await showAlert("Le texte recherché est introuvable. Ouverture automatique du Débogueur.", "Erreur", position);
             setDebuggerRawText(clipboardText);
             setIsDebuggerOpen(true);
           } else {
@@ -745,17 +892,17 @@ export default function App() {
             
             setCommentText(parsed.comment || "");
             setCurrentLabel(parsed.label || "");
-            await showAlert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.");
+            await showAlert(parsed.label ? `Requête "${parsed.label}" chargée !` : "Requête IA validée et chargée ! Cliquez sur APPLIQUER pour valider.", "Information", position);
           }
         } else {
-          await showAlert("Erreur syntaxique détectée dans la requête. Ouverture automatique du Débogueur.", "Erreur");
+          await showAlert("Erreur syntaxique détectée dans la requête. Ouverture automatique du Débogueur.", "Erreur", position);
           setDebuggerRawText(clipboardText);
           setIsDebuggerOpen(true);
         }
       } else {
         // Fallback Texte Brut
         setFindText(clipboardText);
-        await showAlert("Texte brut importé dans la zone de recherche (FIND).");
+        await showAlert("Texte brut importé dans la zone de recherche (FIND).", "Information", position);
       }
     }
   };
@@ -837,7 +984,7 @@ export default function App() {
     loadRequestIntoUI(newReqs[index].parsed, index, newReqs);
   };
 
-  const handleAuditIA = async () => {
+  const handleCherryPickAudit = async () => { if (!store.currentText || occurrencesCount === 0 || multiIndices.length === 0) { await showAlert('Aucune occurrence cochée à auditer.', 'Information'); return; } const lines = store.currentText.split('\n'); let auditText = '--- AUDIT DES OCCURRENCES COCHÉES ---\n\n'; const sortedIndices = [...multiIndices].sort((a, b) => a - b); sortedIndices.forEach(idx => { const occ = occurrences[idx]; if (!occ) return; let currentLength = 0; let targetLineStart = -1; let targetLineEnd = -1; for (let i = 0; i < lines.length; i++) { const lineLen = lines[i].length + 1; if (currentLength + lineLen > occ.start && targetLineStart === -1) { targetLineStart = i; } if (currentLength + lineLen > occ.start + occ.length && targetLineEnd === -1) { targetLineEnd = i; break; } currentLength += lineLen; } if (targetLineEnd === -1) targetLineEnd = lines.length - 1; const contextLines = 3; const startContext = Math.max(0, targetLineStart - contextLines); const endContext = Math.min(lines.length - 1, targetLineEnd + contextLines); auditText += --- OCCURRENCE [Index: ] ---\n; auditText += lines.slice(startContext, endContext + 1).join('\n'); auditText += '\n\n'; }); navigator.clipboard.writeText(auditText).then(async () => await showAlert('Audit des occurrences copié dans le presse-papier !')).catch(async () => await showAlert(\'Erreur de copie de l\'audit.\', 'Erreur')); };\n\n  const handleAuditIA = async () => {
     const failed = pendingRequests.filter(r => r.status === 'error');
     if (failed.length === 0) {
       await showAlert("Aucune erreur à auditer.", "Information");
@@ -858,7 +1005,7 @@ export default function App() {
     setMultiIndices(idxs);
     setIgnoreSpaces(smartMode || false);
 
-    // 2. On applique directement le remplacement sur le code source !
+    // 2. On applique directement le remplacement sur le texte source !
     const newText = applyDeltaOnText(
       store.currentText,
       f,
@@ -1040,6 +1187,7 @@ export default function App() {
         onClearStack={handleClearStack}
         onRevertRequest={handleRevertRequest}
         onAuditIA={handleAuditIA}
+        onCherryPickAudit={handleCherryPickAudit}
         activeOccIndex={activeOccIndex}
         onSetActiveOccIndex={setActiveOccIndex}
         isCodeEmpty={!store.currentText}
@@ -1050,25 +1198,27 @@ export default function App() {
         setIsReplaceActive={setIsReplaceActive}
         isFindEscapeHatchActive={isFindEscapeHatchActive}
         onForceFindEscapeHatch={() => handleEscapeHatchDoubleClick('find')}
+        disabled={isSidebarDisabled}
+        onOpenLineChoiceModal={setLineChoiceModalConfig}
       />
 
       <Splitter direction="vertical" onResize={handleResizeLeft} />
 
       {/* 2. ÉDITEUR DE CODE CENTRAL */}
-      <div className="flex-1 flex flex-col min-w-0 p-2.5 gap-2.5">
+      <div className="flex-1 flex flex-col min-w-[450px] p-2.5 gap-2.5">
         
         {/* En-tête Éditeur Central */}
         <div className="flex justify-between items-start gap-4 border-b border-border-dark pb-2.5 flex-shrink-0">
           <div className="flex flex-col flex-1 h-[75px] justify-center">
             <div 
               className="text-2xl select-none font-bold mt-1 truncate cursor-pointer hover:opacity-80 transition-opacity" 
-              title={`Double-clic pour renommer le projet. CODE SOURCE - ${store.projectName || 'SANS_NOM'} - ${store.currentVersion}`}
+              title={`Double-clic pour renommer le projet. TEXTE SOURCE - ${store.projectName || 'SANS_NOM'} - ${store.currentVersion}`}
               onDoubleClick={() => {
                 setVersionModalInitialTab('rename');
                 setIsVersionModalOpen(true);
               }}
             >
-              CODE SOURCE - <span className="text-[#FF4500] uppercase font-mono">{store.projectName || 'SANS_NOM'}</span> - <span className="text-hl-yellow text-3xl ml-1 font-black font-mono">{store.currentVersion}</span>
+              TEXTE SOURCE - <span className="text-[#FF4500] uppercase font-mono">{store.projectName || 'SANS_NOM'}</span> - <span className="text-hl-yellow text-3xl ml-1 font-black font-mono">{store.currentVersion}</span>
             </div>
           </div>
 
@@ -1076,7 +1226,9 @@ export default function App() {
           <div className="flex gap-2 items-stretch h-[70px]">
             <button
               onClick={handleOpenFile}
-              className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#20b2aa] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
+              className={`px-3.5 rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold hover:border-[#20b2aa] ${
+                !store.currentText ? 'btn-active-blue' : 'btn-active'
+              }`}
               title="Ouvrir un fichier"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -1087,7 +1239,9 @@ export default function App() {
 
             <button
               onClick={handleImportMainCode}
-              className="px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold"
+              className={`px-3.5 rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold hover:border-[#4da6ff] ${
+                !store.currentText ? 'btn-active-blue' : 'btn-active'
+              }`}
               title="Coller le code à modifier depuis le presse-papier"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -1102,8 +1256,10 @@ export default function App() {
             <button
               onClick={handleCopyMainCode}
               disabled={!store.currentText}
-              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-primary-blue rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${isProjectClean ? 'opacity-50' : ''}`}
-              title="Copier le code source modifié dans le presse-papier"
+              className={`px-3.5 rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold hover:border-primary-blue ${
+                !store.currentText ? 'btn-disabled-unclickable' : 'btn-active'
+              } ${isProjectClean ? 'opacity-50' : ''}`}
+              title="Copier le texte source modifié dans le presse-papier"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
                 <path stroke="#4da6ff" strokeWidth="2" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -1118,7 +1274,9 @@ export default function App() {
               type="button"
               onClick={handleSaveAs}
               disabled={!store.currentText}
-              className={`px-3.5 bg-bg-panel-light border border-border-dark hover:border-[#ffd700] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed ${isProjectClean ? 'opacity-50' : ''}`}
+              className={`px-3.5 rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold hover:border-[#ffd700] ${
+                !store.currentText ? 'btn-disabled-unclickable' : 'btn-active'
+              } ${isProjectClean ? 'opacity-50' : ''}`}
               title="Enregistrer le fichier sur votre disque (Save As)"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -1137,7 +1295,9 @@ export default function App() {
                 setIsVersionModalOpen(true);
               }}
               disabled={!store.currentText}
-              className="px-3 bg-bg-panel-light border border-border-dark hover:border-[#20b2aa] rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+              className={`px-3 rounded flex flex-col justify-center items-center gap-1 transition text-xs font-bold hover:border-[#20b2aa] ${
+                !store.currentText ? 'btn-disabled-unclickable' : 'btn-active'
+              }`}
               title="Configurer les versions ou forcer un saut"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#20b2aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1145,6 +1305,18 @@ export default function App() {
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
               <span className="text-[#20b2aa] font-extrabold leading-none mt-0.5">UP VER</span>
+            </button>
+
+            <button
+              onClick={handleSplashButtonClick}
+              className={`w-[72px] flex flex-col justify-center items-center rounded-sm transition gap-1 shadow-md hover:shadow-lg ${
+                !store.currentText 
+                  ? 'btn-disabled-clickable-blue' 
+                  : 'btn-active'
+              }`}
+              title={!store.currentText ? "À propos de Rogue Cherry" : "À propos (Double-clic) / Débogueur (Clic)"}
+            >
+              <img src={pixelCherryLogo} alt="Splash Screen" className={`w-16 h-16 object-contain transition duration-300 ${!store.currentText ? 'grayscale-[40%] opacity-70 brightness-[1.1]' : ''}`} />
             </button>
 
             <div className="flex flex-col gap-1 w-10">
@@ -1172,7 +1344,7 @@ export default function App() {
           onTextChange={handleSaveFreeEdit}
           marks={allMarks}
           activeOccIndex={isGlobalSearching ? globalSearchOccIndex : activeOccIndex}
-          isEditable={isEditable && !isReplaceActive && !isGlobalSearching}
+          isEditable={isEditable && !isReplaceActive}
           onToggleEditable={handleToggleEditable}
           fontSize={fontSize}
           setFontSize={setFontSize}
@@ -1199,8 +1371,12 @@ export default function App() {
           globalSearchOccIndex={globalSearchOccIndex}
           setGlobalSearchOccIndex={setGlobalSearchOccIndex}
           globalSearchMarks={globalSearchResult.marks}
+          globalSearchFoundRatio={globalSearchResult.foundRatio}
           isGlobalEscapeHatchActive={isGlobalEscapeHatchActive}
           onForceGlobalEscapeHatch={() => handleEscapeHatchDoubleClick('global')}
+          globalSearchSuspended={globalSearchSuspended}
+          setGlobalSearchSuspended={setGlobalSearchSuspended}
+          onOpenLineChoiceModal={setLineChoiceModalConfig}
         />
       </div>
 
@@ -1267,7 +1443,7 @@ export default function App() {
           
           if (foundAt !== -1) {
             // Cas simple : le texte du Replace existe encore tel quel dans le code
-            if (await showConfirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nLe texte produit par cette requête a été retrouvé intact dans le code source. L'annulation va rétablir le texte d'origine.`)) {
+            if (await showConfirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nLe texte produit par cette requête a été retrouvé intact dans le texte source. L'annulation va rétablir le texte d'origine.`)) {
               store.pushReplace(
                 inverseFindStr,
                 inverseReplaceStr,
@@ -1428,6 +1604,29 @@ export default function App() {
         />
       )}
 
+      {/* 9. Modale de Choix de Ligne (Navigation Occurrences) */}
+      {lineChoiceModalConfig && (
+        <LineChoiceModal
+          isVisible={true}
+          position={lineChoiceModalConfig.pos}
+          onClose={() => setLineChoiceModalConfig(null)}
+          maxLines={lineChoiceModalConfig.maxLines}
+          linesArray={lineChoiceModalConfig.linesArray}
+          title={lineChoiceModalConfig.title}
+          initialValue={lineChoiceModalConfig.initialValue}
+          onGoToLine={(targetLine, occIndex) => {
+            if (lineChoiceModalConfig.callback) {
+              lineChoiceModalConfig.callback(occIndex);
+            } else {
+              setActiveOccIndex(occIndex - 1);
+            }
+          }}
+        />
+      )}
+
+      {isSplashScreenOpen && (
+        <SplashScreen isOpen={isSplashScreenOpen} onClose={() => setIsSplashScreenOpen(false)} />
+      )}
     </div>
   );
 }

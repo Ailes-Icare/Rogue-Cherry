@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { formatVersionString, incrementRank, parseVersionStringToRanks } from '../utils/versionEngine.js';
 import { useDraggable } from '../hooks/useDraggable.js';
+import faviconSvg from '../assets/brand/FAVICON.svg';
 
 export default function VersionTagModal({ 
   isOpen, 
@@ -213,11 +214,14 @@ export default function VersionTagModal({
         
         {/* EN-TÊTE */}
         <div 
-          className="bg-[#2d2d30] px-4 py-3 border-b border-border-dark flex justify-between items-center select-none cursor-move"
+          className="flex justify-between items-center bg-[#2a2a2a] p-3 border-b border-border-dark flex-shrink-0 cursor-move rounded-t-sm" 
           {...dragHandlers}
         >
-          <div className="font-bold text-[#d4d4d4] flex items-center gap-2">
-            🏷️ {mode === 'init' ? "INITIALISATION DE LA VERSION" : mode === 'branch' ? "CRÉATION DE BRANCHE" : "MISE À JOUR DE VERSION"}
+          <div className="flex items-center gap-2">
+            <img src={faviconSvg} alt="" className="w-10 h-10 -ml-2 -mt-1 drop-shadow-md" />
+            <span className="text-white font-bold text-sm uppercase tracking-wider">
+              {mode === 'init' ? "INITIALISATION DE LA VERSION" : mode === 'branch' ? "CRÉATION DE BRANCHE" : "MISE À JOUR DE VERSION"}
+            </span>
           </div>
           {mode !== 'init' && (
             <button onClick={onClose} className="text-[#888] hover:text-white transition cursor-pointer">✕</button>
@@ -254,7 +258,7 @@ export default function VersionTagModal({
           <div className={`flex flex-col gap-4 bg-[#222] p-4 text-sm rounded-sm border ${mode !== 'init' && interactionMode === 'rename' ? 'border-primary-blue shadow-[0_0_10px_rgba(0,122,204,0.3)]' : 'border-border-dark'}`}>
             {mode === 'init' && (
               <div className="text-[#eed] mb-2">
-                <strong>Bienvenue !</strong> Pour importer votre premier code source, veuillez définir son nom ainsi que le format de versioning que vous souhaitez utiliser pour la version de départ.
+                <strong>Bienvenue !</strong> Pour importer votre premier texte source, veuillez définir son nom ainsi que le format de versioning que vous souhaitez utiliser pour la version de départ.
               </div>
             )}
             

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDraggable } from '../hooks/useDraggable';
+import faviconSvg from '../assets/brand/FAVICON.svg';
 
 const iconMap = {
   warning: '⚠️',
@@ -18,7 +19,8 @@ export default function MessageBox({
   inputs = [],
   onClose,
   draggable = true,
-  centerLocked = false
+  centerLocked = false,
+  position: initialPosition = null
 }) {
   const [inputValues, setInputValues] = useState({});
 
@@ -34,8 +36,13 @@ export default function MessageBox({
   }, [inputs]);
 
   // Configuration du drag & drop
+  // Si on fournit une position initiale, on désactive le centrage automatique
+  const isCentered = centerLocked || !initialPosition;
+  
   const canDrag = draggable && !centerLocked;
-  const { modalRef, dragHandlers, style } = useDraggable({ disabled: !canDrag });
+  // useDraggable gère le décalage (x, y) relatif. Si la modale n'est pas centrée,
+  // ce décalage s'ajoutera à sa position fixe définie plus bas.
+  const { modalRef, dragHandlers, style: dragStyle } = useDraggable({ disabled: !canDrag });
 
   const defaultIcon = type === 'alert' ? 'ℹ️' : type === 'confirm' ? '❓' : type === 'prompt' ? '📝' : null;
   const displayIcon = iconMap[icon] || icon || defaultIcon;
@@ -45,7 +52,6 @@ export default function MessageBox({
   };
 
   const handleButtonClick = (btn) => {
-    // Si c'est un prompt ou custom, et que le bouton est de type "submit"
     if (btn.value === 'submit' && type === 'prompt') {
       onClose(inputValues['promptValue']);
     } else if (btn.value === 'submit') {
@@ -55,21 +61,30 @@ export default function MessageBox({
     }
   };
 
+  // Combinaison des styles de drag et de positionnement initial
+  const containerStyle = !centerLocked 
+    ? {
+        ...dragStyle,
+        ...(initialPosition ? { position: 'fixed', top: initialPosition.y, left: initialPosition.x } : {})
+      }
+    : {};
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm pointer-events-auto">
+    <div className={`fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm pointer-events-auto ${isCentered ? 'flex items-center justify-center' : ''}`}>
       <div 
         ref={modalRef}
         className={`bg-bg-dark border border-border-dark shadow-2xl rounded-sm flex flex-col min-w-[350px] max-w-[600px] overflow-hidden animate-fadeIn ${!centerLocked ? 'absolute' : ''}`}
-        style={!centerLocked ? style : {}}
+        style={containerStyle}
       >
         {/* Header (Drag handle) */}
         <div 
           className={`bg-[#2a2a2a] px-4 py-2 border-b border-border-dark flex justify-between items-center ${canDrag ? 'cursor-move' : ''} select-none flex-shrink-0`}
           {...(canDrag ? dragHandlers : {})}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 pointer-events-auto cursor-grab active:cursor-grabbing font-bold font-mono">
+            <img src={faviconSvg} alt="" className="w-8 h-8 -ml-1.5 -mt-1 drop-shadow-md" />
             {displayIcon && <span className="text-lg">{displayIcon}</span>}
-            <span className="text-white font-bold text-sm uppercase tracking-wider">{title}</span>
+            <span className="text-white font-bold text-sm uppercase tracking-wider truncate">{title}</span>
           </div>
           <button 
             onClick={() => onClose(null)}

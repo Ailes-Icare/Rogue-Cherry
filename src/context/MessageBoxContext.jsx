@@ -26,12 +26,13 @@ export const MessageBoxProvider = ({ children }) => {
     });
   }, []);
 
-  const showAlert = useCallback((message, title = "Information") => {
+  const showAlert = useCallback((message, title = "Information", position = null) => {
     return showModal({
       type: 'alert',
       title,
       message,
-      buttons: [{ label: 'OK', value: true, variant: 'primary' }]
+      buttons: [{ label: 'OK', value: true, variant: 'primary' }],
+      position
     });
   }, [showModal]);
 

@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* ========================================================
+     V8: COULEURS STRICTES DES BOUTONS (Spécifications RGB)
+     ======================================================== */
+  
+  /* Bouton standard non grisé et cliquable : F 45,45,45 / C 68,68,68 */
+  .btn-active {
+    @apply bg-[#2d2d2d] border-[#444444] hover:brightness-110 transition-all duration-150;
+  }
+  
+  /* Bouton standard actif AVEC liseret bleu : F 45,45,45 / C 0,122,204 */
+  .btn-active-blue {
+    @apply bg-[#2d2d2d] border-[#007acc] ring-1 ring-[#007acc] shadow-[0_0_8px_rgba(0,122,204,0.3)] hover:brightness-110 transition-all duration-150;
+  }
+
+  /* Bouton grisé et cliquable : F 38,38,38 / C 49,49,49 */
+  .btn-disabled-clickable {
+    @apply bg-[#262626] border-[#313131] hover:brightness-110 transition-all duration-150;
+  }
+  
+  /* Bouton grisé cliquable AVEC liseret bleu (Cas spécial Splash sans projet) */
+  .btn-disabled-clickable-blue {
+    @apply bg-[#262626] border-[#007acc] ring-1 ring-[#007acc] shadow-[0_0_8px_rgba(0,122,204,0.3)] hover:brightness-110 transition-all duration-150;
+  }
+
+  /* Bouton grisé et non cliquable : F 35,35,35 / Pas de liseret */
+  .btn-disabled-unclickable {
+    @apply bg-[#232323] border-transparent cursor-not-allowed transition-all duration-150 opacity-80;
+  }
+}
 /* === COMPORTEMENT GLOBAL === */
 body, html {
   margin: 0;
@@ -189,6 +219,9 @@ mark {
   content: '↵';
   position: absolute;
   left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  line-height: 0;
   color: #555555;
   font-weight: bold;
   pointer-events: none;

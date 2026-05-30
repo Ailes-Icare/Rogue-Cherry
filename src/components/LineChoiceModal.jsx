@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import faviconSvg from '../assets/brand/FAVICON.svg';
 
 export default function LineChoiceModal({
   isVisible,
@@ -65,16 +66,22 @@ export default function LineChoiceModal({
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     
     const update = (currentDelta) => {
+      let nextValue;
       setValue(v => {
-        const { maxLines, linesArray, onGoToLine } = latestProps.current;
+        const { maxLines } = latestProps.current;
         let n = (parseInt(v) || 1) + currentDelta;
         n = Math.max(1, Math.min(maxLines, n));
-        
-        const targetLine = linesArray ? linesArray[n - 1] : n;
-        onGoToLine(targetLine, n);
-        
+        nextValue = n;
         return n.toString();
       });
+      
+      setTimeout(() => {
+        if (nextValue !== undefined) {
+          const { maxLines, linesArray, onGoToLine } = latestProps.current;
+          const targetLine = linesArray ? linesArray[nextValue - 1] : nextValue;
+          if (onGoToLine) onGoToLine(targetLine, nextValue);
+        }
+      }, 0);
     };
 
     update(delta); // initial click
@@ -135,7 +142,10 @@ export default function LineChoiceModal({
         style={{ left: Math.max(10, Math.min(position.x, window.innerWidth - 250)), top: position.y }}
         onClick={handleModalClick}
       >
-        <span className="text-[11px] text-[#ccc] font-bold uppercase tracking-wider">{title || `Aller à la ligne (1 - ${maxLines})`}</span>
+        <div className="flex items-center gap-2">
+          <img src={faviconSvg} alt="" className="w-8 h-8 -ml-1.5 -mt-1 drop-shadow-md" />
+          <span className="text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">{title || `Aller à la ligne (1 - ${maxLines})`}</span>
+        </div>
         <div className="flex gap-1.5 items-center">
           <input 
             ref={inputRef}

@@ -92,6 +92,9 @@ export default function SidebarRight({
   const branchBtnRef = useRef(null);
   const [branchBtnWidth, setBranchBtnWidth] = useState(120);
 
+  const resetBtnRef = useRef(null);
+  const [resetBtnWidth, setResetBtnWidth] = useState(60);
+
   useEffect(() => {
     if (!branchBtnRef.current) return;
     const observer = new ResizeObserver(entries => {
@@ -100,6 +103,17 @@ export default function SidebarRight({
       }
     });
     observer.observe(branchBtnRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!resetBtnRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setResetBtnWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(resetBtnRef.current);
     return () => observer.disconnect();
   }, []);
 
@@ -181,48 +195,93 @@ export default function SidebarRight({
   return (
     <div 
       id="history-panel-root"
-      style={{ width: `${width}px` }} 
-      className="flex-shrink-0 bg-bg-panel-light flex flex-col overflow-hidden min-w-[250px] p-2.5 gap-2.5"
+      style={{ width: `${width}px`, flexShrink: 9999 }} 
+      className="bg-[#262626] flex flex-col overflow-hidden min-w-[280px] p-2.5 gap-2.5"
     >
       
       {/* 1. Zone Supérieure: Boutons de Projet */}
-      <div className="flex gap-2 h-14 flex-shrink-0">
+      <div className="flex gap-2 h-[72px] flex-shrink-0">
+        {/* Cadre Bleu Global (Gestion de projet) */}
+        <div className="flex-1 bg-[#007acc] rounded-sm flex flex-row overflow-hidden p-[6px] shadow-sm">
+          {/* Titre à gauche, centré dans son espace bleu */}
+          <div className="flex items-center justify-center px-2 min-w-[15%] max-w-[20%]">
+            <span className="text-[17px] font-extrabold text-white text-center leading-[1.1] tracking-wide">
+              Gestion<br/>de projet
+            </span>
+          </div>
+          {/* Cadre intérieur (fond gris du logiciel) avec marge interne */}
+          <div className="flex-1 bg-[#1e1e1e] rounded-sm flex flex-row items-stretch justify-start gap-2 p-[6px] overflow-hidden">
+            <button
+              onClick={onLoadProject}
+              className={`flex-1 max-w-[120px] min-w-[42px] text-xl ${isProjectEmpty ? 'btn-active-blue' : 'btn-disabled-clickable'}`}
+              title="Importer un projet Rogue Cherry à partir d'un fichier JSON"
+            >
+              📂
+            </button>
+            <button
+              onClick={onSaveProject}
+              disabled={isProjectEmpty}
+              className={`flex-1 max-w-[120px] min-w-[42px] text-xl ${isProjectEmpty ? 'btn-disabled-unclickable' : (!isProjectDirty ? 'btn-disabled-clickable' : 'btn-active')}`}
+              title="Sauvegarder le projet et tout l'historique dans un fichier JSON"
+            >
+              💾
+            </button>
+            <button
+              type="button"
+              onClick={onResetProject}
+              disabled={isProjectEmpty}
+              className={`flex-1 max-w-[120px] min-w-[42px] text-xl ${isProjectEmpty ? 'btn-disabled-unclickable' : 'btn-active'}`}
+              title="Fermer le projet courant"
+            >
+              ❌
+            </button>
+          </div>
+        </div>
+
+        {/* Bouton Reset (25%) */}
         <button
-          onClick={onSaveProject}
-          disabled={isProjectEmpty}
-          className={`flex-1 bg-bg-panel hover:border-primary-blue text-[10px] font-bold border border-border-dark flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : (!isProjectDirty ? 'opacity-50' : '')}`}
-          title="Sauvegarder le projet et tout l'historique dans un fichier JSON"
-        >
-          <span className="text-lg leading-none">💾</span>
-          <span className="text-center px-1">SAVE<br/>PROJECT</span>
-        </button>
-        <button
-          onClick={onLoadProject}
-          className={`flex-1 bg-bg-panel hover:border-primary-blue text-[10px] font-bold border border-border-dark flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 ${!isProjectEmpty ? 'opacity-50' : ''}`}
-          title="Importer un projet Rogue Cherry à partir d'un fichier JSON"
-        >
-          <span className="text-lg leading-none">📂</span>
-          <span className="text-center px-1">OPEN<br/>PROJECT</span>
-        </button>
-        <button
+          ref={resetBtnRef}
           type="button"
           onClick={onResetProject}
           disabled={isProjectEmpty}
-          className={`flex-1 bg-cherry-red hover:bg-cherry-red-hover text-[10px] font-bold border border-cherry-red flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 text-white ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : ''}`}
-          title="Fermer le projet courant"
-        >
-          <span className="text-lg leading-none">❌</span>
-          <span className="text-center px-1">FERMER<br/>PROJET</span>
-        </button>
-        <button
-          type="button"
-          onClick={onResetProject}
-          disabled={isProjectEmpty}
-          className={`flex-1 bg-cherry-red hover:bg-cherry-red-hover text-[10px] font-bold border border-cherry-red flex flex-col justify-center items-center rounded-sm transition gap-1 duration-150 text-white ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : ''}`}
+          className={`w-[25%] flex-shrink-0 bg-cherry-red hover:bg-cherry-red-hover font-bold border border-cherry-red flex flex-row justify-evenly items-center rounded-sm transition duration-150 text-white shadow-sm overflow-hidden ${isProjectEmpty ? 'opacity-30 cursor-not-allowed' : ''}`}
           title="Ferme tous les projets en cours et remet l'application vierge"
         >
-          <span className="text-lg leading-none">🔄</span>
-          <span className="text-center px-1 mt-1">RESET</span>
+          {(() => {
+            const w = resetBtnWidth;
+            if (w >= 100) {
+              return (
+                <>
+                  <span className="whitespace-nowrap" style={{ fontSize: '18px' }}>RESET</span>
+                  <span className="text-3xl leading-none flex-shrink-0">🔄</span>
+                </>
+              );
+            } else if (w >= 70) {
+              const fontSize = 12 + 6 * ((w - 70) / 30);
+              const iconSize = 24 + 12 * ((w - 70) / 30);
+              return (
+                <>
+                  <span className="whitespace-nowrap" style={{ fontSize: `${fontSize}px` }}>RESET</span>
+                  <span className="leading-none flex-shrink-0" style={{ fontSize: `${iconSize}px` }}>🔄</span>
+                </>
+              );
+            } else if (w >= 50) {
+              const iconSize = 24 + 12 * ((w - 50) / 20);
+              return (
+                <div className="flex flex-col items-center justify-center w-full">
+                  <span className="leading-none flex-shrink-0" style={{ fontSize: `${iconSize}px` }}>🔄</span>
+                  <span className="text-center w-full mt-1" style={{ fontSize: '10px' }}>RESET</span>
+                </div>
+              );
+            } else {
+              return (
+                <div className="flex flex-col items-center justify-center w-full">
+                  <span className="text-xl leading-none flex-shrink-0 mt-1">🔄</span>
+                  <span className="text-center w-full mt-1" style={{ fontSize: '9px' }}>RESET</span>
+                </div>
+              );
+            }
+          })()}
         </button>
       </div>
       {/* Taille du projet JSON */}
@@ -345,7 +404,7 @@ export default function SidebarRight({
               type="button"
               disabled={selectedIndex <= 0}
               onClick={() => onSelectIndex(selectedIndex - 1)}
-              className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-sm rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`flex-1 font-bold text-sm shadow-sm flex items-center justify-center ${selectedIndex <= 0 ? 'btn-disabled-unclickable' : 'btn-active'}`}
               title="Retourner à la version précédente"
             >
               ◀ Préc.
@@ -353,7 +412,7 @@ export default function SidebarRight({
             <button
               disabled={selectedIndex === -1 || selectedIndex === history.length - 1}
               onClick={() => onSelectIndex(selectedIndex + 1)}
-              className="flex-1 bg-bg-panel hover:bg-bg-dark text-white border border-border-dark font-bold text-sm rounded transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`flex-1 font-bold text-sm shadow-sm flex items-center justify-center ${(selectedIndex === -1 || selectedIndex === history.length - 1) ? 'btn-disabled-unclickable' : 'btn-active'}`}
               title="Avancer à la version suivante"
             >
               Suiv. ▶
@@ -416,7 +475,7 @@ export default function SidebarRight({
             <button
               disabled={selectedIndex === -1 || history[selectedIndex]?.type === 'snapshot' || history[selectedIndex]?.type === 'info'}
               onClick={() => onCopyAsRequest && onCopyAsRequest(selectedIndex)}
-              className="flex-1 bg-bg-panel hover:bg-bg-dark text-green-500 border border-border-dark font-bold text-lg rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              className={`flex-1 font-bold text-lg shadow-sm flex items-center justify-center ${(selectedIndex === -1 || history[selectedIndex]?.type === 'snapshot' || history[selectedIndex]?.type === 'info') ? 'btn-disabled-unclickable' : 'btn-active'}`}
               title="Copier la requête"
             >
               📋
@@ -424,15 +483,16 @@ export default function SidebarRight({
             <button
               disabled={selectedIndex === -1 || history[selectedIndex]?.type !== 'replace'}
               onClick={() => onUndoStrict && onUndoStrict(selectedIndex)}
-              className="flex-1 bg-bg-panel hover:bg-bg-dark text-cherry-red border border-border-dark font-bold text-lg rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
-              title="Annuler (Undo)"
+              className={`flex-[1.2] font-bold text-lg shadow-sm flex items-center justify-center gap-1.5 ${(selectedIndex === -1 || history[selectedIndex]?.type !== 'replace') ? 'btn-disabled-unclickable' : 'btn-active'}`}
+              title="Construction intelligente d'une requête d'annulation&#10;(Si cela est possible)"
             >
-              ↩️
+              <span className="text-sm">⚙️</span>
+              <span className="text-base">↩️</span>
             </button>
             <button
               disabled={selectedIndex <= 0}
               onClick={() => onCompress && onCompress(selectedIndex)}
-              className="flex-1 bg-bg-panel hover:bg-bg-dark text-purple-400 border border-border-dark font-bold text-lg rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              className={`flex-1 font-bold text-lg shadow-sm flex items-center justify-center ${selectedIndex <= 0 ? 'btn-disabled-unclickable' : 'btn-active'}`}
               title="Compresser l'historique"
             >
               🗜️
@@ -447,7 +507,7 @@ export default function SidebarRight({
                   onDeleteLast();
                 }
               }}
-              className="flex-1 bg-bg-panel hover:bg-cherry-red text-white border border-border-dark hover:border-cherry-red font-bold text-xs rounded transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+              className={`flex-1 font-bold text-xs shadow-sm flex items-center justify-center ${(selectedIndex === -1 || selectedIndex !== history.length - 1) ? 'btn-disabled-unclickable' : 'btn-active'}`}
               title="Supprimer dernier item"
             >
               🗑️
@@ -462,7 +522,7 @@ export default function SidebarRight({
                 onClick={() => setIsSyncScroll(!isSyncScroll)}
                 className={`w-8 h-7 flex items-center justify-center rounded border transition text-base ${
                   isSyncScroll
-                    ? 'bg-[#2a2d2e] border-primary-blue text-white'
+                    ? 'bg-[#2a2d2e] border-[#444] text-white'
                     : 'bg-bg-dark border-border-dark text-[#777]'
                 }`}
                 title={isSyncScroll ? "Désactiver le défilement synchronisé des mini-views" : "Activer le défilement synchronisé (🔗)"}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DEFAULT_SYNTAX } from '../utils/textParser.js';
 import { useDraggable } from '../hooks/useDraggable.js';
 import { useMessageBox } from '../context/MessageBoxContext.jsx';
+import faviconSvg from '../assets/brand/FAVICON.svg';
 
 /**
  * Modale de configuration personnalisée pour les balises de requêtes IA.
@@ -69,7 +70,10 @@ export default function SettingsModal({ isOpen, onClose, syntaxConfig, onSave })
           className="flex justify-between items-center p-3.5 bg-bg-dark border-b border-border-dark cursor-move"
           {...dragHandlers}
         >
-          <span className="text-[1.15em] font-bold text-[#20b2aa] uppercase pointer-events-none">⚙️ PARAMÈTRES SYNTAXE</span>
+          <div className="flex items-center gap-2">
+            <img src={faviconSvg} alt="" className="w-10 h-10 -ml-2 -mt-1 drop-shadow-md" />
+            <span className="text-white font-bold text-sm uppercase tracking-wider">⚙️ PARAMÈTRES SYNTAXE</span>
+          </div>
           <button 
             onClick={onClose} 
             className="bg-cherry-red hover:bg-cherry-red-hover text-white font-bold px-2 py-0.5 rounded text-xs transition duration-150"

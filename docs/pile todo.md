@@ -1,3 +1,6 @@
+rappel à mon intention : npm run build
+rappel à ton intention : 
+
 #README / CONSIGNE :
 - tu lira ce fichier dans l'ordre.
 - tu ne retirera jamais la "story" tel que je l'ai écrite. tu écrira toujours les infos lié au sujet d'un chapitre dans le chapitre, sans un sous chapitre a ta propre attention. tu y ajoutera le contexte, les elements supplémentaire necessaire pour clarifier une contradiction ou un element que j'aurais omis
@@ -27,110 +30,6 @@ fait le toutefois seulement dans le cas ou ce que je dis objective un point oubl
 
 #VERSION 8 : derniers ajouts
 
-###Question A :
-le bandeau en bas en bleu affiche "mode normal". a quoi ca correspond ? quand est ce que ca change ?
-si moi meme je comprends pas, c'est que c'est pas adapté.
-préco : voir "ajout 5.2"
-
-
-
-
-
-##V8 - ajout n°5 :
-Fonctionnement de la barre de recherche dans la fenetre principale.
-###5.1 :
-NOTA : la suite a été écrite a un moment ou la textbox "recherche" faisait totalement planter le logiciel. il m'étais donc impossible de verrifier comment se comportait les fonctions que tu avais précédement codé. il est possible que tout ou partie soit deja fonctionnel, et que tu n'ai plus que des ajustement à faire pour t'aligner avec mes consignes.
-
-UI : élargir pour occuper toute la ligne jusqu'au label / bouton "mode de lecture"
-ajouter a gauche un bouton pour le "smart search". bouton avec deux état visuel (actif ou non; inactif par défaut, et redeviens systématiquement innactif quand le texte de recherche est vide depuis 30 secondes). 
-ajouter sur ce bouton un tool tip text pour expliquer ce qu'est le "smart" (gestion des espace ET de la casse). un clic permet de changer l'etat. texte du bouton : SMART + un logo. comme pour "ajout 2", gérer le responsive pour "cacher" l'icone, puis cacher le texte et mettre que l'icone si le bouton se réduit en taille.
-- lorsque qu'un texte est écrit dans cette textbox, toute la side barre de gauche se désactive (grisé + non cliquable) ET la fonction "find" dynamique se désactive si elle était active. son état précédent est sauvegardé.
-- lorsque le textbox est vide, apres un délais de 2 seconde, réactiver la side barre de gauche et remettre la fonction "find" dynamique se remet dans l'état où elle avait été sauvegardé.
-la fonction smart de la case a cocher de gauche est totalement ignoré pour cette recherche
-la fonction smart du nouveau bouton pilote si la recherche est effectué avec une gestion intelligente de la casse et des espace ou non.
-UI / UX : la zone de texte est multiligne, et s'agrandit au fur et a mesure de l'ajout de texte / ligne. lorsqu'elle passe en multiligne, elle intègrera a gauche une numérotation de ligne, comme pour la zone de texte principale
-la premiere ligne n'aura pas de n°, recouvert par le logo "loupe" qui restera visible.
-lorsque la zone de texte atteint 25% de hauteur de l'interface totale, elle ne grandit plus, une barre de défilement apparait, et une barre horizontale de réglage apparait pour laisser l'utilisateur choisir ce qu'il préfère.
-comme pour la textbox principal, il faut ajouter une fonction "zoom dezoom" indépendante des autres textbox, et syncroniser le n° de ligne avec.
-normalement c'est intégré d'origine, mais il faut que si le texte dépasse en longueur le controleur, alors une barre de défillement horizontale pour la ligne apparait
-on utilisera l'algo qui a été developpé pour la modale de debug pour faire une recherche intelligente avec calcul de heatmap.
-
-###5.2 :
-####5.2.1 : 
-remplacer le "mode normal" en bas de la zone de texte, dans le bandeau bleu, par le "mode de lecture seule", et le bouton cadena. inverser l'ordre : le bouton a gauche, suivit du label.
-en mode d'édition, placer le label a gauche, puis les deux boutons (en somme dans le meme ordre que actuellement), mais toujours au meme endroit : dans le bandeau bleu en bas.
-####5.2.2 : 
-dans la zone dégagé en haut, placer le label "heatmap" (quand le textbox de recherche est vide, alors rien apparait dans cette zone. quand le texte est supprimé, les elements disparaissent au bout de 30 secondes)
-ce label heatmap marche en partie comme celui de la modale de debug (mais qui est pas parfait a ce stade, puisque retouché dans les ajouts suivant), tout en s'inspirant de ce qui "marche" pour le bouton "find" de la sidebar de gauche.
-
-actuellement le bouton "find" est remplacé par "1 / 3" avec deux bouton cliquable pour naviguer entre les occurences, si plusieurs occurence sont trouvé. et le texte principal se "déplace" sur l'occurence.
-la ligne est mise en valeur avec liseret rouge qui disparait de lui meme a la fin.
-
-####5.2.3 : 
-le label de heatmap affichera "Conformité heatmap : VALUE" avec la valeur subissant un dégradé de couleur fonction de la valeur (comme pour la modale de debug actuelle)
-par contre, SI plusieurs occurence sont trouvé, alors on doit ajouter juste apres : "- 1/106" et les deux fleches pour naviguer. le "106" etant le nombre d'occurence totale, c'est une valeur importante. met la dans une couleur différence ou en gras, voir les deux.
-
-####5.2.4 : 
-comportement des boutons : quand on "navigue" d'une occurence a l'autre, le texte principal de code doit se déplacer à la bonne ligne, et la ligne est mise en valeur avec un liseret rouge.
-quand la fonction search n'est plus utilisé, le lisert rouge disparait de lui meme au bout de 30 secondes.
-
-###5.3 : 
-ajout de fonctions utile sur ces boutons : 
-un double clic sur la valeur "1 / 103" affiche la meme mini modale que tu as deja réalisé pour aller directement à un n° de ligne quand on double clic sur la barre bleu.
-celle ci aura un petit ajout dont je parlerais en ajout 7
-la valeur entré à la main par l'utilisateur (par exemple 23) deviens la valeur valide : "23 / 100". l'utilisation des fleches sur cette mini modale permet de naviguer dans les occurences.
-pour implémenter convenablement cette fonction, lire "ajout 7"
-
-###5.4 : 
-il faut ajouter un bouton quelque part, peu encombrant mais visible et facile a identifier, qui permet de "copier le texte et supprimer le contenu du texte recherché".
-quand la heatmap atteint 100%, ajouter un liseret vert autour du textbox, et mettre en surbrillance (fond vert ?) ce bouton "copier et supprimer"
-cette surbrillance du texte ET du bouton sont annulé dès que la heatmap n'est plus égale a 100%
-
-##V8 - Ajout n°9 : 
-dans le bandeau bleu en bas, tout a droite, ajouter un bouton " a deux état sans texte mais avec une icone "espion" ou "loupe" ou quelque chose d'évocateur (la loupe étant deja utilisé pour la recherche, je suis pas fan)
-met en tool tip text "affiche ou cache les carractère invisible dans le texte principal"
-implémente la fonction, identique a celle présente dans les textbox "requete", "find" et "replace" de la modale de debug, sur le texte principal.
-par défaut, cette fonction / bouton est désactivé.
-
-##V8 - ajout n°10 : 
-Amélioration UI / UX de la modale de debug
-Dans l'état, tout fonctionne, hormis 3 points UX
-=> doit etre réalisé apres l'ajout n°5 et la stabilisation du mode "search".
-###10.1 DEBUG / PRB UX.
-####10.1.1 
-actuellement, quand on rentre du texte dans le textbox de recherche, ca désactive uniquement le textbox "find". étends ca a TOUTE LA SIDEBAR DE GAUCHE. (le texte de requete, le texte de find, le bouton find dynamique, (qui doit se désactiver et se remettre dans son état précédent apres), le texte de remplacement, le bouton replace, et la case a cocher smart (qui va etre modifié ci après)
-quand le textbox de recherche est vierge, alors réactiver les elements. (le bouton find dynamique doit se remettre dans son état précédent, actif ou non)
-####10.0.2 
-le bouton/label de "find dynamique" quand il affiche d'avoir trouvé plusieurs occurence avec les "petite flèche" pour naviguer d'une occurence à l'autre, ces flèches ne permettent pas de naviguer dans le texte principal. 
-il n'y a pas de déplacement, ni de carré rouge, ni le petit icone bleu qui se déplace.
-de plus concernant ce bouton, il y a le meme bug qu'il y avait sur le "find dynamique" de la fenetre principal : les boutons sont très sensible, et de manière "ressenti comme aléatoire" pour l'utilisateur, les clic sur les boutons "fleche" sont confondu avec une désactivation du find dynamique.
-enfin, les deux fleches sont trop petite et trop proche l'une de l'autre, ca demande une précision chirurgicale de naviguer dessus.
-####10.1.3 
-quand on utilise la fonction "recherche" (la partie en haut a gauche qui désactive find), et que plusieurs occurence sont trouvé, les "petite flèche" pour naviguer d'une occurence à l'autre, ces flèches ne permettent pas de naviguer dans le texte principal. 
-il n'y a pas de déplacement, ni de carré rouge, ni le petit icone bleu qui se déplace.
-###10.2 AMELIORATION FONCTION RECHERCHE : 
-####10.2.1 
-pour la textbox de recherche, reproduire le comportement évoqué en 5.1
-####10.2.2 
-les fonctions de heatmap et les boutons actuel marchent très bien, toutefois, réorganise les différement en respectant les meme consignes (adapté évidement a la modale !) que 5.2.2, 5.2.3 et 5.2.4
-####10.2.3 
-implémente l'équivalent de 5.3 : un double clic sur la numérotation des occurence de "recherche" lance la minimodale de choix de n° de ligne (avec l'attribut debug a true)
-###10.3 AMELIORATION AUTRE : 
-####10.3.1 
-remplace la case à cocher "concillier les espaces (smart mode) par un bouton identique a celui "smart" défini en 5.1
-####10.3.2 
-place le en haut de la sidebar de gauche, sur la meme ligne que "REQUETE BRUTE" et la case a cocher "invisible", à gauche de cette case a cocher (soit au final : label "requete brute (...)", le bouton smart, la fonction "invisible"
-####10.3.3 
-implémente l'equivalent de 5.3 : un double clic sur la numérotation des occurence de "find" lance la minimodale de choix de n° de ligne (avec l'attribut debug a true)
-####10.3.4 
-transforme la case a cocher "invisible" par un bouton a deux état sans texte mais avec une icone "espion" ou "loupe" ou quelque chose d'évocateur (la loupe étant deja utilisé pour la recherche, je suis pas fan)
-met en tool tip text "affiche ou cache les carractère invisible dans les textbox requete, find, replace"
-par défaut cette fonction / bouton est désactivé
-####10.3.5 
-dans le bandeau au dessus du texte principal, ou se trouve le label "MIROIR DE PREVISUALISATION DU CODE SOURCE", ajoute, à droite, le meme icone que 10.3.4 et, comme pour l'ajout 9, ajoute la fonction pour cacher / afficher les caractère invisible dans la zone de texte principal de la modale de debug
-modifie le tool tip text : "Affiche ou cache les cara inivisble dans le texte principal"
-par défaut, cette fonction / bouton est désactivé.
-
 ##V8 - ajout n°11 : 
 Amélioration UI / UX générale / finale
 ### 11.1
@@ -152,7 +51,8 @@ utiliser les SVG dans brand :
 - ce bouton ouvre un "splash screen". en haut a gauche, afficher le logo double cherry vector (non pixelisé) avec le nom du logiciel, la version actuelle en gros titre. en dessous, afficher le texte "faites du cherry picking dans un texte pour cibler au sniper ce que vous voulez changer, et rien d'autre, avec l'aide de votre assistant IA préféré." au dessous, mettre a gauche en haut le logo vector red, puis un texte qui épouse la forme (contourne) le logo. (en haut = en haut du bloc de texte) et en bas a droite mettre le logo vector purple. écrire un texte pour habiller entre ces deux textes : "demandez à votre IA de vous dire comment modifier le texte de votre choix. dites lui ce que vous voulez changer, en lui donnant le texte source, et en lui expliquant également comment elle doit formuler une "requette rogue cherry" pour faire ces modifs. l'IA ne retouchera jamais d'elle meme le texte, au risque de le réécrire entièrement et de faire des bêtise, ou de finir par perdre son contexte a force de réécrire de long texte. elle se contentera de vous fournir une instruction informatique qui explique ce qu'il faut chercher, pour le remplacer par quoi. integrez le texte source et la requete dans rogue cherry, controlez au besoin ce qui est réellement modifié, et laissez faire !". au desous de ce bloc (en haut a gauche le red, en bas a droite le purple, et le texte complet pour combler le reste du rectangle de façon a ce qu'il épouse la forme des deux logo), ajoute un autre bandeau de texte, isolé, qui donne la licence (pour l'instant mets en une cohérente pour ce projet, l'adresse du git hub, l'adresse du readme du projet, l'année) 
 - ajouter le favicon en haut a gauche de toutes modale (sauf la splashscreen et l'écran principal)
 ### 11.3
-
+modifie le titre "code source" en "texte source"
+### 11.4
 
 
 #AJOUTE ICI DES FEATURES SI ON EN IDENTIFIE D'AUTRES AVANT LA V9
