@@ -376,7 +376,7 @@ export function useHistoryStore() {
    * Enregistre un Item informatif dans l'historique (ex: Export, Sauvegarde).
    * Transparent : il est ignoré lors des opérations de retour en arrière ou de navigation dans l'historique.
    */
-  const pushInfoRecord = (actionName, comment = null, source = "Système") => {
+  const pushInfoRecord = (actionName, comment = null, source = "Système", meta = null) => {
     if (selectedIndex === -1) return null;
 
     const timestamp = getFullTimestamp();
@@ -392,7 +392,8 @@ export function useHistoryStore() {
       label: actionName,
       timestamp,
       comment,
-      source
+      source,
+      meta
     };
 
     updateActiveProject(prev => {
@@ -613,6 +614,15 @@ export function useHistoryStore() {
         const newHistory = [...prev.history];
         if (newHistory[index]) {
           newHistory[index] = { ...newHistory[index], action: actionName, comment };
+        }
+        return { ...prev, history: newHistory };
+      });
+    },
+    updateInfoRecord: (index, updates) => {
+      updateActiveProject(prev => {
+        const newHistory = [...prev.history];
+        if (newHistory[index] && newHistory[index].type === 'info') {
+          newHistory[index] = { ...newHistory[index], ...updates };
         }
         return { ...prev, history: newHistory };
       });

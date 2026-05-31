@@ -268,6 +268,8 @@ export default function App() {
 
   // Moteur d'exécution automatique
   const [isPlayingStack, setIsPlayingStack] = useState(false);
+  const [forcePlayStep, setForcePlayStep] = useState(-1);
+  const isUserEditingRef = useRef(false);
 
   // Mode édition libre (Cadenas)
   const [isEditable, setIsEditable] = useState(false);
@@ -277,6 +279,91 @@ export default function App() {
   const [fontSize, setFontSize] = useState(14);
 
   const [isDragging, setIsDragging] = useState(false);
+
+  const cancelActiveSmartCancel = () => {
+    const activeCancelIndex = store.history.findIndex(h => h.action === "🟡 Pile multistack / Smart Cancel");
+    if (activeCancelIndex !== -1) {
+       const cancelRec = store.history[activeCancelIndex];
+       const originalAction = cancelRec.meta?.originalAction || "❌ Échec Annul.";
+       store.updateInfoRecord(activeCancelIndex, { action: originalAction });
+    }
+  };
+
+  // --- GÉNÉRATION AUTOMATIQUE PILE SMART CANCEL ---
+  const handleGenerateMultistack = async (infoIndex) => {
+    const infoRec = store.history[infoIndex];
+    if (!infoRec || !infoRec.meta || !infoRec.meta.conflictBlockers) return;
+
+    if (pendingRequests.length > 0) {
+      if (!(await showConfirm("Une requête ou pile est déjà en cours. Voulez-vous vraiment l'écraser pour lancer l'annulation intelligente ?"))) {
+        return;
+      }
+    }
+
+    const { conflictTarget, conflictBlockers } = infoRec.meta;
+    const blockers = [...conflictBlockers].sort((a, b) => b - a);
+    const indicesToReverse = [...blockers, conflictTarget];
+    
+    let multistackRawText = "";
+    const generatedRequests = [];
+    
+    for (const idx of indicesToReverse) {
+      const rec = store.history[idx];
+      if (!rec || rec.type !== 'replace') continue;
+      
+      const reqLabel = `SmartCancel-${rec.action || idx}`;
+      const multiTag = rec.multiMode ? (rec.multiIndices && rec.multiIndices.length > 0 ? "[MULTI:TRUE]" : "[MULTI:FALSE]") : "[MULTI:FALSE]";
+      
+      const rawText = `##SYNTAX_COPIE## [LABEL:${reqLabel}] ${multiTag}\n` +
+                      `##FIND##\n${rec.replaceStr}\n` +
+                      `##REPLACE##\n${rec.findStr}\n` +
+                      `##END_COPIE##`;
+      
+      if (multistackRawText.length > 0) {
+        multistackRawText += `\n\n##[MULTISTACK REQUEST]##\n\n`;
+      }
+      multistackRawText += rawText;
+      
+      generatedRequests.push({
+        status: 'pending',
+        isModified: false,
+        parsed: {
+          isSyntax: true,
+          isValid: true,
+          label: reqLabel,
+          findText: rec.replaceStr,
+          replaceText: rec.findStr,
+          multiMode: rec.multiMode,
+          multiIndices: rec.multiMode ? [] : [],
+          smartMode: false,
+          rawText: rawText
+        }
+      });
+    }
+    
+    try {
+      await navigator.clipboard.writeText(multistackRawText);
+    } catch (e) {
+      console.error("Clipboard copy failed", e);
+    }
+    
+    setPendingRequests(generatedRequests);
+    setActiveStackIndex(0);
+    loadRequestIntoUI(generatedRequests[0].parsed, 0, generatedRequests);
+    setIsDebuggerOpen(false);
+    
+    store.updateInfoRecord(infoIndex, {
+      action: "🟡 Pile multistack / Smart Cancel",
+      comment: "En attente de résolution par la pile générée."
+    });
+  };
+
+  const handleFocusLeftPanel = () => {
+    if (store.selectedIndex !== store.history.length - 1) {
+      store.setSelectedIndex(store.history.length - 1);
+      setHistoryScrollTarget(null);
+    }
+  };
 
   // Importation générique depuis fichier (Interceptée pour le versioning)
   const processImportFile = (file) => {
@@ -674,6 +761,7 @@ export default function App() {
 
   // Application du remplacement unitaire ou multiple
   const handleReplace = async () => {
+    isUserEditingRef.current = false;
     if (occurrencesCount === 0) return;
 
     // Remplacement unitaire en mode strict
@@ -720,16 +808,29 @@ export default function App() {
         loadRequestIntoUI(newReqs[nextIndex].parsed, nextIndex, newReqs);
       } else if (newReqs.every(r => r.status === 'success' || r.status === 'ignored')) {
         await showAlert("🎉 Toutes les requêtes de la pile Multistack ont été appliquées avec succès !");
+        
+        // INTERCEPTION : Pile Multistack Smart Cancel
+        const activeCancelIndex = store.history.findIndex(h => h.action === "🟡 Pile multistack / Smart Cancel");
+        if (activeCancelIndex !== -1) {
+           const cancelRec = store.history[activeCancelIndex];
+           const originalAction = cancelRec.meta?.originalAction || "❌ Échec Annul.";
+           const newAction = `~~${originalAction}~~`;
+           const newComment = (cancelRec.comment || "") + "\n\n✅ [RÉSOLU] L'annulation a bien pu se réaliser grâce à la requête Multistack Smart.";
+           store.updateInfoRecord(activeCancelIndex, { action: newAction, comment: newComment });
+        }
         setIsPlayingStack(false);
+        setForcePlayStep(-1);
         setFindText("");
         setReplaceText("");
         setPendingRequests([]);
         setActiveStackIndex(-1);
       } else {
         setIsPlayingStack(false);
+        setForcePlayStep(-1);
       }
     } else {
         setIsPlayingStack(false);
+        setForcePlayStep(-1);
     }
   };
 
@@ -769,6 +870,7 @@ export default function App() {
 
   // Chargement d'une requête spécifique dans l'UI (Sas de sécurité)
   const loadRequestIntoUI = async (parsed, index = activeStackIndex, currentReqs = pendingRequests, position = null) => {
+    isUserEditingRef.current = false;
     if (parsed.isValid) {
       skipMultiResetRef.current = true;
       let finalMultiIndices = resolveMultiIndices(parsed, store.currentText);
@@ -803,7 +905,10 @@ export default function App() {
   };
 
   // Réception et traitement d'une requête syntaxique IA (Coller depuis presse-papier)
-  const handleImportSyntaxRequest = async (clipboardText, position = null) => {
+  const handleImportSyntaxRequest = async (clipboardText, position = null, isSmartCancelImport = false) => {
+    if (!isSmartCancelImport) {
+       cancelActiveSmartCancel();
+    }
     // 1. Découpage du bloc en requêtes distinctes (Multistack)
     const requests = splitMultistackRequest(clipboardText);
 
@@ -871,6 +976,9 @@ export default function App() {
   };
 
   const handlePlayStack = () => {
+    if (activeStackIndex >= 0 && pendingRequests[activeStackIndex]) {
+      setForcePlayStep(activeStackIndex);
+    }
     setIsPlayingStack(true);
   };
 
@@ -880,32 +988,49 @@ export default function App() {
       if (isPlayingStack) {
         if (pendingRequests.length === 0 || activeStackIndex === -1 || activeStackIndex >= pendingRequests.length) {
           setIsPlayingStack(false);
+          setForcePlayStep(-1);
           return;
         }
         
         const req = pendingRequests[activeStackIndex];
         
         // Sécurité : on vérifie que les textboxes correspondent bien à la requête active
-        if (findText !== req.parsed.findText) {
+        if (findText !== req.parsed.findText && forcePlayStep !== activeStackIndex) {
           return; // on attend le prochain render
         }
 
-        if (req.status === 'error') {
-          setIsPlayingStack(false);
-          await showAlert(`Arrêt de l'exécution de la pile : erreur détectée à l'index ${activeStackIndex + 1}.`, "Erreur");
-          return;
-        }
-        
-        if (occurrencesCount === 0) {
-          setIsPlayingStack(false);
-          await showAlert(`Arrêt de l'exécution : l'occurrence est introuvable pour la requête n°${activeStackIndex + 1}.`, "Erreur");
-          return;
-        }
-        
-        if (multiMode && occurrencesCount > 1 && multiIndices.length !== occurrencesCount) {
-          setIsPlayingStack(false);
-          await showAlert(`Arrêt de l'exécution : mode multi avec cherry-picking requis à l'index ${activeStackIndex + 1}. Veuillez sélectionner les occurrences ciblées.`, "Avertissement");
-          return;
+        if (forcePlayStep !== activeStackIndex) {
+          if (req.status === 'error') {
+            setIsPlayingStack(false);
+            await showAlert(`Arrêt de l'exécution de la pile : erreur détectée à l'index ${activeStackIndex + 1}.`, "Erreur");
+            return;
+          }
+          
+          if (occurrencesCount === 0) {
+            setIsPlayingStack(false);
+            await showAlert(`Arrêt de l'exécution : l'occurrence est introuvable pour la requête n°${activeStackIndex + 1}.`, "Erreur");
+            return;
+          }
+          
+          if (multiMode && occurrencesCount > 1) {
+            if (multiIndices.length !== occurrencesCount) {
+              setIsPlayingStack(false);
+              await showAlert(`Arrêt de l'exécution : mode multi avec cherry-picking requis à l'index ${activeStackIndex + 1}. Veuillez sélectionner les occurrences ciblées.`, "Avertissement");
+              return;
+            } else {
+              const activeCancelIndex = store.history.findIndex(h => h.action === "🟡 Pile multistack / Smart Cancel");
+              if (activeCancelIndex !== -1) {
+                setIsPlayingStack(false);
+                await showAlert(`Arrêt de sécurité (Smart Cancel) : la requête n°${activeStackIndex + 1} modifie plusieurs occurrences. Veuillez vérifier visuellement si l'annulation s'applique correctement à toutes les cibles avant de cliquer sur "Appliquer Pile".`, "Avertissement");
+                return;
+              }
+            }
+          }
+        } else if (occurrencesCount === 0) {
+           setIsPlayingStack(false);
+           setForcePlayStep(-1);
+           await showAlert(`Impossible de forcer l'exécution : l'occurrence de la requête n°${activeStackIndex + 1} est toujours introuvable. Veuillez corriger le texte ou cliquer sur le bouton R pour réparer la cible.`, "Erreur bloquante");
+           return;
         }
 
         // Si tout est ok, on applique avec un délai pour l'animation
@@ -921,7 +1046,9 @@ export default function App() {
   }, [isPlayingStack, activeStackIndex, pendingRequests, occurrencesCount, multiMode, multiIndices, findText]);
 
   const handleClearStack = async () => {
+    isUserEditingRef.current = false;
     if (await showConfirm("Voulez-vous vider la pile Multistack actuelle ?")) {
+      cancelActiveSmartCancel();
       setPendingRequests([]);
       setActiveStackIndex(-1);
       setFindText("");
@@ -930,6 +1057,38 @@ export default function App() {
       setCurrentLabel("");
     }
   };
+
+  // Sauvegarde à la volée des retouches libres sur la requête en cours (Multistack)
+  useEffect(() => {
+    if (!isUserEditingRef.current) return;
+
+    if (activeStackIndex >= 0 && pendingRequests[activeStackIndex]) {
+       const req = pendingRequests[activeStackIndex].parsed;
+       if (req.findText !== findText || 
+           req.replaceText !== replaceText || 
+           req.multiMode !== multiMode || 
+           req.smartMode !== ignoreSpaces || 
+           JSON.stringify(req.multiIndices) !== JSON.stringify(multiIndices)) {
+          
+          setPendingRequests(prev => {
+             const newReqs = [...prev];
+             if (newReqs[activeStackIndex]) {
+               newReqs[activeStackIndex].parsed = {
+                 ...newReqs[activeStackIndex].parsed,
+                 findText,
+                 replaceText,
+                 multiMode,
+                 smartMode: ignoreSpaces,
+                 multiIndices
+               };
+               newReqs[activeStackIndex].status = 'repaired';
+               newReqs[activeStackIndex].isModified = true;
+             }
+             return newReqs;
+          });
+       }
+    }
+  }, [findText, replaceText, multiMode, ignoreSpaces, multiIndices, activeStackIndex]);
 
   const handleRevertRequest = (index) => {
     const newReqs = [...pendingRequests];
@@ -1113,6 +1272,7 @@ export default function App() {
 
       {/* 1. PANNEAU GAUCHE */}
       <SidebarLeft
+        onFocusPanel={handleFocusLeftPanel}
         findText={findText}
         replaceText={replaceText}
         commentText={commentText}
@@ -1121,16 +1281,16 @@ export default function App() {
         pendingRequests={pendingRequests}
         activeStackIndex={activeStackIndex}
         onSelectStackRequest={handleSelectStackRequest}
-        onChangeFindText={setFindText}
-        onChangeReplaceText={(txt) => { setReplaceText(txt); setActiveOccIndex(-1); }}
+        onChangeFindText={(val) => { isUserEditingRef.current = true; setFindText(val); }}
+        onChangeReplaceText={(txt) => { isUserEditingRef.current = true; setReplaceText(txt); setActiveOccIndex(-1); }}
         splitChars={splitChars}
         onChangeSplitChars={setSplitChars}
         ignoreSpaces={ignoreSpaces}
-        onChangeIgnoreSpaces={setIgnoreSpaces}
+        onChangeIgnoreSpaces={(val) => { isUserEditingRef.current = true; setIgnoreSpaces(val); }}
         multiMode={multiMode}
-        onChangeMultiMode={setMultiMode}
+        onChangeMultiMode={(val) => { isUserEditingRef.current = true; setMultiMode(val); }}
         multiIndices={multiIndices}
-        onChangeMultiIndices={setMultiIndices}
+        onChangeMultiIndices={(val) => { isUserEditingRef.current = true; setMultiIndices(val); }}
         occurrencesCount={occurrencesCount}
         onSearch={handleSearch}
         onReplace={handleReplace}
@@ -1367,6 +1527,7 @@ export default function App() {
         }}
         onEditRecord={handleEditRecord}
         onGoToRecord={handleGoToRecord}
+        onGenerateMultistack={handleGenerateMultistack}
         onCopyAsRequest={async (index) => {
           const rec = store.history[index];
           if (!rec || rec.type === 'snapshot' || rec.type === 'info') {
@@ -1390,55 +1551,75 @@ export default function App() {
             await showAlert("Impossible d'annuler ce type d'élément.", "Erreur");
             return;
           }
+          
+          // La confirmation systèmatique AVANT toute vérification technique !
+          if (!(await showConfirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nL'annulation va générer une nouvelle opération à la FIN de l'historique pour le rétablir, sans altérer vos travaux intermédiaires.`))) {
+             return; // L'utilisateur a cliqué sur "Non"
+          }
+
           // Tentative d'annulation : on inverse Find et Replace
           const inverseFindStr = rec.replaceStr;
           const inverseReplaceStr = rec.findStr;
+
+          // 1. Scanner les conflits avec les requêtes ultérieures AVANT tout
+          const conflicting = [];
+          for (let i = index + 1; i < store.history.length; i++) {
+            const laterRec = store.history[i];
+            if (laterRec.type !== 'replace') continue;
+            // Un conflit existe si le findStr de l'item ultérieur chevauche le replaceStr de l'item à annuler
+            if (laterRec.findStr && rec.replaceStr && (
+              laterRec.findStr.includes(rec.replaceStr) || 
+              rec.replaceStr.includes(laterRec.findStr) ||
+              laterRec.findStr.includes(rec.findStr) ||
+              rec.findStr.includes(laterRec.findStr)
+            )) {
+              conflicting.push({ index: i, label: laterRec.action || `Item #${i}` });
+            }
+          }
+
+          if (conflicting.length > 0) {
+            const conflictIndices = conflicting.map(c => c.index);
+            const conflictLabels = conflicting.map(c => c.label).join(', ');
+            
+            store.pushInfoRecord(
+              `❌ Échec Annul.`, 
+              `Conflit avec : ${conflictLabels}`, 
+              "système",
+              {
+                conflictTarget: index,
+                conflictBlockers: conflictIndices,
+                originalAction: `❌ Échec Annul.`
+              }
+            );
+
+            let message = `Désolé, mais je ne peux pas effectuer cette action, car plusieurs requêtes ultérieures ont modifié la même zone de texte ou s'appuient sur cette modification :\n${conflicting.map(c => `  • ${c.label} (item #${c.index + 1})`).join('\n')}\n\nUn rapport a été ajouté à l'historique. Tu peux cliquer sur l'engrenage (⚙️) de ce rapport pour générer et appliquer automatiquement la pile d'annulation corrective (Smart Cancel Multistack).`;
+            await showAlert(message, "Conflit détecté");
+            return;
+          }
           
-          // Vérifier si le texte inversé existe dans le code actuel
+          // 2. Vérifier si le texte inversé existe dans le code FINAL (à la fin de l'historique)
+          const finalIndex = store.history.length - 1;
           const currentText = store.currentText;
           const foundAt = currentText.indexOf(inverseFindStr);
           
           if (foundAt !== -1) {
-            // Cas simple : le texte du Replace existe encore tel quel dans le code
-            if (await showConfirm(`Annuler "${rec.action || 'cette opération'}" ?\n\nLe texte produit par cette requête a été retrouvé intact dans le texte source. L'annulation va rétablir le texte d'origine.`)) {
-              store.pushReplace(
-                inverseFindStr,
-                inverseReplaceStr,
-                false,
-                [],
-                false,
-                `↩️ Annulation de "${rec.action || 'opération'}"`,
-                rec.splitChars || false
-              );
-            }
+            // Cas simple : le texte du Replace existe encore tel quel dans le code final
+            store.pushReplace(
+              inverseFindStr,
+              inverseReplaceStr,
+              rec.multiMode,
+              rec.multiMode ? [] : [], // L'inversion détruit le ciblage du cherry-picking
+              rec.splitChars || false,
+              `↩️ ${rec.action || 'opération'}`,
+              rec.ignoreSpaces || false, // ignoreSpaces
+              null, // explicitVersion
+              `Annulation intelligente de l'opération générée à la version ${rec.version}`, // comment
+              "système", // source
+              true // appendToEnd
+            );
           } else {
-            // Cas complexe : le texte a été modifié par des items ultérieurs
-            // Identifier les items conflictuels
-            const conflicting = [];
-            for (let i = index + 1; i < store.history.length; i++) {
-              const laterRec = store.history[i];
-              if (laterRec.type !== 'replace') continue;
-              // Un conflit existe si le findStr de l'item ultérieur chevauche le replaceStr de l'item à annuler
-              if (laterRec.findStr && rec.replaceStr && (
-                laterRec.findStr.includes(rec.replaceStr) || 
-                rec.replaceStr.includes(laterRec.findStr) ||
-                laterRec.findStr.includes(rec.findStr) ||
-                rec.findStr.includes(laterRec.findStr)
-              )) {
-                conflicting.push({ index: i, label: laterRec.action || `Item #${i}` });
-              }
-            }
-            
-            let message = `Impossible d'annuler directement "${rec.action || 'cette opération'}".\n\nLe texte produit par cette requête n'existe plus tel quel dans le code actuel.`;
-            
-            if (conflicting.length > 0) {
-              message += `\n\nOpérations ultérieures en conflit :\n${conflicting.map(c => `  • ${c.label} (item #${c.index + 1})`).join('\n')}`;
-              message += `\n\nVous devez d'abord annuler ces opérations en remontant le fil.`;
-            } else {
-              message += `\n\nLe texte a été modifié par des opérations ultérieures non identifiées automatiquement. Remontez le fil de l'historique pour annuler progressivement.`;
-            }
-            
-            await showAlert(message, "Avertissement");
+            // Cas complexe : introuvable malgré l'absence de conflits stricts
+            await showAlert(`Impossible d'annuler directement "${rec.action || 'cette opération'}".\n\nLe texte produit par cette requête n'existe plus tel quel dans le code actuel. Il a probablement été altéré par des opérations non identifiées automatiquement.`, "Avertissement");
           }
         }}
         onCompress={async (index) => {

@@ -70,6 +70,7 @@ export default function SidebarRight({
   onBranchOut,
   onEditRecord,
   onGoToRecord,
+  onGenerateMultistack,
   onCopyAsRequest,
   onUndoStrict,
   onCompress,
@@ -323,19 +324,33 @@ export default function SidebarRight({
             ) : (
               history.map((rec, index) => {
                 const isInfo = rec.type === 'info';
-                const isSelected = index === selectedIndex && !isInfo;
+                const isSmartCancelFailure = isInfo && rec.action === '❌ Échec Annul.';
                 
+                // On autorise la sélection des Échecs d'Annulation pour voir les lignes concernées
+                const isSelected = index === selectedIndex && (!isInfo || isSmartCancelFailure);
+
+                let rowColorClass = 'hover:bg-bg-panel text-text-light/90 cursor-pointer';
+                if (isInfo && !isSmartCancelFailure) {
+                  rowColorClass = 'bg-[#1a1a1a] text-[#666] border-l-4 border-transparent cursor-default';
+                } else if (isSelected) {
+                  rowColorClass = 'bg-[#37373d] border-l-4 border-primary-blue font-bold text-white cursor-pointer';
+                }
+
+                // Surlignage conditionnel si un Échec d'annulation est sélectionné
+                const activeRec = history[selectedIndex];
+                if (activeRec && activeRec.action === '❌ Échec Annul.' && activeRec.meta) {
+                  if (activeRec.meta.conflictTarget === index) {
+                    rowColorClass = 'bg-[#1a2b3d] border-l-4 border-blue-500 font-bold text-blue-300 cursor-default';
+                  } else if (activeRec.meta.conflictBlockers && activeRec.meta.conflictBlockers.includes(index)) {
+                    rowColorClass = 'bg-[#3d1a1a] border-l-4 border-red-500 font-bold text-red-300 cursor-default';
+                  }
+                }
+
                 return (
                   <tr
                     key={index}
-                    onClick={() => { if (!isInfo) onSelectIndex(index); }}
-                    className={`transition duration-100 ${
-                      isInfo 
-                        ? 'bg-[#1a1a1a] text-[#666] border-l-4 border-transparent cursor-default'
-                        : isSelected
-                          ? 'bg-[#37373d] border-l-4 border-primary-blue font-bold text-white cursor-pointer'
-                          : 'hover:bg-bg-panel text-text-light/90 cursor-pointer'
-                    }`}
+                    onClick={() => { if (!isInfo || isSmartCancelFailure) onSelectIndex(index); }}
+                    className={`transition duration-100 ${rowColorClass}`}
                   >
                     <td className={`p-2 font-mono text-[10px] align-top whitespace-nowrap w-px ${rec.isSaved ? 'text-[#87cefa]' : ''}`}>{rec.version}</td>
                     <td className={`p-2 align-top whitespace-nowrap w-px ${rec.isSaved ? 'text-[#87cefa] font-bold' : ''}`} title={rec.action}>
@@ -353,6 +368,11 @@ export default function SidebarRight({
                          <div className="flex gap-1.5 justify-end mt-1 text-base">
                              <button onClick={(e) => { e.stopPropagation(); onEditRecord(index); }} title="Éditer le label ou le commentaire" className="hover:text-primary-blue transition-colors">✏️</button>
                              <button onClick={(e) => { e.stopPropagation(); onGoToRecord(); }} title="Aller à la modification ciblée" className="hover:text-primary-blue transition-colors">🎯</button>
+                         </div>
+                      )}
+                      {rec.action === '❌ Échec Annul.' && (
+                         <div className="flex gap-1.5 justify-end mt-1 text-base">
+                             <button onClick={(e) => { e.stopPropagation(); onGenerateMultistack(index); }} title="Générer et appliquer la pile d'annulation intelligente (Smart Cancel)" className="hover:text-yellow-500 transition-colors">⚙️</button>
                          </div>
                       )}
                     </td>
