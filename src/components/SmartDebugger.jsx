@@ -154,7 +154,8 @@ export default function SmartDebugger({
   onAcceptAndCopy,
   syntaxConfig,
   searchLimits,
-  setSearchLimits
+  setSearchLimits,
+  isMultistackMode
 }) {
   const { showCustom } = useMessageBox();
   const [rawText, setRawText] = useState(initialRawText || "");
@@ -1053,13 +1054,16 @@ export default function SmartDebugger({
           </button>
           <button 
             type="button"
-            disabled={!parsedRequest.isValid || searchResult.foundRatio < 1}
+            disabled={isMultistackMode || !parsedRequest.isValid || searchResult.foundRatio < 1}
             onClick={handleValidateAndApply}
             className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
-              parsedRequest.isValid && searchResult.foundRatio === 1
-                ? 'bg-primary-blue hover:bg-primary-blue-hover text-white cursor-pointer' 
-                : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
+              isMultistackMode 
+                ? 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
+                : parsedRequest.isValid && searchResult.foundRatio === 1
+                  ? 'bg-primary-blue hover:bg-primary-blue-hover text-white cursor-pointer' 
+                  : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
             }`}
+            title={isMultistackMode ? "Impossible d'appliquer directement une modification via le débogueur lors d'une exécution de pile multistack." : ""}
           >
             VALIDER & APPLIQUER LA REQUÊTE
           </button>

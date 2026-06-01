@@ -607,6 +607,16 @@ export default function App() {
         setInitialTextPayload(clipText);
         setInitialTextSource({ label: "import init", source: "presse-papier" });
         store.setProjectName("");
+        
+        cancelActiveSmartCancel();
+        setPendingRequests([]);
+        setActiveStackIndex(-1);
+        setFindText("");
+        setReplaceText("");
+        setCommentText("");
+        setCurrentLabel("");
+        setMultiIndices([]);
+        setMultiMode(false);
 
         setIsVersionModalInitMode(true);
         setVersionModalInitialTab('increment');
@@ -872,7 +882,11 @@ export default function App() {
   const loadRequestIntoUI = async (parsed, index = activeStackIndex, currentReqs = pendingRequests, position = null) => {
     isUserEditingRef.current = false;
     if (parsed.isValid) {
-      skipMultiResetRef.current = true;
+      if (parsed.multiMode && parsed.multiIndices && parsed.multiIndices.length === 0 && !parsed.multiExclude) {
+        skipMultiResetRef.current = false;
+      } else {
+        skipMultiResetRef.current = true;
+      }
       let finalMultiIndices = resolveMultiIndices(parsed, store.currentText);
 
       setFindText(parsed.findText);
@@ -1114,6 +1128,7 @@ export default function App() {
 
   // Application de la requête réparée depuis la modale de Débogage
   const handleApplyDebuggerRequest = async ({ findText: f, replaceText: r, label, multiMode: m, multiIndices: idxs, smartMode }) => {
+    isUserEditingRef.current = true;
     // 1. On charge la requête dans le formulaire gauche
     setFindText(f);
     setReplaceText(r);
@@ -1152,6 +1167,7 @@ export default function App() {
 
   // Copie de la requête depuis la modale sans appliquer
   const handleAcceptAndCopy = async ({ findText: f, replaceText: r, multiMode: m, multiIndices: idxs, smartMode }) => {
+    isUserEditingRef.current = true;
     setFindText(f);
     setReplaceText(r);
     setMultiMode(m);
@@ -1219,6 +1235,17 @@ export default function App() {
           
           store.importProject(data.projectName, data.history);
           setLastSavedHistoryLength(data.history.length);
+          
+          cancelActiveSmartCancel();
+          setPendingRequests([]);
+          setActiveStackIndex(-1);
+          setFindText("");
+          setReplaceText("");
+          setCommentText("");
+          setCurrentLabel("");
+          setMultiIndices([]);
+          setMultiMode(false);
+
           await showAlert(`Projet "${data.projectName}" importé avec succès !`);
         } catch (err) {
           await showAlert("Erreur lors de la lecture du fichier JSON.", "Erreur");
@@ -1317,6 +1344,7 @@ export default function App() {
         onForceFindEscapeHatch={() => handleEscapeHatchDoubleClick('find')}
         disabled={isSidebarDisabled}
         onOpenLineChoiceModal={setLineChoiceModalConfig}
+        isSmartCancelActive={store.history.findIndex(h => h.action === "🟡 Pile multistack / Smart Cancel") !== -1}
       />
 
       <Splitter direction="vertical" onResize={handleResizeLeft} />
@@ -1517,8 +1545,15 @@ export default function App() {
           if (await showConfirm("Voulez-vous vraiment effacer tout le projet et l'historique ?")) {
             store.resetStore();
             setLastSavedHistoryLength(0);
+            cancelActiveSmartCancel();
+            setPendingRequests([]);
+            setActiveStackIndex(-1);
             setFindText("");
             setReplaceText("");
+            setCommentText("");
+            setCurrentLabel("");
+            setMultiIndices([]);
+            setMultiMode(false);
           }
         }}
         onBranchOut={() => {
@@ -1655,6 +1690,7 @@ export default function App() {
         syntaxConfig={syntaxConfig}
         searchLimits={searchLimits}
         setSearchLimits={setSearchLimits}
+        isMultistackMode={pendingRequests.length > 0}
       />
 
       {isVersionModalOpen && (

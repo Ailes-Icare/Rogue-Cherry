@@ -114,7 +114,8 @@ export default function SidebarLeft({
   occLinesArray,
   isFindEscapeHatchActive,
   onForceFindEscapeHatch,
-  disabled = false
+  disabled = false,
+  isSmartCancelActive
 }) {
   const { showAlert } = useMessageBox();
   const [showInvisibles, setShowInvisibles] = useState(true);
@@ -476,7 +477,12 @@ Règles d'or MANDATORY :
       {pendingRequests && pendingRequests.length > 0 && (
         <div className="flex flex-col flex-1 min-h-0 bg-[#1e1e1e] border border-border-dark p-2 rounded-sm overflow-y-auto custom-scrollbar relative">
           <div className="text-[11px] font-bold text-[#aaa] mb-1 flex justify-between items-center">
-            <span>📦 PILE MULTISTACK</span>
+            <span>
+              📦 PILE MULTISTACK
+              {isSmartCancelActive && (
+                <span className="text-yellow-500 ml-2">— Annulation intelligente</span>
+              )}
+            </span>
             <div className="flex items-center gap-2">
               <span className="text-[#20b2aa]">{pendingRequests.length} REQUÊTE{pendingRequests.length > 1 ? 'S' : ''}</span>
               <button 
