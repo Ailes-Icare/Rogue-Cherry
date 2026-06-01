@@ -72,6 +72,7 @@ export default function SidebarRight({
   onGoToRecord,
   onGenerateMultistack,
   onCopyAsRequest,
+  onLoadRequestToSidebar,
   onUndoStrict,
   onCompress,
   onDeleteLast,
@@ -330,7 +331,9 @@ export default function SidebarRight({
                 const isSelected = index === selectedIndex && (!isInfo || isSmartCancelFailure);
 
                 let rowColorClass = 'hover:bg-bg-panel text-text-light/90 cursor-pointer';
-                if (isInfo && !isSmartCancelFailure) {
+                if (rec.isIgnored) {
+                  rowColorClass = 'bg-[#1e1e1e] text-[#555] opacity-50 cursor-default';
+                } else if (isInfo && !isSmartCancelFailure) {
                   rowColorClass = 'bg-[#1a1a1a] text-[#666] border-l-4 border-transparent cursor-default';
                 } else if (isSelected) {
                   rowColorClass = 'bg-[#37373d] border-l-4 border-primary-blue font-bold text-white cursor-pointer';
@@ -364,15 +367,20 @@ export default function SidebarRight({
                     </td>
                     <td className="p-2 text-right pr-3 text-[#999] text-[10px] font-mono align-top whitespace-nowrap w-px">
                       {rec.timestamp}
-                      {isSelected && rec.type !== 'snapshot' && (
+                      {isSelected && rec.type !== 'snapshot' && !rec.isIgnored && (
                          <div className="flex gap-1.5 justify-end mt-1 text-base">
                              <button onClick={(e) => { e.stopPropagation(); onEditRecord(index); }} title="Éditer le label ou le commentaire" className="hover:text-primary-blue transition-colors">✏️</button>
                              <button onClick={(e) => { e.stopPropagation(); onGoToRecord(); }} title="Aller à la modification ciblée" className="hover:text-primary-blue transition-colors">🎯</button>
                          </div>
                       )}
-                      {rec.action === '❌ Échec Annul.' && (
+                      {rec.action === '❌ Échec Annul.' && !rec.isIgnored && (
                          <div className="flex gap-1.5 justify-end mt-1 text-base">
                              <button onClick={(e) => { e.stopPropagation(); onGenerateMultistack(index); }} title="Générer et appliquer la pile d'annulation intelligente (Smart Cancel)" className="hover:text-yellow-500 transition-colors">⚙️</button>
+                         </div>
+                      )}
+                      {rec.isIgnored && rec.type === 'replace' && (
+                         <div className="flex gap-1.5 justify-end mt-1 text-base">
+                             <button onClick={(e) => { e.stopPropagation(); onLoadRequestToSidebar(index); }} title="Recharger cette requête annulée dans la zone de gauche" className="hover:text-green-400 transition-colors">♻️</button>
                          </div>
                       )}
                     </td>

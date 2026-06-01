@@ -172,6 +172,7 @@ export function rebuildTextAt(history, targetIndex, fileId = "main") {
   for (let i = snapshotIdx + 1; i <= targetIndex; i++) {
     const op = history[i];
     const opFileId = op.fileId || "main";
+    if (op.isIgnored) continue;
     if (op.type === "replace" && opFileId === fileId) {
       currentText = applyDeltaOnText(
         currentText,
@@ -336,9 +337,13 @@ export function useHistoryStore() {
     };
 
     // Si on insère à un index intermédiaire (Time-Travel puis application d'une nouvelle branche),
-    // on coupe l'historique à l'index sélectionné avant de pousser.
+    // on garde l'historique mais on marque les éléments "futurs" comme ignorés.
     updateActiveProject(prev => {
-      const cleanHistory = prev.history.slice(0, prev.selectedIndex + 1);
+      const newHistory = [...prev.history];
+      for (let i = prev.selectedIndex + 1; i < newHistory.length; i++) {
+        newHistory[i] = { ...newHistory[i], isIgnored: true };
+      }
+      const cleanHistory = newHistory;
       
       // Sécurisation : Il faut recalculer dynamiquement la version et le label basés sur `cleanHistory` 
       // pour que ce soit synchronisé si plusieurs appels synchrones ont lieu !
@@ -362,10 +367,10 @@ export function useHistoryStore() {
         version: dynamicNextVer
       };
 
-      const newHistory = [...cleanHistory, finalRecord];
+      const updatedHistory = [...cleanHistory, finalRecord];
       return {
-        history: newHistory,
-        selectedIndex: newHistory.length - 1
+        history: updatedHistory,
+        selectedIndex: updatedHistory.length - 1
       };
     });
     
@@ -423,10 +428,13 @@ export function useHistoryStore() {
     if (targetRankIndex === -1) {
       // Pur retour en arrière (annulation complète du futur)
       updateActiveProject(prev => {
-        const cleanHistory = prev.history.slice(0, prev.selectedIndex + 1);
+        const newHistory = [...prev.history];
+        for (let i = prev.selectedIndex + 1; i < newHistory.length; i++) {
+          newHistory[i] = { ...newHistory[i], isIgnored: true };
+        }
         return {
-          history: cleanHistory,
-          selectedIndex: cleanHistory.length - 1
+          history: newHistory,
+          selectedIndex: prev.selectedIndex
         };
       });
       return;
@@ -506,10 +514,17 @@ export function useHistoryStore() {
         isSaved: freezeArchive
       };
       
-      const updatedHistory = [...prev.history, record];
+      const newHistory = [...prev.history];
+      if (!isAtTip) {
+        for (let i = prev.selectedIndex + 1; i < newHistory.length; i++) {
+          newHistory[i] = { ...newHistory[i], isIgnored: true };
+        }
+      }
+      newHistory.push(record);
+
       return {
-        history: updatedHistory,
-        selectedIndex: updatedHistory.length - 1
+        history: newHistory,
+        selectedIndex: newHistory.length - 1
       };
     });
   };

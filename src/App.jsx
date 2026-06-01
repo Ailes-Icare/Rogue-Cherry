@@ -1580,6 +1580,17 @@ export default function App() {
             .then(async () => await showAlert("La requête a bien été copiée dans le presse-papier."))
             .catch(async () => await showAlert("Erreur lors de la copie.", "Erreur"));
         }}
+        onLoadRequestToSidebar={(index) => {
+          const rec = store.history[index];
+          if (!rec || rec.type !== 'replace') return;
+          setFindText(rec.findStr || "");
+          setReplaceText(rec.replaceStr || "");
+          setMultiMode(rec.multiMode || false);
+          setMultiIndices(rec.multiIndices || []);
+          setIgnoreSpaces(rec.ignoreSpaces || false);
+          setCommentText(rec.comment || "");
+          setCurrentLabel(rec.label || "");
+        }}
         onUndoStrict={async (index) => {
           const rec = store.history[index];
           if (!rec || rec.type !== 'replace') {

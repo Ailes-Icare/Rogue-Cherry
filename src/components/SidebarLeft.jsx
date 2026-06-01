@@ -666,8 +666,33 @@ Règles d'or MANDATORY :
       {/* 5. Zone de Recherche (1) - Double calque Backdrop/Overlay */}
       <div className="flex flex-col flex-1 min-h-[60px] shrink">
         <div className="flex justify-between items-center mb-1 flex-shrink-0">
-          <span className="text-xxs text-[#aaa] font-bold uppercase">Texte à chercher (1)</span>
-          <div 
+          <div className="flex items-center gap-2">
+            <span className="text-xxs text-[#aaa] font-bold uppercase">Texte à chercher (1)</span>
+            <button
+               type="button"
+               disabled={isCodeEmpty}
+               onClick={() => setShowInvisibles(!showInvisibles)}
+               className={`transition-colors ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'hover:text-white cursor-pointer text-[#888]'}`}
+               title="Afficher/Masquer les caractères cachés (·, →, ↵)"
+            >
+               {showInvisibles ? (
+                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+               ) : (
+                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+               )}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+               type="button"
+               disabled={isCodeEmpty}
+               onClick={() => onChangeIgnoreSpaces(!ignoreSpaces)}
+               className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${isCodeEmpty ? 'opacity-40 cursor-not-allowed text-[#555]' : (ignoreSpaces ? 'bg-[#4caf50] text-white shadow-[0_0_8px_rgba(76,175,80,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]')}`}
+               title="Concilier espaces et majuscules (Smart)"
+            >
+               SMART
+            </button>
+            <div 
             className={`text-[11px] font-mono px-2 py-0.5 rounded font-bold transition-colors select-none flex items-center gap-1.5 ${
                isGlobalSearching
                  ? 'bg-[#331111] text-[#883333] cursor-not-allowed border border-[#552222]'
@@ -738,6 +763,7 @@ Règles d'or MANDATORY :
             ) : (
               <span>FIND</span>
             )}
+            </div>
           </div>
         </div>
         {isFindEscapeHatchActive && (
@@ -819,60 +845,28 @@ Règles d'or MANDATORY :
         <div className="flex flex-row gap-2">
           
           {/* Options de validation (Gauches) */}
-          <div className="flex flex-col gap-2 flex-1 text-[11px] text-[#ccc] font-medium justify-start">
+          <div className="flex flex-col gap-2 flex-1 justify-start min-h-[88px]">
           
-          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
-            <input 
-              type="checkbox" 
-              id="chk-split-chars" 
-              checked={splitChars}
-              onChange={(e) => onChangeSplitChars(e.target.checked)}
+          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`} onClick={() => !isCodeEmpty && onChangeSplitChars(!splitChars)}>
+            <button 
               disabled={isCodeEmpty}
-              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-            />
-            <label htmlFor="chk-split-chars" className={`select-none ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+              className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${splitChars ? 'bg-[#007acc] text-white shadow-[0_0_8px_rgba(0,122,204,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
+            >
+              STRICT
+            </button>
+            <label className={`select-none text-[11px] ${splitChars ? 'text-white font-bold' : 'text-[#ccc]'} ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               Moteur strict (LCS fin)
             </label>
           </div>
 
-          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
-            <input 
-              type="checkbox" 
-              id="chk-ignore-spaces" 
-              checked={ignoreSpaces}
-              onChange={(e) => onChangeIgnoreSpaces(e.target.checked)}
+          <div className={`flex items-center gap-2 mt-1 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`} onClick={() => !isCodeEmpty && onChangeMultiMode(!multiMode)}>
+            <button 
               disabled={isCodeEmpty}
-              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-            />
-            <label htmlFor="chk-ignore-spaces" className={`select-none font-bold text-white ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-              Concilier espaces et majuscules (Smart)
-            </label>
-          </div>
-
-          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
-            <input 
-              type="checkbox" 
-              id="chk-show-invisibles" 
-              checked={showInvisibles}
-              onChange={(e) => setShowInvisibles(e.target.checked)}
-              disabled={isCodeEmpty}
-              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-            />
-            <label htmlFor="chk-show-invisibles" className={`select-none ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-              Afficher les caractères cachés (·, →, ↵)
-            </label>
-          </div>
-
-          <div className={`flex items-center gap-2 mt-1 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
-            <input 
-              type="checkbox" 
-              id="chk-multi" 
-              checked={multiMode}
-              onChange={(e) => onChangeMultiMode(e.target.checked)}
-              disabled={isCodeEmpty}
-              className={`w-4 h-4 ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-            />
-            <label htmlFor="chk-multi" className={`select-none font-bold text-white ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+              className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${multiMode ? 'bg-[#5c2d91] text-white shadow-[0_0_8px_rgba(92,45,145,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
+            >
+              MULTI
+            </button>
+            <label className={`select-none text-[11px] ${multiMode ? 'text-white font-bold' : 'text-[#ccc]'} ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               Multi-emplacement ({occurrencesCount} trouvé{occurrencesCount !== 1 ? 's' : ''})
             </label>
           </div>

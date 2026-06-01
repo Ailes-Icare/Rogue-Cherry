@@ -250,25 +250,67 @@ export default function SmartDebugger({
     return parseSyntaxRequest(rawText, syntaxConfig);
   }, [rawText, syntaxConfig]);
 
+  const handleUpdateHeader = (updates) => {
+    if (!parsedRequest.isValid || isMultistackMode) return;
+    const newProps = {
+      smartMode: parsedRequest.smartMode || false,
+      multiMode: parsedRequest.multiMode || false,
+      multiIndices: parsedRequest.multiIndices || [],
+      label: parsedRequest.label || "",
+      comment: parsedRequest.comment || "",
+      ...updates
+    };
+
+    const multiTag = newProps.multiMode 
+      ? (newProps.multiIndices && newProps.multiIndices.length > 0 ? `[MULTI:${newProps.multiIndices.join(',')}]` : '[MULTI:TRUE]') 
+      : '[MULTI:FALSE]';
+    const smartTag = newProps.smartMode ? '[SMART:TRUE]' : '[SMART:FALSE]';
+    const labelTag = newProps.label ? `[LABEL:${newProps.label}]` : '';
+    const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
+    
+    const lines = rawText.split('\n');
+    if (lines.length > 0) lines[0] = header;
+
+    let contentLines = [];
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].startsWith('##') && lines[i].endsWith('##') && !lines[i].includes('[MULTISTACK REQUEST]')) {
+          continue;
+      }
+      contentLines.push(lines[i]);
+    }
+
+    if (newProps.comment) {
+      contentLines.unshift(`##${newProps.comment}##`);
+    }
+
+    setRawText([lines[0], ...contentLines].join('\n'));
+  };
+
   // Synchronisation bidirectionnelle : éditer FIND met à jour la Requête Brute
   const handleFindChange = (val) => {
     if (!parsedRequest.isValid) return;
-    const multiTag = parsedRequest.multiMode ? '[MULTI:TRUE]' : '[MULTI:FALSE]';
+    const multiTag = parsedRequest.multiMode 
+      ? (parsedRequest.multiIndices && parsedRequest.multiIndices.length > 0 ? `[MULTI:${parsedRequest.multiIndices.join(',')}]` : '[MULTI:TRUE]') 
+      : '[MULTI:FALSE]';
     const smartTag = parsedRequest.smartMode ? '[SMART:TRUE]' : '[SMART:FALSE]';
     const labelTag = parsedRequest.label ? `[LABEL:${parsedRequest.label}]` : '';
     const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
-    const newRaw = `${header}\n${syntaxConfig.FIND}\n${val}\n${syntaxConfig.REPLACE}\n${parsedRequest.replaceText || ''}\n${syntaxConfig.END}`;
+    const commentTag = parsedRequest.comment ? `\n##${parsedRequest.comment}##` : '';
+    const newRaw = `${header}${commentTag}\n${syntaxConfig.FIND}\n${val}\n${syntaxConfig.REPLACE}\n${parsedRequest.replaceText || ''}\n${syntaxConfig.END}`;
     setRawText(newRaw);
   };
 
   // Synchronisation bidirectionnelle : éditer REPLACE met à jour la Requête Brute
   const handleReplaceChange = (val) => {
     if (!parsedRequest.isValid) return;
-    const multiTag = parsedRequest.multiMode ? '[MULTI:TRUE]' : '[MULTI:FALSE]';
+    const multiTag = parsedRequest.multiMode 
+      ? (parsedRequest.multiIndices && parsedRequest.multiIndices.length > 0 ? `[MULTI:${parsedRequest.multiIndices.join(',')}]` : '[MULTI:TRUE]') 
+      : '[MULTI:FALSE]';
     const smartTag = parsedRequest.smartMode ? '[SMART:TRUE]' : '[SMART:FALSE]';
     const labelTag = parsedRequest.label ? `[LABEL:${parsedRequest.label}]` : '';
     const header = `${syntaxConfig.START} ${labelTag} ${multiTag} ${smartTag}`.replace(/\s+/g, ' ').trim();
-    const newRaw = `${header}\n${syntaxConfig.FIND}\n${parsedRequest.findText || ''}\n${syntaxConfig.REPLACE}\n${val}\n${syntaxConfig.END}`;
+    const commentTag = parsedRequest.comment ? `\n##${parsedRequest.comment}##` : '';
+    const newRaw = `${header}${commentTag}\n${syntaxConfig.FIND}\n${parsedRequest.findText || ''}\n${syntaxConfig.REPLACE}\n${val}\n${syntaxConfig.END}`;
     setRawText(newRaw);
   };
 
@@ -1031,42 +1073,110 @@ export default function SmartDebugger({
         </div>
 
         {/* Footer de la Modale */}
-        <div className="p-3.5 bg-bg-dark border-t border-border-dark flex justify-end gap-3 flex-shrink-0 select-none">
-          <button 
-            type="button"
-            onClick={onClose} 
-            className="bg-disabled-dark hover:bg-border-dark text-white px-5 py-2.5 rounded font-bold text-xs shadow transition"
-          >
-            ANNULER
-          </button>
-          <button 
-            type="button"
-            disabled={!parsedRequest.isValid}
-            onClick={handleValidateAndCopy}
-            className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
-              parsedRequest.isValid 
-                ? 'bg-[#333] hover:bg-[#444] text-white border border-[#555] cursor-pointer' 
-                : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
-            }`}
-            title="Copier les textes dans les champs à gauche sans les appliquer immédiatement"
-          >
-            VALIDER & COPIER LA REQUÊTE
-          </button>
-          <button 
-            type="button"
-            disabled={isMultistackMode || !parsedRequest.isValid || searchResult.foundRatio < 1}
-            onClick={handleValidateAndApply}
-            className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
-              isMultistackMode 
-                ? 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
-                : parsedRequest.isValid && searchResult.foundRatio === 1
-                  ? 'bg-primary-blue hover:bg-primary-blue-hover text-white cursor-pointer' 
+        <div className="p-3.5 bg-bg-dark border-t border-border-dark flex justify-between items-center gap-3 flex-shrink-0 select-none">
+          
+          <div className={`flex items-center gap-3 ${isMultistackMode ? 'opacity-40 pointer-events-none' : ''}`}>
+             <button
+               type="button"
+               onClick={() => handleUpdateHeader({ smartMode: !parsedRequest.smartMode })}
+               className={`text-[10px] font-bold px-2 py-1 rounded transition ${parsedRequest.smartMode ? 'bg-[#4caf50] text-white shadow-[0_0_8px_rgba(76,175,80,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
+               title="Smart mode"
+             >
+               SMART
+             </button>
+
+             <div className="flex items-center gap-1">
+               <button
+                 type="button"
+                 onClick={() => handleUpdateHeader({ multiMode: !parsedRequest.multiMode, multiIndices: [] })}
+                 className={`text-[10px] font-bold px-2 py-1 rounded transition ${parsedRequest.multiMode ? 'bg-[#5c2d91] text-white shadow-[0_0_8px_rgba(92,45,145,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
+               >
+                 MULTI
+               </button>
+               {parsedRequest.multiMode && (
+                 <div className="flex items-center gap-1">
+                   <input
+                     type="text"
+                     value={parsedRequest.multiIndices ? parsedRequest.multiIndices.join(',') : ''}
+                     onChange={(e) => {
+                        const str = e.target.value;
+                        if (str === '') {
+                            handleUpdateHeader({ multiIndices: [] });
+                        } else {
+                            const vals = str.split(',').map(s => s.trim() ? parseInt(s.trim()) : null).filter(n => n !== null && !isNaN(n));
+                            handleUpdateHeader({ multiIndices: vals });
+                        }
+                     }}
+                     className="w-16 h-6 bg-[#1e1e1e] border border-border-dark text-[#ccc] text-[10px] px-1 rounded text-center"
+                     placeholder="ex: 0,2,4"
+                   />
+                   <span className="text-[9px] text-[#888] max-w-[150px] leading-tight">
+                     * Indices depuis 0. Pour une sélection complexe, utilisez l'interface principale.
+                   </span>
+                 </div>
+               )}
+             </div>
+
+             <div className="flex items-center gap-1 ml-2">
+               <span className="text-[10px] text-[#888] font-bold">LBL:</span>
+               <input
+                 type="text"
+                 value={parsedRequest.label || ''}
+                 onChange={(e) => handleUpdateHeader({ label: e.target.value })}
+                 className="w-24 h-6 bg-[#1e1e1e] border border-border-dark text-[#ccc] text-[10px] px-1 rounded"
+                 placeholder="Label"
+               />
+             </div>
+
+             <div className="flex items-center gap-1">
+               <span className="text-[10px] text-[#888] font-bold">CMT:</span>
+               <input
+                 type="text"
+                 value={parsedRequest.comment || ''}
+                 onChange={(e) => handleUpdateHeader({ comment: e.target.value })}
+                 className="w-40 h-6 bg-[#1e1e1e] border border-border-dark text-[#ccc] text-[10px] px-1 rounded"
+                 placeholder="Commentaire"
+               />
+             </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="bg-disabled-dark hover:bg-border-dark text-white px-5 py-2.5 rounded font-bold text-xs shadow transition"
+            >
+              ANNULER
+            </button>
+            <button 
+              type="button"
+              disabled={!parsedRequest.isValid}
+              onClick={handleValidateAndCopy}
+              className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
+                parsedRequest.isValid 
+                  ? 'bg-[#333] hover:bg-[#444] text-white border border-[#555] cursor-pointer' 
                   : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
-            }`}
-            title={isMultistackMode ? "Impossible d'appliquer directement une modification via le débogueur lors d'une exécution de pile multistack." : ""}
-          >
-            VALIDER & APPLIQUER LA REQUÊTE
-          </button>
+              }`}
+              title="Copier les textes dans les champs à gauche sans les appliquer immédiatement"
+            >
+              VALIDER & COPIER LA REQUÊTE
+            </button>
+            <button 
+              type="button"
+              disabled={isMultistackMode || !parsedRequest.isValid || searchResult.foundRatio < 1}
+              onClick={handleValidateAndApply}
+              className={`px-6 py-2.5 rounded font-black text-xs shadow-md transition ${
+                isMultistackMode 
+                  ? 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
+                  : parsedRequest.isValid && searchResult.foundRatio === 1
+                    ? 'bg-primary-blue hover:bg-primary-blue-hover text-white cursor-pointer' 
+                    : 'bg-disabled-dark text-[#666] cursor-not-allowed opacity-50'
+              }`}
+              title={isMultistackMode ? "Impossible d'appliquer directement une modification via le débogueur lors d'une exécution de pile multistack." : ""}
+            >
+              VALIDER & APPLIQUER LA REQUÊTE
+            </button>
+          </div>
         </div>
 
       </div>
