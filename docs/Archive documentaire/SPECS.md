@@ -102,7 +102,7 @@ Le parseur extrait :
 - **Le Cadenas (🔒 / 🔓) :** 
   - Lorsque le cadenas est verrouillé (🔒), le code source principal est en lecture seule. Toute modification passe obligatoirement par l'importation d'une requête syntaxique.
   - Lorsque le cadenas est déverrouillé (🔓), l'utilisateur peut taper librement dans l'éditeur.
-  - **Verrouillage automatique (Sauvegarde fantôme) :** Dès que le cadenas est reverrouillé, l'état global calcule les différences par rapport à la version verrouillée précédente, crée une **requête fantôme virtuelle** dans l'historique (nommée `[LABEL:Édition Libre]`) pour figer la modification, et recalcule les marqueurs de colorisation pour la nouvelle version.
+  - **Verrouillage automatique (Sauvegarde fantôme) :** Dès que le cadenas est reverrouillé, l'état global calcule les différences par rapport à la version verrouillée précédente, crée une **requête fantôme virtuelle** dans l'historique (nommée `[LABEL:Édition Libre]`) pour figer la modification, et recalcule les marqueurs de colorisation DraftSurge pour la nouvelle version.
 
 ---
 
@@ -116,15 +116,15 @@ Le parseur extrait :
 - Modale à z-index 1000 prenant 95% de la hauteur de l'écran.
 - Divisée en deux colonnes redimensionnables via un **Splitter réutilisable**.
   - **Colonne Gauche :** Requête brute (éditable) ↔ Zones FIND/REPLACE synchronisées via double calque Backdrop/Overlay.
-  - **Colonne Droite :** Barre de recherche Live Find avec heatmap interactive et miroir de prévisualisation du code source.
+  - **Colonne Droite :** Barre de recherche Live Find avec Lightmap/Heatmap DraftSearch interactive et miroir de prévisualisation du code source.
 - Thème premium sombre avec bordures s'allumant en vert émeraude (`#00FF7F`) dès que la requête brute redevient syntaxiquement valide.
 
-### Comportement & Recherche Heatmap
+### Comportement & Recherche Lightmap/Heatmap DraftSearch
 - **Fail-Fast Tokenizer :** Dès qu'une balise est mal orthographiée ou positionnée, le Backdrop de la requête brute souligne en rouge ondulé le premier token en erreur.
-- **Recherche Live Heatmap :** 
+- **Recherche Live Lightmap/Heatmap DraftSearch :** 
   - Le champ de recherche de la colonne droite effectue une recherche dynamique.
   - Si la correspondance est parfaite (100%), la ligne est marquée en jaune vif (`hl-yellow`).
-  - Si la correspondance est partielle, le moteur calcule la plus longue sous-chaîne commune via une dichotomie rapide et applique une opacité dégradée (Heatmap) du rouge vers l'orange et le jaune selon le pourcentage de similarité (50%, 80%, 100%), permettant à l'utilisateur de localiser instantanément où l'IA a fait une erreur de caractère ou d'indentation dans sa requête.
+  - Si la correspondance est partielle, le moteur calcule la plus longue sous-chaîne commune via une dichotomie rapide et applique une opacité dégradée (Lightmap/Heatmap DraftSearch) du rouge vers l'orange et le jaune selon le pourcentage de similarité (50%, 80%, 100%), permettant à l'utilisateur de localiser instantanément où l'IA a fait une erreur de caractère ou d'indentation dans sa requête.
 
 ---
 

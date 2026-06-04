@@ -73,6 +73,12 @@ Pour éviter que l'interface ne saute à chaque chiffre tapé (ex: taper "1", "5
 - Un fond transparent `fixed inset-0 z-40` (backdrop) écoute les `onMouseDown` pour fermer la modale si l'utilisateur clique hors d'elle.
 - Elle n'est PAS draggable (contrairement à MessageBox). Elle est fixée au point de départ fourni.
 
+### 1.6 Temporisations de Surbrillance de Ligne associées
+
+Lorsque la modale valide un saut vers une ligne ou une occurrence, le CodeEditor cible visuellement la ligne de destination. Deux timers distincts régissent l'effacement de ce ciblage visuel (liseret rouge et lueur) :
+- **Mode Navigation Standard (Saut de ligne)** : Le liseret rouge de ciblage s'efface automatiquement après **1500 ms** (1,5 seconde) via le timer `targetHighlightTimerRef`.
+- **Mode Recherche Globale (Cherry-Picking)** : Le liseret rouge reste persistant pendant **30 secondes** (pour permettre une vérification attentive), et cette persistance se prolonge **même après la fermeture, le masquage ou l'effacement de la barre de recherche globale**, garantissant que l'utilisateur garde le repère visuel sur la ligne trouvée. Il s'efface immédiatement si une nouvelle recherche est lancée.
+
 ---
 
 ## 2. SplashScreen
@@ -138,3 +144,10 @@ Pour éviter que l'interface ne saute à chaque chiffre tapé (ex: taper "1", "5
 - La configuration est passée comme prop `syntaxConfig` à tous les composants qui en ont besoin (`SidebarLeft`, `SmartDebugger`, `App.jsx`).
 
 > **CONSIGNE LEGACY (DAT v7, §1.1.1)** : À chaque fois qu'une nouvelle fonctionnalité est ajoutée au format de requête, il est IMPÉRATIF de mettre à jour simultanement : (1) l'affichage dans l'Assistant Prompt, (2) le texte généré par "Ask to AI", ET (3) la Modale de débogage. Ces trois éléments doivent toujours être en parfaite cohérence syntaxique.
+
+---
+
+## 5. Références fonctionnelles
+- Voir [hooks.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/hooks.md) pour les détails sur la logique de déplacement de fenêtres (`useDraggable`) et du zoom Ctrl+molette (`useZoomable`).
+- Voir [helpers.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/helpers.md) pour l'échappement HTML et le rendu des invisibles.
+

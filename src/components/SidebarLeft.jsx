@@ -187,7 +187,7 @@ export default function SidebarLeft({
     }
 
     // Hauteur d'une ligne = 30px. Titre = 30px.
-    const fullyVisibleLimit = count <= 10 ? 5 : 10;
+    const fullyVisibleLimit = count < 10 ? 5 : 10;
     const requiredMultistackHeight = 30 + (fullyVisibleLimit * 30);
     
     // Si l'assistant est déplié, il prend ~220px. Les boutons prennent 140px.
@@ -581,7 +581,7 @@ Règles d'or MANDATORY :
             type="button"
             disabled={occurrencesCount === 0 || isGlobalSearching}
             onClick={onReplace}
-            className={`${(pendingRequests && pendingRequests.length > 0) ? 'w-1/2' : 'w-full'} bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 ${occurrencesCount === 0 || isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''} select-none`}
+            className={`${(pendingRequests && pendingRequests.length > 0) ? 'w-1/2' : 'w-full'} bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 ${occurrencesCount === 0 || isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''} ${activeStackIndex >= 0 && pendingRequests && pendingRequests.length > 0 ? 'outline outline-2 outline-primary-blue outline-offset-1' : ''} select-none`}
             title="Appliquer cette requête individuellement"
           >
             {replaceText === "" ? '🗑️ SUPPRIMER L\'OCCURRENCE' : '⚙️ APPLIQUER'}

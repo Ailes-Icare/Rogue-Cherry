@@ -33,9 +33,9 @@ Vous gardez le **contrôle total** sur l'opération. L'interface vous permet de 
 
 **Pour ceux qui veulent voir ce qu'il y a sous le capot :**
 
-DraftSurge repose sur une architecture de **Machine à États (State Machine)** globale, garantissant que l'application est une projection parfaite de vos données. Le moteur utilise un algorithme de comparaison de type **LCS (Longest Common Subsequence)** pour générer une matrice de différences au caractère près. Le rendu visuel utilise un système de calques (**Backdrop/Overlay**) permettant une colorisation dynamique en temps réel sans latence d'écriture.
+DraftSurge repose sur une architecture de **Machine à États (State Machine)** globale, garantissant que l'application est une projection parfaite de vos données. Le moteur utilise un algorithme de comparaison de type **LCS (Longest Common Subsequence)** pour générer une matrice de différences au caractère près. Le rendu visuel utilise un système de calques (**Backdrop/Overlay**) permettant une colorisation DraftSurge en temps réel sans latence d'écriture.
 
-La sécurité du processus est renforcée par une logique de **Boucle Inverse (Reverse Loop)** lors des remplacements multiples, ce qui prévient toute corruption des index mathématiques du texte. Enfin, le système d'historique ne se contente pas de sauvegarder le texte : il enregistre des instantanés complets incluant la colorisation sémantique, tandis que la console de débogage dédiée permet une gestion fine des caractères invisibles pour traquer les erreurs d'indentation ou les espaces fantômes.
+La sécurité du processus est renforcée par une logique de **Boucle Inverse (Reverse Loop)** lors des remplacements multiples, ce qui prévient toute corruption des index mathématiques du texte. Enfin, le système d'historique ne se contente pas de sauvegarder le texte : il enregistre des instantanés complets incluant la colorisation DraftSurge, tandis que la console de débogage dédiée permet une gestion fine des caractères invisibles pour traquer les erreurs d'indentation ou les espaces fantômes.
 
 ---
 
@@ -95,7 +95,7 @@ Que faire face à une requête IA "hallucinée" ou mal formatée ? Le Smart Debu
 
 - **Vision Rayons-X :** Les IA trébuchent souvent sur l'indentation. La modale révèle les caractères invisibles (espaces ·, tabulations →, sauts de ligne ↵) pour débusquer immédiatement les anomalies de formatage.
 
-- **Recherche Nuancée (Heatmap) :** Si le texte recherché n'est pas trouvé à 100%, un algorithme dichotomique scanne le document pour localiser les correspondances partielles et applique un dégradé de chaleur (du Vert fluo au Rouge critique). Vous savez immédiatement où l'IA s'est trompée d'un seul mot.
+- **Recherche Nuancée DraftSearch (Lightmap/Heatmap) :** Si le texte recherché n'est pas trouvé à 100%, un algorithme dichotomique scanne le document pour localiser les correspondances partielles et applique un dégradé de chaleur via la Lightmap DraftSearch (du Vert fluo au Rouge critique). Vous savez immédiatement où l'IA s'est trompée d'un seul mot.
 
 ### 4.3. 🛰️ Time-Travel & MultiStack
 
@@ -142,7 +142,7 @@ Dans cet espace isolé, un analyseur syntaxique colore votre requête en temps r
 ### 6.4. Protocole de Crise : Échec de la Recherche (Find)
 
 L'autre erreur fréquente de l'IA est de vous proposer un texte à chercher qui ne correspond pas *exactement* à votre document (un espace en trop, un retour à la ligne manquant). Là encore, l'outil vous alerte ("0 occurrence trouvée") et vous propose d'ouvrir la modale de débogage.
-Dans ce mode, vous bénéficiez d'une vision **"Rayons-X"** qui affiche les caractères invisibles (espaces, tabulations, sauts de ligne) pour repérer facilement les anomalies. Si la recherche échoue toujours, l'outil active son mode de **"Recherche Nuancée" (Heatmap)** : il scanne votre code et met en évidence par un dégradé (du vert fluo au rouge) les zones qui ressemblent presque à ce que vous cherchez. Vous repérez ainsi instantanément le mot ou l'espace qui bloque la procédure.
+Dans ce mode, vous bénéficiez d'une vision **"Rayons-X"** qui affiche les caractères invisibles (espaces, tabulations, sauts de ligne) pour repérer facilement les anomalies. Si la recherche échoue toujours, l'outil active son mode de **"Recherche Nuancée DraftSearch" (Lightmap/Heatmap)** : il scanne votre code et met en évidence par un dégradé de Lightmap DraftSearch (du vert fluo au rouge) les zones qui ressemblent presque à ce que vous cherchez. Vous repérez ainsi instantanément le mot ou l'espace qui bloque la procédure.
 
 ### 6.5. Tactiques Avancées : Multi-Occurrence et Audit IA
 

@@ -549,7 +549,7 @@ Cette section retrace les chaînes d'appels (recettes) lors des actions clés de
 
 ### 2.5 : ARCHITECTURE DES DONNÉES
 
-#### 2.5.1 : MARQUEURS DE COLORISATION DANS LE TEXTE
+#### 2.5.1 : MARQUEURS DE COLORISATION DRAFTSURGE DANS LE TEXTE
 
 L'outil repose sur un système de marqueurs abstraits pour gérer le surlignage. Plutôt que de stocker du HTML contenant des balises de couleur (qui se corrompraient à la moindre modification), le système stocke les marqueurs sous la forme d'un tableau d'objets mathématiques : { start: entier, length: entier, type: 'classe-css', scroll: booléen }.
 
@@ -571,7 +571,7 @@ Pour restituer fidèlement l'expérience visuelle, il sauvegarde également les 
 **D. Conversion, Translation et Index Shifting**
 Lorsqu'un remplacement est validé ("effectuerRemplacement"), l'algorithme "computeLiveDiff" génère la matrice de la modification (ex: "ajouter 5 caractères en rose à l'index 10"). Cependant, cet index 10 est relatif au Texte 1. 
 Le système opère alors une **translation mathématique** : il ajoute l'index de la position de la recherche ("state.tempSearchIndex") à tous les nouveaux marqueurs pour les projeter au bon endroit dans le Texte 3.
-Simultanément, un **Index Shifting** est appliqué : comme le texte inséré peut être plus long ou plus court que le texte supprimé, le système calcule la différence ("shiftLen"). Tous les anciens marqueurs ("state.marks") dont le "start" est situé après la zone de modification voient leur position décalée de cette valeur "shiftLen". Cela garantit que les anciennes couleurs ne se décalent pas par rapport à leur texte d'origine.
+Simultanément, un **Index Shifting** est appliqué : comme le texte inséré peut être plus long ou plus court que le texte supprimé, le système calcule la différence ("shiftLen"). Tous les anciens marqueurs ("state.marks") dont le "start" is situé après la zone de modification voient leur position décalée de cette valeur "shiftLen". Cela garantit que les anciennes couleurs ne se décalent pas par rapport à leur texte d'origine.
 
 #### 2.5.2 : FICHIER DE SAUVEGARDE JSON
 
@@ -582,7 +582,7 @@ Le fichier contient un objet JSON de premier niveau avec les clés suivantes :
 * "projectName" (String) : Le nom défini par l'utilisateur.
 * "vX", "vY", "vZ" (Integers) : La numérotation de la version actuelle.
 * "rawText" (String) : Le code source brut dans son état le plus récent, sans aucune balise HTML.
-* "marks", "yellowMarks" (Arrays) : Les marqueurs de colorisation actuels.
+* "marks", "yellowMarks" (Arrays) : Les marqueurs de colorisation DraftSurge actuels.
 * "searchStr", "replaceStr" (Strings) : Le dernier état des champs de recherche et remplacement.
 * "history" (Array d'objets) : La pile complète contenant toutes les étapes du projet (versions, branches, opérations de remplacement).
 

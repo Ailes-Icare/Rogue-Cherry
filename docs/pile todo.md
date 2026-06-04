@@ -62,7 +62,7 @@ la source doit porter le nom du fichier (agrémenté ou non de son suffixe le re
 la requete contiendra un nouvel attribut "File" pour savoir sur quel fichier elle est supposé s'appliquer. cet attribut est en réalité double : nom du projet / nom du fichier
 une ligne d'onglet est créé au dessous du trait horizontal, et au dessus de la zone de texte principal. un premier onglet apparait avec l'ancien fichier chargé (et son nom) et un second onglet est créé avec le nouveau fichier.
 il devient l'onglet "focus", mis en surbrillance, et le texte est chargé en zone principale.
-les sidebar gauche et droite ne sont pas modifié. le texte principal apparait sans colorisation (pour le nouveau fichier) mais si on change d'onglet, les colorisation existante sur les autres onglet seront chargé avec le texte.
+les sidebar gauche et droite ne sont pas modifiées. Le texte principal apparaît sans colorisation DraftSurge (pour le nouveau fichier) mais si on change d'onglet, les colorisations DraftSurge existantes sur les autres onglets seront chargées avec le texte.
 les onglets peuvent etre réorganisé
 une petite croix permet de les fermer, mais une modale apparait alors pour signifier : 
 "voulez vous supprimer le fichier du projet, ou simplement le fermer ?"

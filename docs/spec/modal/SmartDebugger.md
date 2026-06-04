@@ -1,128 +1,91 @@
-# Spécifications : Modale Débogueur Intelligent (`SmartDebugger.jsx`)
+# Spécifications : Modale Débogueur Intelligent (`SmartDebugger.jsx`) — Agencement Visuel (UI)
 
-**Fichier source** : `src/components/SmartDebugger.jsx` (1089 lignes)
+**Fichier source** : `src/components/SmartDebugger.jsx` (1203 lignes)
 
-Le `SmartDebugger` est l'outil d'analyse le plus lourd de Rogue Cherry. Il s'ouvre lorsqu'une requête IA est imparfaite ou introuvable, permettant à l'utilisateur de corriger la requête via une vue miroir bidirectionnelle.
-
----
-
-## 1. Déclenchement et Modes d'Ouverture
-
-Le SmartDebugger peut être ouvert de deux manières distinctes :
-
-### A. Ouverture Automatique (Erreur de Parsing)
-- Déclenché depuis `App.jsx` lorsque `parseSyntaxRequest()` retourne `isValid = false` après collage d'une requête IA.
-- La prop `initialRawText` reçoit le texte brut de la requête défectueuse.
-- La prop `sourceText` reçoit le code source actuel du projet pour la fenêtre miroir.
-
-### B. Ouverture Manuelle (Accès d'Urgence)
-- Déclenchée via double-clic sur l'icône des deux cerises dans la SidebarLeft (Ajout 11 — Story V8).
-- Dans ce mode, `initialRawText` peut être **vide** — le débogueur s'ouvre avec un champ Raw vierge permettant de tester n'importe quelle requête à la volée.
+Ce document définit l'agencement visuel, le squelette structurel et les contrôles de positionnement de la modale de débogage. Pour les spécifications logiques, voir :
+- Le [Contrôleur de l'Éditeur Miroir (modal-debug-code-editor.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/modal-debug-code-editor.md)
+- Le [Contrôleur de Saisie et de Recherche (modal-debug-recherche.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/modal-debug-recherche.md)
 
 ---
 
-## 2. Architecture Visuelle (Splitter Horizontal)
+## 1. Cadre de la Modale et Triggers d'Ouverture
 
-La modale est draggable (via `useDraggable`) et occupe une grande portion de l'écran. Elle est divisée en deux panneaux via un `Splitter.jsx` redimensionnable :
+La modale s'affiche au-dessus de l'interface principale (fond d'assombrissement noir translucide `bg-black/80` avec un `zIndex` de `1000`).
 
-- **Panneau Gauche** (40% de largeur par défaut, `leftWidthPercent`) : Gestion de la requête.
-- **Panneau Droit** (60% de largeur) : Miroir du code source avec heatmaps.
+### 1.1 Triggers Visuels
+Elle s'ouvre de deux façons :
+1.  **Ouverture automatique** : Suite à une erreur de syntaxe après collage ou application d'une requête IA.
+2.  **Ouverture manuelle** : En cliquant sur le **Logo Cerises** du bandeau supérieur (quand un texte est chargé).
 
-La largeur du splitter est persistée en state local (`leftWidthPercent`).
-
----
-
-## 3. Le Panneau Gauche : Analyse de la Requête
-
-### 3.1 Zone de Requête Brute (Raw Text)
-- **Architecture Calques** : Comme les textareas FIND/REPLACE de la sidebar, le champ Raw est constitué d'un calque `textarea` (transparent, éditable) superposé à un `backdrop div` (colorisé, read-only).
-- **Coloration Syntaxique "Fail-Fast"** (`renderSyntaxHighlightHtml`) :
-  - Balises `START` : fond bleu `bg-primary-blue`
-  - Balises `FIND` et `REPLACE` : fond orange `#FF8C00`
-  - Balise `END` : fond violet `#9E67BA`
-  - La coloration cesse au premier caractère invalide, laissant le reste non coloré (visual fail indicator).
-- **Mode Invisibles** : Toggle icône œil active l'affichage des espaces (·), tabulations (→), retours à la ligne (¶) dans le calque backdrop.
-
-### 3.2 Onglets FIND et REPLACE
-- Deux onglets permettent de voir/éditer le contenu extrait du parsing.
-- **Synchronisation Bidirectionnelle** :
-  - Éditer le champ FIND → Reconstruit automatiquement `rawText` complet avec les bons tags via `handleFindChange`.
-  - Éditer le champ REPLACE → Idem via `handleReplaceChange`.
-  - Les métadonnées (MULTI, SMART, LABEL) sont **préservées** lors de la reconstruction.
-
-### 3.3 Barre de Recherche Complémentaire
-- Un champ de recherche indépendant situé dans le panneau gauche permet de tester une chaîne brute dans le miroir, **indépendamment du contenu FIND de la requête**.
-- Si ce champ est rempli, il **prend la priorité** sur le contenu FIND pour l'affichage de la heatmap dans le miroir.
-- Un bouton "Couper" (✂️) copie le contenu dans le presse-papier ET le colle dans le champ FIND via `handleCopyAndDeleteSearch`, puis vide la barre.
-- Un toggle Smart Mode est disponible pour cette barre de recherche.
+### 1.2 Styles du Cadre
+- Le cadre principal de la modale prend une largeur de **90%** et une hauteur de **95%** de l'écran (`w-[90%] h-[95%]`).
+- La bordure du cadre s'adapte dynamiquement selon la conformité syntaxique de la requête :
+  - **Requête Conforme** : Bordure verte `rgb(0, 255, 127)` (`#00FF7F`) et lueur `shadow-[0_0_15px_rgba(0,255,127,0.25)]`.
+  - **Syntaxe Invalide** : Bordure rouge cerise `rgb(209, 105, 105)` (`#d16969`) et lueur `shadow-[0_0_15px_rgba(209,105,105,0.25)]`.
+- La modale est repositionnable manuellement (draggable) via un écouteur sur son en-tête.
 
 ---
 
-## 4. Le Panneau Droit : Miroir de Source
+## 2. Architecture Splitter Horizontal
 
-### 4.1 Modes d'Affichage Selon l'Onglet Actif
+La zone de travail sous l'en-tête est coupée en deux panneaux par un séparateur vertical dynamique (`Splitter.jsx` glissant horizontalement) :
 
-| Onglet actif | Affichage miroir |
-|---|---|
-| **RAW ou FIND** | Heatmap dichotomique (`computeSearchHeatmap`) cherchant le texte FIND dans le code source |
-| **REPLACE** (et FIND à 100%) | Rendu de la version *modifiée* du texte (`applyDeltaOnText`), avec diff coloré via `computeLiveDiff` (lignes rouges = supprimé, vertes = ajouté) |
-
-### 4.2 Optimisation par Windowing (Anti-Freeze)
-- Le miroir ne rend que les lignes visibles à l'écran + 100 lignes de marge de chaque côté (`mirrorVisibleRange`).
-- Lors du scroll, un `onScroll` recalcule `mirrorVisibleRange` avec la formule : `startLine = scrollTop / lineHeight`.
-- Le `MirrorLine` est un composant `React.memo` qui ne se re-rend que si son texte ou ses marques changent.
-- Cette optimisation est **critique** : sans elle, un fichier de 10 000 lignes causerait un freeze complet de l'UI lors du toggle des invisibles.
-
-### 4.3 Auto-Scroll et Mise en Valeur
-- Lorsqu'une occurrence est trouvée (ou que l'index d'occurrence change), un `useEffect` force le scroll du miroir vers la ligne cible via `scrollIntoView`.
-- La ligne cible reçoit un `outline-red` + shadow rouge pendant 1500ms (`targetHighlightTimerRef`).
-- La gouttière du miroir affiche les mêmes indicateurs `●` (occurrence) et `▶` (occurrence active) que le CodeEditor principal.
+-   **Panneau Gauche** : Réservé à l'analyse et à la correction de la requête (largeur initiale fixée par défaut à **40%**).
+-   **Panneau Droit** : Réservé à la prévisualisation miroir du code source (largeur restante de **60%**).
 
 ---
 
-## 5. L'Échappement de Sécurité (Escape Hatch Anti-Lag)
+## 3. Panneau Gauche : Édition et Décodage de la Requête
 
-### 5.1 Condition de Déclenchement
-```
-isEscapeHatchActive = (
-  sourceText.split('\n').length > searchLimits.maxLines
-  AND activeSearchText.length < searchLimits.minChars
-  AND !forceSearchOverride
-)
-```
-
-### 5.2 Comportement
-- Si actif : La recherche en temps réel est **bloquée**. Aucun calcul de heatmap n'est fait.
-- Un bandeau d'alerte rouge s'affiche dans le panneau avec un double-clic pour débloquer.
-- Au double-clic, une `MessageBox` propose 3 options :
-  1. **Annuler** : Rien ne se passe.
-  2. **Éditer les limites** : Ouvre un formulaire numérique pour modifier `maxLines` et `minChars` pour la session.
-  3. **Forcer la recherche** : Active `forceSearchOverride = true` → Aucune limite jusqu'au prochain changement de texte.
-
-### 5.3 Valeurs par défaut des limites
-- `maxLines = 500` (lignes maximales dans le document source)
-- `minChars = 3` (longueur minimale de la chaîne de recherche)
-- Ces valeurs sont partagées avec la SidebarLeft et la recherche globale du CodeEditor.
+Ce panneau regroupe verticalement :
+1.  **Entête "Requête Brute (Éditable)"** : Titre à gauche, bouton Smart Mode et **bouton œil de gauche** à droite.
+2.  **Zone de Requête Brute** : Hauteur fixe de `160px` avec liseret pointillé bleu (`border-dashed border-primary-blue`), constitué d'un calque superposé `textarea` / `backdrop` pour la coloration syntaxique en temps réel.
+3.  **Encart d'erreur** : S'affiche sous la requête brute en rouge cerise si la syntaxe est invalide.
+4.  **Onglets de visualisations décodées** :
+    -   Onglet **FIND** : Zone de texte en lecture seule affichant le texte recherché extrait.
+    -   Onglet **REPLACE** : Zone de texte en lecture seule affichant le texte de remplacement extrait.
 
 ---
 
-## 6. Validation et Application
+## 4. Panneau Droit : Miroir de Prévisualisation
 
-- **Bouton Valider** : Actif uniquement si `parsedRequest.isValid === true` ET `searchResult.foundRatio === 1`.
-- **Bouton Copier & Fermer** (`onAcceptAndCopy`) : Copie la requête brute corrigée dans le presse-papier et ferme la modale. L'utilisateur peut ensuite recoller dans l'interface principale.
-- **Bouton Appliquer** (`onApply`) : Injecte directement la requête corrigée dans le flux principal de l'application, la faisant entrer dans le cycle `parseSyntaxRequest → handleSearch → handleReplace`.
+Ce panneau regroupe verticalement :
+1.  **Barre de Recherche Globale** : Un champ de recherche à hauteur extensible avec boutons d'occurrence.
+2.  **Barre d'état de Conformité Heatmap** : Affiche le ratio de conformité en pourcentage.
+3.  **Miroir du Texte Source** : Un conteneur d'affichage de code entouré d'un cadre sombre.
+    -   **Entête du Miroir** : Titre à gauche ("Miroir de Prévisualisation du Texte Source") et **bouton œil de droite** à droite.
+    -   **Zone de Code** : Zone de défilement affichant les lignes du code source (composant `MirrorLine` virtualisé).
 
 ---
 
-## 7. Heatmap Colorimétrique (Classes CSS)
+## 5. Boutons de Visibilité des Caractères Invisibles (EyeIcons)
 
-Le ratio de correspondance dichotomique produit les classes CSS suivantes sur les lignes du miroir :
+Pour préserver l'espace de la barre de statut principale, la modale intègre **deux boutons d'affichage des caractères invisibles (icônes œil) distincts** :
 
-| Ratio | Classe | Couleur |
-|---|---|---|
-| 100% | `hl-yellow` | Jaune vif (correspondance parfaite) |
-| ≥ 80% | `hl-find-80` | Jaune/Orange |
-| ≥ 50% | `hl-find-50` | Orange |
-| < 50% | `hl-find-10` | Rouge |
+### 5.1 Bouton Œil Gauche (Saisie Requête)
+-   **Position** : Situé tout en haut à droite du panneau gauche, dans la barre d'en-tête de la "Requête Brute (Éditable)".
+-   **Action** : Active ou désactive l'affichage des espaces (`·`), tabulations (`→`) et retours à la ligne (`¶`/`↵`) dans les zones d'édition de gauche (Requête brute, FIND décodé, REPLACE décodé).
 
-La gouttière utilise la couleur dominante du fond pour teinter l'indicateur `●`.
+### 5.2 Bouton Œil Droite (Miroir de Code)
+-   **Position** : Situé en haut à droite du panneau droit, dans la barre d'en-tête noire du "Miroir de Prévisualisation du Texte Source".
+-   **Action** : Active ou désactive l'affichage des caractères invisibles spécifiquement dans la zone d'affichage du code miroir à droite.
+
+*Ces deux contrôles fonctionnent sur le même principe visuel que le bouton œil de l'éditeur principal (voir [zone-centrale-bandeau-bas.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-bandeau-bas.md)), mais agissent indépendamment sur leurs panneaux respectifs.*
+
+---
+
+## 6. Contrôles de Zoom Indépendants (Ctrl + Molette)
+
+Pour optimiser la lisibilité du code et des requêtes, la modale intègre des mécanismes de zoom indépendants contrôlés par le raccourci `Ctrl + Molette` (via le hook `useZoomable`) :
+
+### 6.1 Zoom des Zones de Saisie et de Décodage (Panneau Gauche)
+- **Requête Brute, FIND et REPLACE** : Chacune de ces trois zones dispose de son propre conteneur zoomable indépendant (limites de **8 px** à **40 px**, valeur initiale **14 px**).
+- Le zoom adapte dynamiquement la taille du texte tout en préservant l'alignement et la superposition des calques de coloration syntaxique et de caractères invisibles.
+
+### 6.2 Zoom du Miroir de Prévisualisation (Panneau Droit)
+- **Miroir du Texte Source** : Le conteneur du miroir dispose d'un zoom indépendant (limites de **8 px** à **40 px**, valeur initiale **10 px**).
+- **Synchronisation de la Gouttière** : La gouttière de numérotation de ligne (`MirrorLine`) hérite de la taille de police active du miroir (`style={{ fontSize: 'inherit' }}`). Ainsi, la gouttière et ses indicateurs zooment et dézooment en parfaite synchronisation avec le texte du code source.
+
+### 6.3 Zoom de la Barre de Recherche Globale
+- En mode multiline, la zone de texte de recherche possède son propre zoom indépendant (`searchFontSize` de **8 px** à **40 px**), avec une gouttière de numéros de ligne multiline synchronisée qui s'ajuste également en temps réel.
+

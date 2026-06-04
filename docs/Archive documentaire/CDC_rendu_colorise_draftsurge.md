@@ -1,6 +1,6 @@
 # Spécifications Fonctionnelles : Moteur de Rendu DraftSurge
 
-Ce document explicite le comportement mathématique et visuel du moteur de comparaison (LCS) issu de la V7.5, pour la colorisation de l'historique et des différences.
+Ce document explicite le comportement mathématique et visuel du moteur de comparaison (LCS) issu de la V7.5, pour la colorisation DraftSurge de l'historique et des différences.
 
 ## Mécanique Globale du Moteur
 

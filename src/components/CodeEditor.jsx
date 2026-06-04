@@ -147,7 +147,8 @@ const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine,
     >
       {/* Numéro de ligne + Gouttière interactive */}
       <div 
-        className={`w-12 pr-2 text-right text-[#858585] bg-[#252526] border-r border-border-dark user-select-none flex justify-between items-center select-none font-sans text-xs`}
+        className={`w-12 pr-2 text-right text-[#858585] bg-[#252526] border-r border-border-dark user-select-none flex justify-between items-center select-none font-sans`}
+        style={{ fontSize: 'inherit', lineHeight: 1.5 }}
       >
         <span className="text-[10px] pl-1 font-bold flex items-center h-full">
           {isActiveOccLine ? (
@@ -157,7 +158,7 @@ const CodeLine = React.memo(({ number, text, marks, isGutterModified, isOccLine,
           ) : null}
         </span>
         <span className={`
-          ${isGutterModified ? 'bg-gutter-mod text-black font-bold rounded-sm text-[10px]' : ''} 
+          ${isGutterModified ? 'bg-gutter-mod text-black font-bold rounded-sm text-[0.8em]' : ''} 
           ${isTargeted ? 'outline outline-1 outline-red-500 rounded-sm shadow-[0_0_5px_rgba(239,68,68,0.8)] z-10 relative bg-bg-dark text-white' : ''}
           ${isGutterModified || isTargeted ? 'px-[2px]' : ''}
         `}>
@@ -840,8 +841,8 @@ export default function CodeEditor({
                 const isTargeted = targetHighlightLine === i;
                 return (
                   <div key={i} className="flex justify-end items-center h-[1.5em]">
-                    <span className={`pl-1 font-bold text-xs
-                      ${isModified ? 'bg-gutter-mod text-black rounded-sm text-[10px]' : ''}
+                    <span className={`pl-1 font-bold
+                      ${isModified ? 'bg-gutter-mod text-black rounded-sm text-[0.8em]' : ''}
                       ${isTargeted ? 'outline outline-1 outline-red-500 rounded-sm shadow-[0_0_5px_rgba(239,68,68,0.8)] z-10 relative bg-bg-dark text-white' : ''}
                       ${isModified || isTargeted ? 'px-[2px]' : ''}
                     `}>

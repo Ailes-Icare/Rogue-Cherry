@@ -113,7 +113,10 @@ const MirrorLine = React.memo(({ line, showMirrorInvisibles, isVisible, isTarget
         line.isHighlightLine ? 'bg-[#59466D]/15' : ''
       }`}
     >
-      <div className="w-10 pr-2 text-right text-[#555] bg-bg-panel/40 border-r border-border-dark flex justify-between items-center select-none text-[9px] font-sans">
+      <div 
+        className="w-10 pr-2 text-right text-[#555] bg-bg-panel/40 border-r border-border-dark flex justify-between items-center select-none font-sans"
+        style={{ fontSize: 'inherit', lineHeight: 1.625 }}
+      >
         <span className="pl-0.5 flex items-center h-full">
           {line.isActiveOccLine ? (
             <span className="bg-primary-blue text-white w-3 h-3 flex items-center justify-center rounded-[2px] text-[8px]" title="Occurrence active">▶</span>

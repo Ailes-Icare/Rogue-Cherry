@@ -11,7 +11,7 @@ La `VersionTagModal` est la fenêtre de dialogue centrale gérant l'évolution d
 | Prop | Type | Rôle |
 |---|---|---|
 | `isOpen` | `bool` | Contrôle l'affichage |
-| `mode` | `'init' \| 'upVersion' \| 'branch'` | Définit le contexte d'ouverture |
+| `mode` | `'init' \| 'upVersion' \| 'branch' \| 'addFile'` | Définit le contexte d'ouverture |
 | `initialConfig` | `Object` | La config de versioning actuelle (`{ ranks, autoIncrementIndex }`) |
 | `currentVersion` | `string` | La chaîne de version actuelle (ex: `"V1.0.0"`) |
 | `projectName` | `string` | Nom du projet actuel |
@@ -25,7 +25,7 @@ La `VersionTagModal` est la fenêtre de dialogue centrale gérant l'évolution d
 
 ---
 
-## 2. Les 3 Modes d'Ouverture
+## 2. Les 4 Modes d'Ouverture
 
 ### A. Mode `init` — Initialisation
 - **Déclenché par** : Premier import d'un code source via `onLoadProject` ou depuis le SplashScreen.
@@ -49,9 +49,17 @@ La `VersionTagModal` est la fenêtre de dialogue centrale gérant l'évolution d
   - Un bandeau d'avertissement jaune **"⚠️ Nouvel arbre de réalité"** apparaît dans l'onglet "Incrémenter" pour signaler que le passé sera purgé (`showBranchWarning`).
 - **Comportement** : Appelle `onBranchFromParent` ou `onForceIncrement` selon la sélection. Purge automatiquement tous les enregistrements postérieurs au point sélectionné.
 
+### D. Mode `addFile` — Ajout de Fichier (Projet Multi-fichiers)
+- **Déclenché par** : Choix "Ajouter ce fichier" dans la mini-modale de chargement de fichier, lorsque le projet est déjà actif.
+- **Comportement et Contraintes** :
+  - La modale est ouverte comme un dialogue de validation d'importation de fichier.
+  - L'onglet "Incrémenter" permet de valider l'ajout du fichier en incrémentant la version sur le rang automatique.
+  - **Bouton d'Import Silencieux** : Un bouton spécifique est ajouté en bas à gauche de la modale : **"Importer silencieusement"**. Il permet d'importer le fichier sans modifier les compteurs de version (la version actuelle reste inchangée).
+  - **Résultat** : Ajoute un enregistrement d'historique de type `Add file` avec la source correspondant au nom du fichier, et lie le fichier à la session d'onglets de l'éditeur central.
+
 ---
 
-## 3. Interface à Onglets (mode `upVersion` et `branch` uniquement)
+## 3. Interface à Onglets (mode `upVersion`, `branch` et `addFile` uniquement)
 
 ### 3.1 Onglet "Incrémenter"
 - Affiche les rangs de la version actuelle sous forme de **boutons cliquables**.

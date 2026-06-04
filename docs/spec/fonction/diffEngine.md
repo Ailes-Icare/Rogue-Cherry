@@ -2,13 +2,13 @@
 
 **Fichier source** : `src/utils/diffEngine.js` (503 lignes)
 
-Le moteur de diff est le cœur analytique de Rogue Cherry. Il gère quatre fonctions majeures : la comparaison sémantique, la génération de deltas fantômes, la colorisation DraftSurge, et les heatmaps de recherche floue.
+Le moteur de diff est le cœur analytique de Rogue Cherry. Il gère quatre fonctions majeures : la comparaison sémantique, la génération de deltas fantômes, la colorisation DraftSurge, et les Lightmaps/Heatmaps de recherche DraftSearch.
 
 ---
 
 ## 1. `getSimilarity(str1, str2)` → `Float [0..1]`
 
-**Finalité** : Calculer un indice de similarité entre deux chaînes pour décider si une ligne a été *modifiée* (et mérite une colorisation intra-ligne) ou si elle a été *remplacée totalement* (deux lignes indépendantes).
+**Finalité** : Calculer un indice de similarité entre deux chaînes pour décider si une ligne a été *modifiée* (et mérite une colorisation DraftSurge intra-ligne) ou si elle a été *remplacée totalement* (deux lignes indépendantes).
 
 **Algorithme** :
 - Extrait les tokens (mots/identifiants) via la RegEx `/[a-zA-Z0-9\-_]+/g`.
@@ -78,7 +78,7 @@ Le moteur de diff est le cœur analytique de Rogue Cherry. Il gère quatre fonct
 
 ## 4. `computeSearchHeatmap(sourceText, searchStr, ignoreSpaces = false)` → `{ marks, foundRatio }`
 
-**Finalité** : Moteur de recherche floue (Fuzzy Search) produisant une Heatmap de correspondance. Utilisé par la barre de recherche globale (CodeEditor), la SidebarLeft, et le SmartDebugger.
+**Finalité** : Moteur de recherche floue DraftSearch (Fuzzy Search) produisant une Lightmap/Heatmap DraftSearch de correspondance. Utilisé par la barre de recherche globale (CodeEditor), la SidebarLeft, et le SmartDebugger.
 
 **Mode SMART (`ignoreSpaces = true`)** :
 - Convertit `searchStr` en un pattern `Regex` ignorant les espaces superflus et la casse.
