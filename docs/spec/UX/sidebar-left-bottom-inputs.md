@@ -83,7 +83,23 @@ La zone inférieure de la sidebar gauche (`SidebarLeft.jsx`) contient les zones 
   - Ce dispositif s'applique si la recherche dynamique est active, mais que le texte saisi comporte **moins de 3 caractères** alors que le texte principal dépasse **500 lignes** (ou le seuil `maxLines` configuré).
   - Dans cette configuration, le système suspend automatiquement la recherche dynamique en temps réel pour éviter les traitements inutiles et le lag de saisie.
   - Un bandeau d'avertissement orange s'affiche : `"⚠️ Texte à chercher trop court dans un texte trop long (double-cliquez pour forcer)"`.
-  - L'utilisateur doit double-cliquer sur ce bandeau pour outrepasser la sécurité et forcer l'évaluation (`onForceFindEscapeHatch`).
+  - **Dialogue d'outrepassation (Double-clic)** : Un double-clic de l'utilisateur sur ce bandeau lance une procédure interactive via le système de boîtes de messages universelles (`MessageBox`) :
+    1. **MessageBox de Mise en garde** :
+       - **Titre** : `"Attention : Risque de ralentissement"`
+       - **Message** : `"Forcer la recherche dynamique pour une occurrence courte dans un texte long risque de ralentir fortement l'application."`
+       - **Boutons** :
+         - `Annuler` (variante secondaire) : Ferme la boîte de dialogue, la recherche reste suspendue.
+         - `Éditer les limites` (variante secondaire) : Ouvre le formulaire d'édition des limites (voir ci-dessous).
+         - `Forcer la recherche` (variante principale) : Outrepasse la sécurité (active le flag `forceFindSearchOverride`) et force l'évaluation immédiate de la recherche dynamique.
+    2. **MessageBox d'Édition des Limites** (déclenchée par l'option *Éditer les limites*) :
+       - **Titre** : `"Éditer les limites de l'échappement"`
+       - **Message** : `"Définissez les nouvelles limites pour la sécurité anti-lag de la recherche dynamique :"`
+       - **Champs de saisie (Inputs)** :
+         - `"maxLines"` (type numérique) : Nombre maximal de lignes tolérées dans le texte principal (valeur par défaut : la valeur courante de `maxLines`).
+         - `"minChars"` (type numérique) : Nombre minimum de caractères requis pour lancer la recherche (valeur par défaut : la valeur courante de `minChars`).
+       - **Boutons** :
+         - `Annuler` (variante secondaire) : Ferme la boîte sans appliquer de changements.
+         - `Valider` (variante principale) : Met à jour la configuration globale `searchLimits` avec les nouvelles valeurs (avec repli à 500 et 3 par défaut en cas de saisie invalide). La nouvelle configuration s'applique immédiatement pour toutes les recherches dynamiques de la session.
 
 ---
 

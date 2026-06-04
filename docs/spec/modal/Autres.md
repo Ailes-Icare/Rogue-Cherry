@@ -77,7 +77,14 @@ Pour éviter que l'interface ne saute à chaque chiffre tapé (ex: taper "1", "5
 
 Lorsque la modale valide un saut vers une ligne ou une occurrence, le CodeEditor cible visuellement la ligne de destination. Deux timers distincts régissent l'effacement de ce ciblage visuel (liseret rouge et lueur) :
 - **Mode Navigation Standard (Saut de ligne)** : Le liseret rouge de ciblage s'efface automatiquement après **1500 ms** (1,5 seconde) via le timer `targetHighlightTimerRef`.
-- **Mode Recherche Globale (Cherry-Picking)** : Le liseret rouge reste persistant pendant **30 secondes** (pour permettre une vérification attentive), et cette persistance se prolonge **même après la fermeture, le masquage ou l'effacement de la barre de recherche globale**, garantissant que l'utilisateur garde le repère visuel sur la ligne trouvée. Il s'efface immédiatement si une nouvelle recherche est lancée.
+- **Mode Recherche Globale (Cherry-Picking)** : Le liseret rouge reste persistant pendant **30 secondes** (pour permettre une vérification attentive), et cette persistance se prolonge **même après la fermeture, l'effacement ou le masquage de la barre de recherche globale**, garantissant que l'utilisateur garde le repère visuel sur la ligne trouvée. Il s'efface immédiatement si une nouvelle recherche est lancée.
+
+### 1.7 Double Instanciation et Gestion du Mode DEBUG
+
+Conformément à la spécification originelle exigeant une distinction d'effet entre la navigation principale et la navigation en mode débogage (option `DEBUG` logique) :
+- **Absence de prop de distinction** : Le composant `LineChoiceModal` lui-même ne prend pas d'attribut `DEBUG` direct dans le code car son isolation est gérée de manière structurelle par sa double instanciation dans le DOM.
+- **Instance Principale (`App.jsx`)** : Cette instance gère la navigation ligne par ligne (double-clic sur le bandeau bleu) et la navigation des occurrences du Find/Search de la Sidebar gauche. Son callback `onGoToLine` met à jour le viewport du `CodeEditor` principal.
+- **Instance Débogueur (`SmartDebugger.jsx`)** : Cette instance gère exclusivement la navigation des occurrences de recherche dans le miroir de prévisualisation à droite du débogueur. Son callback `onGoToLine` met à jour le viewport du miroir de code à droite (en modifiant l'index d'occurrence active `searchOccIndex` du débogueur), préservant ainsi l'éditeur principal de tout effet de bord.
 
 ---
 

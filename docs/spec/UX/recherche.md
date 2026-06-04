@@ -49,6 +49,11 @@ La recherche en temps réel (déclenchée à chaque frappe de touche) peut satur
 
 ### 3.2 Déclenchement de la sécurité
 Si le nombre de lignes du texte source est **strictement supérieur** à `maxLines` ET que la longueur de la chaîne recherchée (non vide) est **strictement inférieure** à `minChars` :
--   Le moteur de recherche dynamique DraftSearch se met en veille.
--   Les calculs de Lightmap DraftSearch (heatmap) et de ratio sont suspendus (aucun lag de frappe).
--   Un bandeau d'avertissement jaune (ou rouge dans la modale) s'affiche, invitant l'utilisateur à double-cliquer pour forcer l'override si nécessaire.
+- Le moteur de recherche dynamique DraftSearch se met en veille.
+- Les calculs de Lightmap DraftSearch (heatmap) et de ratio sont suspendus (aucun lag de frappe).
+- Un bandeau d'avertissement jaune (ou rouge dans la modale) s'affiche, invitant l'utilisateur à double-cliquer pour forcer l'override si nécessaire.
+- **Double-clic sur l'avertissement (Dialogue d'outrepassation)** : Déclenche l'ouverture d'une boîte de message interactive (`MessageBox`) proposant trois options :
+  1. **Annuler** : La sécurité reste active et les calculs de recherche restent en veille.
+  2. **Éditer les limites** : Ouvre une seconde MessageBox contenant un formulaire avec deux champs de saisie numériques (`maxLines` et `minChars`) permettant de modifier dynamiquement et globalement les seuils pour la session de travail en cours.
+  3. **Forcer la recherche** : Ignore la sécurité (active un flag d'override temporaire comme `forceFindSearchOverride`, `forceGlobalSearchOverride` ou `forceSearchOverride`) et exécute immédiatement les calculs de recherche et de Lightmap DraftSearch au risque d'induire de la latence lors de la frappe.
+

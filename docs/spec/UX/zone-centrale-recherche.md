@@ -82,6 +82,22 @@ Afin d'éviter de saturer le thread principal Javascript lors de la recherche dy
     - **Couleur de fond** : Sombre orangé/marron (`#332200`).
     - **Bordure** : Fine bordure orange (`border border-[#ff9800]`).
     - Le texte en gras `"⚠️ Texte trop court (double-cliquez pour forcer)"` attire immédiatement l'œil.
-  - **Contournement manuel (Force Search)** : Un double-clic de l'utilisateur sur ce badge orange permet de court-circuiter temporairement la sécurité et de forcer l'exécution de la recherche sur le fichier (au risque de provoquer des ralentissements lors de la frappe).
+  - **Contournement manuel (Force Search - Double-clic)** : Un double-clic de l'utilisateur sur ce badge orange lance la procédure de confirmation interactive via le système `MessageBox` :
+    1. **MessageBox de Mise en garde** :
+       - **Titre** : `"Attention : Risque de ralentissement"`
+       - **Message** : `"Forcer la recherche dynamique pour une occurrence courte dans un texte long risque de ralentir fortement l'application."`
+       - **Boutons** :
+         - `Annuler` (variante secondaire) : Ferme la boîte de dialogue, la recherche globale reste suspendue.
+         - `Éditer les limites` (variante secondaire) : Ouvre le formulaire d'édition des limites (voir ci-dessous).
+         - `Forcer la recherche` (variante principale) : Outrepasse la sécurité (active le flag `forceGlobalSearchOverride`) et force l'évaluation immédiate de la recherche globale.
+    2. **MessageBox d'Édition des Limites** (déclenchée par l'option *Éditer les limites*) :
+       - **Titre** : `"Éditer les limites de l'échappement"`
+       - **Message** : `"Définissez les nouvelles limites pour la sécurité anti-lag de la recherche dynamique :"`
+       - **Champs de saisie (Inputs)** :
+         - `"maxLines"` (type numérique) : Nombre maximal de lignes tolérées dans le texte principal (valeur par défaut : la valeur courante de `maxLines`).
+         - `"minChars"` (type numérique) : Nombre minimum de caractères requis pour lancer la recherche (valeur par défaut : la valeur courante de `minChars`).
+       - **Boutons** :
+         - `Annuler` (variante secondaire) : Ferme la boîte sans appliquer de changements.
+         - `Valider` (variante principale) : Met à jour la configuration globale `searchLimits` avec les nouvelles valeurs (avec repli à 500 et 3 par défaut en cas de saisie invalide). La nouvelle configuration s'applique immédiatement pour toutes les recherches dynamiques de la session.
 
 
