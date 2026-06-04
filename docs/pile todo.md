@@ -120,14 +120,33 @@ NOTA : cet export est idéal pour donner à une IA en entrée, avec la "consigne
 compte tenu de ce cahier des charge initial, effectue si necessaire une refactorisation complète du code pour standardiser les elements sans rien retirer des fonctions.
 liste ci après les taches que tu pense etre utile pour cela et toute les notes qui te seront utile pour archive
 
+*Plan de Refactorisation (Étape 1) :*
+- [ ] **Tâche 1.1 : Exposer les primitives multi-fichiers et multi-projets depuis le hook `useHistoryStore`**
+  - Exposer `projects`, `activeProjectId`, `activeFileId`, `files`, ainsi que les fonctions de manipulation (`setActiveProjectId`, `setActiveFileId`, ajout/fermeture/suppression de fichiers et projets).
+- [ ] **Tâche 1.2 : Adapter `rebuildTextAt` et le calcul des deltas au support multi-fichiers**
+  - S'assurer que le champ `fileId` (actuellement déduit à `"main"`) est correctement stocké dans chaque enregistrement (`snapshot`/`replace`) et que `rebuildTextAt` filtre bien par `fileId` actif.
+- [ ] **Tâche 1.3 : Préparer la migration des états de recherche / remplacement de `App.jsx` vers un modèle multi-fichiers**
+  - Préparer la gestion des états de saisie (`findText`, `replaceText`, `multiIndices`, `isFindActive`, `isReplaceActive`, `globalSearchBarText`) afin d'éviter qu'une recherche sur un fichier ne pollue visuellement l'affichage d'un autre fichier lors du changement d'onglet.
+- [ ] **Tâche 1.4 : Standardiser et préparer l'arborescence des composants pour accueillir l'UI de navigation**
+  - Prévoir le découpage et l'insertion des futurs composants d'UI (onglets de fichiers dans la zone centrale, onglets de projets dans la SidebarRight) sans casser le layout réactif existant.
+
 ###étape 2 : 
 compte tenu de ce cahier des charges, défini ici une a une les étapes pour monter tout ca.
 commence par donner les grandes étapes clé avec un petit commentaire suffisant pour comprendre le contenu.
 
-puis on traitera chaque étape une par une, et quand on en fera une seule, tu commencera par définir toi meme la granularité du projet et les sous étapes / cahier des charges.
-tu notera dedans les éléments important / consigne qui émergerait de nos discussion et des ajustement
-et tu validera les étapes sans jamais les supprimer au fur et a mesure ou je te dirais qu'on est bon.
-une étape bonne deviens une étape archivé ici, non modifiable sans mon accord, qui pourra etre relue pour que tu n'oublie pas les "consigne" que je t'ai donné, afin que la progression ne produise pas de régression.
+*Grandes étapes de la Roadmap V9 (Étape 2) :*
+- [ ] **Étape 2.1 : Intégration du State Multi-Fichiers / Multi-Projets dans le Store**
+  - Mettre à jour `useHistoryStore.js` pour supporter les actions de gestion de plusieurs projets et fichiers (gestion des handles, suffixes uniques pour doublons de noms, sauvegarde automatique de l'arborescence).
+- [ ] **Étape 2.2 : Interface des Onglets de Fichiers (Zone Centrale)**
+  - Ajouter une barre d'onglets au-dessus de l'éditeur principal avec réorganisation interactive (drag & drop) et option de fermeture de fichiers (prompts à 3 choix). Ajouter l'onglet réduit `↑` à gauche pour l'accès aux fichiers fermés.
+- [ ] **Étape 2.3 : Modale d'Import Multi-Choix et Mode UpVersion Silencieux**
+  - Intercepter l'import de fichier pour proposer "Nouveau projet" ou "Ajouter le fichier". Si ajouté, afficher la modale UpVersion avec option "Importation silencieuse" (pas de changement de version globale) et insérer l'action "Add file" dans l'historique.
+- [ ] **Étape 2.4 : Gestion de l'Attribut `File` dans les Requêtes et Modale d'Assignation Manuelle**
+  - Parser l'attribut `File` (`[FILE:projet/fichier]`). En multi-fichiers, si l'attribut est absent, bloquer l'exécution et afficher une modale d'assignation manuelle, puis reconstruire et réinjecter la requête.
+- [ ] **Étape 2.5 : Interface de Gestion de Projets (Sidebar Droite)**
+  - Ajouter un système d'onglets sous les boutons d'action de la SidebarRight pour basculer d'un projet à l'autre.
+- [ ] **Étape 2.6 : Sauvegarde et Exportation "TOUT"**
+  - Diviser les boutons d'export et sauvegarde en sous-boutons "TOUT" en présence de plusieurs fichiers, avec prompts pour sauvegarde JSON unique vs fichiers séparés (via fileHandle) et export condensé pour prompts d'IA.
 
 ###étape 3 : 
 alimente la roadmap qu'on transformera progressivement en avancant en cdc, puis en consigne valide / rules.

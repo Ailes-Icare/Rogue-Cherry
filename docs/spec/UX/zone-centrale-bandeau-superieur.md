@@ -8,7 +8,7 @@ Le bandeau supérieur regroupe le titre dynamique du projet ainsi que la barre d
 
 ## 1. Agencement Spatial et Dimensions
 
-- **Hauteur totale** : **95 pixels non réductibles** (la hauteur physique du conteneur est figée à 95px).
+- **Hauteur totale** : la hauteur physique du conteneur est par défaut, en pleinte taille à 95px. elle pourra se réduire à 48px (voir chapitre 3.3)
 - **Séparateur horizontal** : Directement au-dessous du bandeau se trouve une ligne de séparation horizontale purement esthétique (couleur `#444444` / `border-b border-border-dark`), d'une épaisseur de 1px.
 - **Placement sous-jacent** : Juste en dessous de cette ligne de séparation esthétique se trouve le système d'onglets (décrit dans [zone-centrale-onglets.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-onglets.md)).
 
@@ -72,9 +72,10 @@ Les boutons de l'interface Rogue Cherry utilisent des classes CSS strictes défi
 ---
 
 ### 3.3 Améliorations Responsives Cibles (Futur)
-Actuellement, ces boutons ont une taille fixe et peuvent empiéter ou passer sous la sidebar droite lorsque celle-ci s'élargit ou que le panneau central rétrécit.
-- **Règle de dimensionnement réactif** : Le titre et les boutons occupent environ 1060px en pleine taille. Dès que la largeur utile descend sous 1060px, le titre et les boutons doivent réduire leur échelle progressivement jusqu'à atteindre un minimum de **50% de leur taille initiale**.
-- **Titre multi-ligne** : Si la longueur en pixels du titre dépasse environ 500px, le titre doit se répartir sur deux lignes (avec mise à la ligne du numéro de version). Les 70px de hauteur utile du bandeau permettent cette disposition sur deux lignes sans dépassement.
+Actuellement, ces boutons ont une taille fixe et peuvent empiéter ou passer au dessus de la sidebar droite lorsque celle-ci s'élargit ou que le panneau central rétrécit. il convient de réordonnancer leur position (passer les boutons au dessous de la sidebar)
+- **Règle de dimensionnement réactif** : Le titre et les boutons occupent environ 1060px en pleine taille par défaut (avec le titre par défaut). Dès que la largeur utile descend sous 1060px, le titre et les boutons doivent réduire leur échelle progressivement jusqu'à atteindre un minimum de **50% de leur taille initiale**.
+conséquement, la barre horizontale a 95 pixel se réduira pour passer a 48 pixel en taille minimale.
+- **Titre multi-ligne** : Si la longueur en pixels du titre dépasse environ 600px, le titre doit se répartir sur deux lignes (avec mise à la ligne du numéro de version). Les 70px de hauteur utile du bandeau permettent cette disposition sur deux lignes sans dépassement. le titre doit rester dans l'encombrement vertical défini par les boutons, et la mise à l'échelle doit rester conforme à cette règle.
 
 ---
 

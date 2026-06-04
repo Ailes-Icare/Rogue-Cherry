@@ -19,7 +19,7 @@ La barre de statut est un bandeau horizontal de couleur bleue VSCode (`#007acc`)
 
 ### 2.1 Mode Lecture Seule (État par défaut)
 - Affiche l'icône de cadenas fermé : **🔒** (bouton cliquable avec infobulle "Déverrouiller l'édition libre du texte source").
-- Affiche la mention : `👁️ MODE LECTURE SEULE` en gris clair `#d4d4d4` avec espacement des lettres (`tracking-wider`).
+- Affiche la mention : `👁️ MODE LECTURE SEULE` en gris clair `#d4d4d4` avec espacement des lettres (`tracking-wider`). agit sur le controle défini dans @CodeEditor.md.
 
 ### 2.2 Mode Édition Libre
 - Affiche la mention : `✏️ MODE ÉDITION LIBRE` en jaune vif `#FFD700` (`tracking-wider`).
@@ -50,3 +50,4 @@ Elle regroupe des compteurs textuels et le contrôle d'affichage des caractères
   - Affiche l'icône `EyeIcon`.
   - Au survol : fond sombre translucide (`hover:bg-black/20`).
   - Infobulle : "Affiche ou cache les caractères invisibles dans le texte principal".
+  - Agit sur le comportement du controle @CodeEditor.md
