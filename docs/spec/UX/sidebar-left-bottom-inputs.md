@@ -33,7 +33,9 @@ La zone inférieure de la sidebar gauche (`SidebarLeft.jsx`) contient les zones 
 - **Charte Visuelle et États du Bouton SMART** :
   Le bouton **SMART** dispose d'un curseur main-bouton (`cursor-pointer`) et se décline en deux états :
   - **État non validé (Inactif)** : Fond gris sombre (`bg-[#555]`), texte gris clair (`text-[#ccc]`). Au survol, il passe à un gris légèrement plus clair (`hover:bg-[#666]`).
-  - **État validé (Actif)** : Fond vert brillant (`bg-[#4caf50]`) avec u- **Charte Visuelle et États du Bouton/Badge FIND** :
+  - **État validé (Actif)** : Fond vert brillant (`bg-[#4caf50]`) avec un effet de lueur.
+  - **Double-clic** : Un double-clic sur le bouton SMART permet de sauvegarder son état actuel comme la valeur par défaut pour l'utilisateur.
+- **Charte Visuelle et États du Bouton/Badge FIND** :
   Le bouton/badge **FIND** s'adapte dynamiquement selon son état d'activation et le résultat de la recherche :
   - **État 1 : Inactif (Find dynamique DraftSearch désactivé : `isFindActive = false`)** :
     - *Si occurrences trouvées > 0* : Fond gris sombre (`bg-[#555]`), texte vert-turquoise (`text-[#00FF7F]`). Curseur main-bouton (`cursor-pointer`).

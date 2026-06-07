@@ -14,7 +14,8 @@ Le bandeau supérieur de gestion est divisé horizontalement en deux blocs disti
 
 - **Style** : Conteneur bleu VSCode (`#007acc`), arrondi, contenant un titre à gauche et une boîte intérieure grise.
 - **Comportement responsive (Flexbox)** : Le cadre bleu est configuré avec un comportement élastique (`flex-1`) pour s'adapter à la largeur disponible de la sidebar.
-  - **Titre à gauche** : Contraint horizontalement avec des limites de largeur relatives : minimum **15%** (`min-w-[15%]`) et maximum **20%** (`max-w-[20%]`) de la largeur totale du cadre bleu. Le texte "Gestion\nde projet" (17px, extra-gras, interligne serré `leading-[1.1]`) est centré verticalement.
+  - **Titre à gauche** : Contraint horizontalement à une largeur fixe confortable de **70 px** (`w-[70px] flex-shrink-0`). Le texte "Gestion\nde projet" (14px, extra-gras, interligne serré `leading-[1.1]`) est centré verticalement et écrit sur exactement deux lignes sans retour automatique parasite (`whitespace-nowrap`).
+    - **Bascule en texte vertical ("PROJET")** : Si la largeur de la sidebar descend sous **301 px** (soit une largeur disponible pour les barres inférieure à 281px), la Blue Card se réduit et le titre horizontal est automatiquement remplacé par une version verticale lettre-par-lettre épelant `"PROJET"` en taille compacte (10px, gras, lettres empilées). Cela libère l'espace horizontal nécessaire pour conserver la taille des boutons d'actions et du Reset.
   - **Cadre intérieur gris (`#1e1e1e`)** : Prend tout le reste de la largeur disponible (`flex-1`) et regroupe trois boutons d'action de taille égale disposés en ligne (gaps de 8px `gap-2` et paddings de 6px `p-[6px]`) :
     - **Importer (📂)** : Charge un fichier JSON de projet Rogue Cherry (voir [json-project-schema-v8.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-schema-v8.md) pour la structure V8 attendue, et [json-project-v9-specs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-v9-specs.md) pour la conversion automatique en V9 multi-fichier).
       - *État* : Couleur bleue vive (`btn-active-blue`) si aucun projet n'est chargé, gris discret (`btn-disabled-clickable`) si un projet est déjà ouvert.
@@ -28,7 +29,7 @@ Le bandeau supérieur de gestion est divisé horizontalement en deux blocs disti
       - Largeur minimale : **42 px** (`min-w-[42px]`)
       - Largeur maximale : **120 px** (`max-w-[120px]`)
       - Taille de police fixe : `text-xl` (~20 px)
-      - *Résolution minimale* : À la largeur minimale de la sidebar droite (280 px), les boutons conservent leur taille minimale de 42 px (largeur totale de la boîte grise de 154 px) sans rognage.
+      - Les trois boutons intérieurs sont **sanctuarisés** à leur largeur minimale de 42 px et ne doivent jamais rétrécir plus bas.
     - **Évolution future (Affichage sur 2 lignes)** :
       > [!NOTE]
       > **Option d'agencement intégrée pour l'avenir** : Si l'évolution de l'application amène à afficher plus de 3 boutons dans ce cadre (par exemple lors de l'intégration de nouvelles actions de cycle de vie en V9) et que la largeur de la sidebar ne permet plus un affichage correct sur une seule ligne :
@@ -41,25 +42,29 @@ Le bandeau supérieur de gestion est divisé horizontalement en deux blocs disti
 
 - **Style** : Bouton rouge cerise (`bg-cherry-red`), séparé du cadre bleu avec un espacement fixe de 8px (`gap-2` sur le conteneur).
 - **Rôle** : Réinitialise complètement l'application (suppression de tout l'historique, fermeture de tous les fichiers et projets, et nettoyage du texte de l'éditeur de code) après confirmation explicite de l'utilisateur via une MessageBox.
-- **Comportement responsive (`ResizeObserver`)** : Le bouton RESET est surveillé par un observateur de redimensionnement qui affecte sa largeur courante `resetBtnWidth` dans l'état local. Le composant ajuste dynamiquement son agencement et sa taille de police (zoom/dezoom) selon les paliers algorithmiques suivants :
-  - **Palier A (Largeur >= 100 px) - Mode Horizontal Standard** :
-    - Disposition : Côte à côte (texte "RESET" à gauche, icône 🔄 à droite).
-    - Zoom fixe : Police du texte fixée à **18 px**, icône fixée à **30 px** (`text-3xl`).
-  - **Palier B (Largeur entre 70 px et 100 px) - Mode Horizontal Dynamique** :
-    - Disposition : Côte à côte (texte "RESET" à gauche, icône 🔄 à droite).
-    - Facteur de zoom progressif :
-      - *Police du texte* : `12 + 6 * ((w - 70) / 30)` px (varie continûment de **12 px** à **18 px**).
-      - *Taille de l'icône* : `24 + 12 * ((w - 70) / 30)` px (varie continûment de **24 px** à **36 px**).
-  - **Palier C (Largeur entre 50 px et 70 px) - Mode Vertical Dynamique** :
-    - Disposition : Alignement vertical (icône 🔄 au-dessus, texte "RESET" en dessous).
-    - Facteur de zoom progressif :
-      - *Police du texte* : Fixée à **10 px** avec une marge supérieure de 4px (`mt-1`).
-      - *Taille de l'icône* : `24 + 12 * ((w - 50) / 20)` px (varie continûment de **24 px** à **36 px**).
-  - **Palier D (Largeur < 50 px) - Mode Vertical Minimal** :
-    - Disposition : Alignement vertical (icône 🔄 au-dessus, texte "RESET" en dessous).
-    - Zoom minimal fixe :
-      - *Police du texte* : Fixée à **9 px**.
-      - *Taille de l'icône* : Fixée à **20 px` (`text-xl`).
+- **Comportement responsive flexible** :
+  - **Zone Standard (Largeur cible à 25%)** : Le bouton RESET occupe 25% de la largeur tandis que la Blue Card occupe 75%.
+  - **Zone de Butée Horizontale** : Quand les boutons de la Blue Card atteignent leur taille minimale (bloquant la Blue Card à une largeur minimale de 235px avec titre horizontal de 70px), le bouton RESET commence à diminuer en pourcentage de largeur en dessous de 25% pour absorber toute la réduction.
+  - **Zone de Butée Verticale** : Sous une largeur de sidebar de 301px, le titre de la Blue Card bascule en vertical, ramenant sa taille minimale absolue à 196px. La Blue Card shrinking alors vers 196px, et le bouton RESET continue d'absorber la réduction jusqu'à son minimum absolu de 42px.
+  - **Comportement d'agencement du texte RESET** : Le bouton RESET est surveillé par un observateur de redimensionnement qui affecte sa largeur courante `resetBtnWidth` dans l'état local. Le composant ajuste dynamiquement son agencement et sa taille de police (zoom/dezoom) selon les paliers algorithmiques suivants :
+    - **Palier A (Largeur >= 100 px) - Mode Horizontal Standard** :
+      - Disposition : Côte à côte (texte "RESET" à gauche, icône 🔄 à droite).
+      - Zoom fixe : Police du texte fixée à **18 px**, icône fixée à **30 px** (`text-3xl`).
+    - **Palier B (Largeur entre 70 px et 100 px) - Mode Horizontal Dynamique** :
+      - Disposition : Côte à côte (texte "RESET" à gauche, icône 🔄 à droite).
+      - Facteur de zoom progressif :
+        - *Police du texte* : `12 + 6 * ((w - 70) / 30)` px (varie continûment de **12 px** à **18 px**).
+        - *Taille de l'icône* : `24 + 12 * ((w - 70) / 30)` px (varie continûment de **24 px** à **36 px**).
+    - **Palier C (Largeur entre 50 px et 70 px) - Mode Vertical Dynamique** :
+      - Disposition : Alignement vertical (icône 🔄 au-dessus, texte "RESET" en dessous).
+      - Facteur de zoom progressif :
+        - *Police du texte* : Fixée à **10 px** avec une marge supérieure de 4px (`mt-1`).
+        - *Taille de l'icône* : `24 + 12 * ((w - 50) / 20)` px (varie continûment de **24 px** à **36 px**).
+    - **Palier D (Largeur < 50 px) - Mode Vertical Minimal** :
+      - Disposition : Alignement vertical (icône 🔄 au-dessus, texte "RESET" en dessous).
+      - Zoom minimal fixe :
+        - *Police du texte* : Fixée à **9 px**.
+        - *Taille de l'icône* : Fixée à **20 px` (`text-xl`).
 - **Activation** : Désactivé et semi-transparent (`opacity-30`) si aucun projet n'est ouvert (`isProjectEmpty === true`).
 
 ### 3. Indicateur de taille JSON

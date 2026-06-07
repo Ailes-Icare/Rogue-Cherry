@@ -21,9 +21,10 @@ La zone inférieure de la sidebar droite (`SidebarRight.jsx`) est située juste 
 
 Cette ligne de contrôles permet de manipuler l'historique et de générer des requêtes :
 
-- **Navigation pas-à-pas** :
-  - **◀ Préc.** : Recule d'une version dans l'historique (`selectedIndex - 1`). Désactivé si on se trouve sur la version de départ (index 0).Reste à implanter : Le comportement responsive suppose une disparition du texte « prec » lorsque la taille des icônes n'est plus suffisante pour afficher du texte. 
-  - **Suiv. ▶** : Avance d'une version dans l'historique (`selectedIndex + 1`). Désactivé si on se trouve sur la dernière version.Reste à implanter : Le comportement responsive suppose une disparition du texte « suiv » lorsque la taille des icônes n'est plus suffisante pour afficher du texte. 
+- **Navigation pas-à-pas (Agencement Vertical)** :
+  - Les boutons de navigation "Précédent" et "Suivant" sont positionnés l'un au-dessus de l'autre dans une unique colonne flex verticale de largeur fixe (`w-10 flex-shrink-0 h-12`).
+  - **Bouton du haut (▲)** : Recule d'une version dans l'historique (Précédent, `selectedIndex - 1`). Désactivé si on se trouve sur la version de départ (index 0).
+  - **Bouton du bas (▼)** : Avance d'une version dans l'historique (Suivant, `selectedIndex + 1`). Désactivé si on se trouve sur la dernière version.
 - **Bouton "New Branch"** :
   - *Rôle* : Ouvre la modale `VersionTagModal` en mode `branch` pour créer un nouveau point d'embranchement à partir de la version sélectionnée.
   - *Style* : Fond rouge cerise (`bg-cherry-red hover:bg-cherry-red-hover`), gras.

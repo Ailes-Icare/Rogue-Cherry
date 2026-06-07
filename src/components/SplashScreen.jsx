@@ -38,7 +38,7 @@ export default function SplashScreen({ isOpen, onClose }) {
                 Rogue Cherry
               </h1>
               <span className="bg-[#333] text-white px-2 py-0.5 lg:px-3 lg:py-1 rounded text-[10px] lg:text-xs [@media(min-height:1100px)]:text-sm font-bold font-mono tracking-widest border border-[#555] transition-all">
-                VERSION 1.8.11 / RELEASE 1.0
+                V1.9.0 / <span className="text-yellow-500">ALPHA V2</span>
               </span>
             </div>
           </div>

@@ -24,17 +24,17 @@ Ces contrôles modifient la façon dont le moteur évalue la requête FIND/REPLA
 - **Mode MULTI** :
   - *Comportement* : Active ou désactive l'application multi-emplacement de la modification (`multiMode`).
   - *Bouton* : Libellé "MULTI". De couleur violette avec effet de lueur (`bg-[#5c2d91] shadow-[0_0_8px_rgba(92,45,145,0.6)]`) si actif, gris sombre (`bg-[#555]`) si inactif.
+  - *Double-clic* : Un double-clic sur le bouton MULTI ou son label permet de sauvegarder son état actuel comme la valeur par défaut pour l'utilisateur.
   - *Étiquette associée* : "Multi-emplacement (N trouvés)", indiquant en temps réel le nombre d'occurrences de la chaîne FIND détectées dans le document source. Reste à faire : même constat que pour le bouton strict — le label associé pourra être supprimé ou caché pour répondre aux besoins responsifs de la réduction de la largeur du bandeau de gauche. 
 
 ---
 
-### 2. Boutons d'action globale
+## ### 2. Boutons d'action globale
 
 - **Bouton VIDER 1 & 2** :
-  - *Rôle* : Efface instantanément le contenu textuel des champs FIND (1) et REPLACE (2), ainsi que le commentaire, et tout élément en mémoire lié a la requete en cours. cela ne supprime pas une requete multistack, mais reviens plutot a totalement décocher toute requete du table. dans ce mode précis, il sera possible d'écrire manuellement une requete sans que cela supprime la pile multistack, toujours prete a etre joué. réinitialisant ainsi la saisie de la requête active.
+  - *Rôle* : Efface instantanément le contenu textuel des champs FIND (1) et REPLACE (2), supprime le commentaire, supprime le label/nom de la requête, et réinitialise les options SMART et MULTI à l'état par défaut choisi par l'utilisateur (ou `false` par défaut). Si une pile multistack est ouverte, le tableau de la pile reste actif et sa requête active est mise à jour avec ces valeurs vides.
   - *Style* : Fond gris sombre (`bg-[#333]`), passant au rouge cerise et texte blanc au survol (`hover:bg-cherry-red hover:text-white`).
   - *Activation* : Désactivé si aucun code source n'est chargé.
-  - *Indépendance* : N'affecte pas le champ de commentaire, qui est géré indépendamment.
 
 ---
 

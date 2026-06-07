@@ -1,5 +1,6 @@
 rappel à mon intention : npm run build
 rappel à ton intention : $env:PATH = "C:\Program Files\nodejs;" + $env:PATH; & "C:\Program Files\nodejs\npm.cmd" run build
+ou plus simplementg : cmd /c npm run build
 
 #README / CONSIGNE :
 - tu lira ce fichier dans l'ordre.
@@ -152,3 +153,43 @@ commence par donner les grandes étapes clé avec un petit commentaire suffisant
 alimente la roadmap qu'on transformera progressivement en avancant en cdc, puis en consigne valide / rules.
 
 
+🏗️ Rapport d'Audit Architecture (Préparation V9 : Multi-fichiers / Multi-projets)
+Date : 7 juin 2026 Objectif : Confirmer que l'architecture actuelle est bien compatible et prête pour accueillir les évolutions majeures de la V9, comme décrit dans la Phase 1 du cahier des charges (fichier pile todo.md).
+
+📊 État des Lieux par Composant Core
+1. 🟢 Couche Données et État (useHistoryStore.js)
+Statut : Prêt à 100% pour la V9
+
+Architecture d'état : L'état global stocke déjà un tableau projects, contenant lui-même un tableau files (avec les propriétés internalName, originalName, et le pointeur natif fileHandle). Les IDs de sélection activeProjectId et activeFileId sont en place.
+Moteur temporel : La fonction rebuildTextAt a été parfaitement adaptée. Elle accepte désormais un fileId en argument et filtre intelligemment la pile d'historique pour ne reconstruire que l'état du fichier ciblé (filtre sur opFileId === fileId).
+Enregistrement : Les fonctions pushReplace et pushSnapshot attachent déjà de manière proactive l'identifiant du fichier courant (fileId: activeFileId || "main") à chaque nouvelle opération.
+TIP
+
+Le refactoring profond du gestionnaire d'état a été fait de manière exemplaire. Aucune refonte du stockage historique n'est requise.
+
+2. ⚠️ Couche Parsing IA (textParser.js)
+Statut : Préparation manquante (Action requise)
+
+Problème : Le cahier des charges de la V9 indique que chaque requête IA pourra posséder un attribut [FILE:projet/fichier]. Actuellement, textParser.js extrait parfaitement [LABEL:...], [MULTI:...] et [SMART:...], mais ignore toute logique d'extraction d'une balise [FILE:...].
+Action V9 : Il faudra simplement ajouter une regex pour extraire cette balise optionnelle dans parseSyntaxRequest et la retourner dans l'objet parsedRequest.
+3. ⚠️ Couche d'Orchestration UI (App.jsx - États de Recherche)
+Statut : Non conforme (Tâche 1.3 de la roadmap V9 non finalisée)
+
+Problème : Les états qui pilotent la recherche et le ciblage (findText, replaceText, multiIndices, isFindActive, isReplaceActive, globalSearchBarText) sont déclarés comme de simples variables d'état (scalaires) à la racine de App.jsx.
+Impact : Si l'utilisateur charge le fichier A et recherche le mot "const", puis clique sur l'onglet du fichier B, le mot "const" restera en surbrillance rouge sur le fichier B. L'état "pollue" la vue d'un fichier à l'autre.
+Action V9 : Il faudra implémenter un useEffect qui écoute les changements de store.activeFileId et qui déclenche une réinitialisation automatique (ou une sauvegarde en cache locale) des variables de recherche.
+4. 🟡 Couche Interface Utilisateur (Layouts UI)
+Statut : Pré-câblé mais composants manquants (Tâche 1.4 partielle)
+
+Zone Centrale (App.jsx) : Le squelette Flexbox est optimal. L'en-tête (qui contient le nom du fichier) et l'éditeur CodeEditor sont séparés. Il suffira d'intercaler un composant FileTabsBar entre l'en-tête et l'éditeur, qui s'alimentera du tableau store.files.
+Sidebar Droite (SidebarRight.jsx) : Les boutons d'importation et de sauvegarde globale sont prêts (il y a même déjà de l'espace alloué en haut), mais il n'y a pas encore de structure d'onglets pour gérer les Projets. L'agencement permet de glisser un bloc d'onglets sans rien casser.
+📝 Conclusion & Plan d'Action pour lancer la V9
+IMPORTANT
+
+L'assertion selon laquelle une nouvelle refonte architecturale est inutile est VRAIE. Le plus dur (la migration de l'historique de type array plat vers un arbre projects -> files -> history) a déjà été réalisé. La fondation est solide.
+
+Cependant, avant de plonger tête baissée dans la création des modales complexes de la V9, voici le Plan d'Action Minimal (Phase 1 V9) qu'il faudra exécuter pour achever la préparation :
+
+Parser : Modifier textParser.js pour qu'il reconnaisse [FILE:nom].
+Cloisonnement : Rajouter le useEffect dans App.jsx qui nettoiera findText / replaceText lors d'un changement de activeFileId (Validation Tâche 1.3).
+Skeleton UI : Créer deux composants "coquilles vides" (FileTabs et ProjectTabs) et les insérer dans le layout de App.jsx et SidebarRight.jsx pour visualiser l'espace qu'ils prendront (Validation Tâche 1.4).

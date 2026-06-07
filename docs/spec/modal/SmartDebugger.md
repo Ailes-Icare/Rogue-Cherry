@@ -143,7 +143,8 @@ Pour optimiser la lisibilité du code et des requêtes, la modale intègre des m
 La zone inférieure de la modale regroupe la configuration fine des paramètres de la requête et les boutons de validation :
 
 ### 7.1 Les Paramètres de la Requête (À gauche)
-Ces contrôles permettent de modifier directement les métadonnées de la requête IA décodée sans éditer manuellement la chaîne brute. Ils sont désactivés si la pile multistack est active (`isMultistackMode = true`) :
+Ces contrôles permettent de modifier directement les métadonnées de la requête IA décodée sans avoir besoin d'éditer manuellement la chaîne brute. Ils sont désactivés si la pile multistack est active (`isMultistackMode = true`). 
+**Mécanisme de secours (Fallback) :** Même si la syntaxe de la zone brute est globalement invalide (ce qui bloque la génération standard), l'utilisation de ces contrôles (Smart, Multi, Label, Commentaire) ne s'arrête pas silencieusement. Ils utilisent une modification chirurgicale (Regex) directement sur les premières lignes de la chaîne de texte brute pour forcer la mise à jour des en-têtes sans endommager le reste du contenu saisi.
 - **Bouton SMART (💡)** : 
   - *Rôle* : Active ou désactive le mode tolérant aux espaces et à la casse (`smartMode`) sur l'en-tête de la requête.
   - *Comportement* : Met à jour la chaîne brute en injectant `[SMART:TRUE]` ou `[SMART:FALSE]`.
@@ -153,8 +154,8 @@ Ces contrôles permettent de modifier directement les métadonnées de la requê
   - *Comportement* : Affiche un champ de saisie texte à sa droite lorsqu'il est actif pour spécifier les indices des occurrences ciblées.
   - *Couleur* : Violet royal (`bg-[#5c2d91]` avec lueur) si actif, gris sombre (`bg-[#555]`) si inactif.
   - **Saisie des indices** : Permet d'écrire une liste d'entiers séparés par des virgules (ex: `0,2,4`) représentant les index base-0 des occurrences à modifier. Un label rappelle que pour les sélections complexes, il convient de passer par l'interface principale (Cherry-Picking).
-- **Champ LBL** : Zone de saisie du label personnalisé. Sa modification met à jour l'en-tête `[LABEL:...]` de la requête brute.
-- **Champ CMT** : Zone de saisie du commentaire optionnel. Sa modification met à jour la section `##Commentaire##` en bas de la requête brute.
+- **Champ Label (LBL sur mobile)** : Zone de saisie du label personnalisé. Sa modification met à jour l'en-tête `[LABEL:...]` de la requête brute. Le champ est désormais flexible (flex-1) et responsif.
+- **Champ Commentaire (CMT sur mobile)** : Zone de saisie du commentaire optionnel. Sa modification met à jour la section `##Commentaire##` en bas de la requête brute. Le champ est étendu visuellement pour plus de confort de saisie.
 
 ### 7.2 Les Boutons d'Action (À droite)
 - **ANNULER** : Ferme la modale sans appliquer ni conserver les modifications de la session de débogage.

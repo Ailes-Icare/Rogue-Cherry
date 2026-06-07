@@ -36,6 +36,23 @@ Le contrôleur coordonne l'état du projet et son évolution temporelle. Il gèr
 - **Déclencheur** : Bouton de compression (🗜️).
 - **Action** : Purge définitivement tous les points d'historique antérieurs à l'index sélectionné et les remplace par un snapshot unique (perte définitive du Time-Travel sur cette période passée).
 
+### 2.4 Sécurisation du Flux de Branches (Modification d'une version antérieure)
+- **Déclencheur** :
+  - L'utilisateur tente de charger/coller une requête via la zone centrale, OU 
+  - L'utilisateur clique sur le bouton "Appliquer" pour exécuter une requête existante.
+- **Contexte** : L'index sélectionné dans le tableau Time-Travel (`selectedIndex`) n'est pas le dernier élément de la pile (`history.length - 1`).
+- **Comportements mis en place** :
+  1. **Au chargement ou collage d'une requête** (import) : Le contrôleur force le repositionnement automatique de l'index sur le dernier état (`selectedIndex = history.length - 1`), afin de prémunir l'utilisateur d'un import dangereux sur un vieil état sans s'en rendre compte.
+  2. **À l'application d'une modification (Appliquer) après modification manuelle** : Si l'utilisateur a cliqué sur l'historique pour remonter dans le temps, ET qu'il a modifié manuellement la requête (clic sur les boutons SMART/MULTI, saisie de texte dans les champs, etc.), le clic sur Appliquer ne déclenchera pas de modale d'avertissement mais **créera implicitement une nouvelle branche** à partir de cet ancien état. La ligne temporelle précédente (futur) est alors débranchée et grisée.
+
+### 2.5 Suivi de Rechargement de Requête Annulée (♻️)
+- **Déclencheur** : L'utilisateur clique sur le bouton "Recharger" (♻️) d'une requête ignorée (grisée) dans l'historique, puis clique sur "Appliquer" sans l'avoir modifiée.
+- **Processus de contrôle** :
+  1. Lors du clic sur ♻️, l'index de la requête historique est conservé en mémoire temporaire (`reloadedRecordIndex`).
+  2. Lors de l'application (bouton Appliquer), le contrôleur compare de manière stricte le contenu du formulaire (FIND, REPLACE, MULTI, SMART) avec la requête d'origine en mémoire.
+  3. Si la correspondance est exacte (aucune modification manuelle), la requête historique d'origine est marquée comme "Réappliquée avec succès" (`isReapplied = true`).
+  4. L'icône ♻️ est alors remplacée visuellement par un indicateur de validation (✔️), confirmant que cette branche morte a été restaurée sans altération. La mémoire temporaire est ensuite purgée.
+
 ---
 
 ## 3. Gestion des Fichiers et Exportations (JSON)

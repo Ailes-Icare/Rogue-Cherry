@@ -99,6 +99,7 @@ Si l'utilisateur clique sur le bouton **Annuler** :
   - Si l'index de l'occurrence est déjà présent dans le tableau de sélection `multiIndices`, il est retiré.
   - S'il n'est pas présent, il est ajouté et trié par ordre croissant.
   - Cela met instantanément à jour le panneau de Cherry-Picking de la Sidebar gauche et modifie la signature de la requête brute générée (`[MULTI:...]`).
+  - **Maintien de la position de lecture** : Lors du clic pour activer ou désactiver une occurrence, le défilement de la page reste fixe (le système intercepte ce changement pour ne pas ramener brutalement l'utilisateur vers la première occurrence du fichier).
 
 ### 4.1 Retours Visuels et Charte Colorimétrique du Cherry-Picking
 

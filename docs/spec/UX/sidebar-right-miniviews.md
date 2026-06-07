@@ -40,7 +40,7 @@ Pour afficher les différences au caractère près (DraftSurge unitaire), l'appl
 
 - Chaque miniature dispose de son propre hook de zoom (`useZoomable`) attaché à son conteneur.
 - Cela permet d'ajuster la taille de police indépendamment de l'autre vue en cas de besoin de lecture de longs blocs de code denses, sans affecter le niveau de zoom global de la zone centrale.
-- La taille de police par défaut est de **10 px** (`font-mono`).
+- La taille de police par défaut est de **14 px** (`font-mono`).
 
 ---
 
@@ -66,7 +66,7 @@ Le panneau inférieur hébergeant les deux mini-views (AVANT / APRÈS) est enti�
 - **Comportement déplié (`showMiniViews === true`)** :
   - Le séparateur horizontal est à nouveau visible et actif.
   - La hauteur du tableau d'historique est restreinte à la valeur fixée par le séparateur (`historyHeight`).
-  - Le panneau inférieur des mini-views comparatives réapparaît en prenant la place restante (`flex-1`) avec une contrainte de hauteur minimale de **120 px** (`min-h-[120px]`) pour garantir la lisibilité des deux fenêtres.
+  - Le panneau inférieur des mini-views comparatives réapparaît en prenant la place restante (`flex-1`) avec une contrainte de hauteur minimale de **100 px** (`min-h-[100px]`) pour garantir la lisibilité des deux fenêtres.
 
 ---
 
@@ -76,7 +76,7 @@ L'agencement des mini-views AVANT et APRÈS s'adapte dynamiquement aux contraint
 1. **Empilement vertical systématique** : Contrairement aux zones de saisie gauche qui peuvent basculer de côte à côte, les deux mini-views comparatives conservent toujours une disposition verticale (`flex-col gap-2`). Les deux blocs sont empilés (AVANT au-dessus, APRÈS en dessous) pour préserver la lisibilité de la structure de code dans le bandeau droit dont la largeur minimale est de **280 px**.
 2. **Hauteur adaptative et défilement interne** :
    - Chaque mini-view possède un style `flex-1 overflow-auto` et une hauteur minimale (`min-h-0`) pour forcer l'affichage de barres de défilement internes individuelles (horizontalement et verticalement) en cas de débordement du texte, empêchant ainsi le panneau d'historique de déborder de l'écran.
-3. **Police fixe et échelle de zoom** : La taille de police par défaut est de **10 px** (`font-mono`) pour maximiser la quantité de texte affichée dans un espace contraint, et l'ajustement est rendu dynamique par le hook de zoom individuel.
+3. **Police fixe et échelle de zoom** : La taille de police par défaut est de **14 px** (`font-mono`) pour maximiser la lisibilité dans un espace contraint, et l'ajustement est rendu dynamique par le hook de zoom individuel.
 
 ---
 

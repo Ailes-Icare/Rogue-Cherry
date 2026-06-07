@@ -71,11 +71,15 @@ Les boutons de l'interface Rogue Cherry utilisent des classes CSS strictes défi
 
 ---
 
-### 3.3 Améliorations Responsives Cibles (Futur)
-Actuellement, ces boutons ont une taille fixe et peuvent empiéter ou passer au dessus de la sidebar droite lorsque celle-ci s'élargit ou que le panneau central rétrécit. il convient de réordonnancer leur position (passer les boutons au dessous de la sidebar)
-- **Règle de dimensionnement réactif** : Le titre et les boutons occupent environ 1060px en pleine taille par défaut (avec le titre par défaut). Dès que la largeur utile descend sous 1060px, le titre et les boutons doivent réduire leur échelle progressivement jusqu'à atteindre un minimum de **50% de leur taille initiale**.
-conséquement, la barre horizontale a 95 pixel se réduira pour passer a 48 pixel en taille minimale.
-- **Titre multi-ligne** : Si la longueur en pixels du titre dépasse environ 600px, le titre doit se répartir sur deux lignes (avec mise à la ligne du numéro de version). Les 70px de hauteur utile du bandeau permettent cette disposition sur deux lignes sans dépassement. le titre doit rester dans l'encombrement vertical défini par les boutons, et la mise à l'échelle doit rester conforme à cette règle.
+### 3.3 Comportement Réactif et Responsive
+
+- **Largeur des boutons d'actions** : Les 6 boutons principaux (OUVRIR, IMPORT, EXPORT, SAUVER, UP VER et le logo Cerises) ont **strictement la même largeur**.
+- **Cinématique responsive en 3 étapes** (déclenchée par le redimensionnement de la zone centrale) :
+  1. *Étape 1 : Rapprochement* : Les boutons de droite se rapprochent du titre à taille constante de 100% (`scale = 1.0`).
+  2. *Étape 2 : Titre double-ligne* : Lorsque l'espace restant entre le titre simple ligne et les boutons de droite est inférieur à la largeur requise pour le titre simple ligne, le titre passe sur deux lignes (`TEXTE SOURCE - [NOM_PROJET]` sur la première ligne, et `[VERSION]` sur la deuxième, sans préfixe). Durant cette étape, la taille du titre et des icônes/boutons reste inchangée à 100% (`scale = 1.0`).
+  3. *Étape 3 : Mise à l'échelle progressive* : Si la largeur continue de diminuer et que l'espace restant est inférieur à la largeur requise pour le titre sur deux lignes, on commence à réduire progressivement l'échelle (`scale` de 1.0 à 0.5) de la hauteur du bandeau (de 95px à 48px), de la taille de police du titre, et de la dimension des boutons/icônes.
+- **Masquage réactif des textes (Seuil de lisibilité)** : Une fois le facteur d'échelle inférieur à **0.80** (`scale < 0.8`), les textes explicatifs sous les icônes (`OUVRIR`, `IMPORT`, etc.) sont supprimés pour ne pas être illisibles. Les icônes SVG sont alors automatiquement agrandies de **24px à 32px** pour occuper l'espace libéré et rester faciles à actionner.
+- **Butée de sécurité visuelle** : L'en-tête central et la zone centrale possèdent des règles de masquage d'overflow strictes (`overflow: hidden`). Il est totalement exclu que les boutons puissent chevaucher ou passer par-dessus ou par-dessous le bandeau de la sidebar droite. Tout dépassement visuel est coupé net au niveau de la bordure du splitter vertical.
 
 ---
 
@@ -83,5 +87,5 @@ conséquement, la barre horizontale a 95 pixel se réduira pour passer a 48 pixe
 
 À l'extrême droite du bandeau, un pavé vertical composé de deux boutons (`+` et `-`) permet d'ajuster rapidement la taille du texte de l'éditeur principal :
 - **Bouton `+`** : Augmente la taille de la police (`fontSize`) jusqu'à une limite maximale de **30px**.
-- **Bouton `-`** : Diminue la taille de la police jusqu'à une limite minimale de **8px**.
-- Raccourci alternatif : `Ctrl + Molette` directement sur la zone de texte de l'éditeur principal produit le même effet (avec une limite haute de **40px**).
+- **Bouton `-`** : Diminue la taille de la police jusqu'à une limite minimale de **16px** (facteur 2 d'agrandissement de la taille standard minimale par rapport aux anciennes versions pour préserver une lisibilité totale).
+- Raccourci alternatif : `Ctrl + Molette` directement sur la zone de texte de l'éditeur principal produit le même effet (avec une limite basse de **16px** et une limite haute de **40px**).

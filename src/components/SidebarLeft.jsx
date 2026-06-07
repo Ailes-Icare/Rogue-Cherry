@@ -98,6 +98,7 @@ export default function SidebarLeft({
   syntaxConfig,
   width,
   onPlayStack,
+  onCopyStack,
   onClearStack,
   onRevertRequest,
   onAuditIA,
@@ -115,7 +116,9 @@ export default function SidebarLeft({
   isFindEscapeHatchActive,
   onForceFindEscapeHatch,
   disabled = false,
-  isSmartCancelActive
+  isSmartCancelActive,
+  onDoubleClickMulti,
+  onDoubleClickSmart
 }) {
   const { showAlert } = useMessageBox();
   const [showInvisibles, setShowInvisibles] = useState(true);
@@ -486,6 +489,13 @@ Règles d'or MANDATORY :
             <div className="flex items-center gap-2">
               <span className="text-[#20b2aa]">{pendingRequests.length} REQUÊTE{pendingRequests.length > 1 ? 'S' : ''}</span>
               <button 
+                onClick={(e) => { e.stopPropagation(); onCopyStack && onCopyStack(); }}
+                className="text-[#4da6ff] hover:bg-[#4da6ff22] rounded px-1 transition"
+                title="Copier la pile multistack reconstituée"
+              >
+                📋
+              </button>
+              <button 
                 onClick={(e) => { e.stopPropagation(); onClearStack(); }}
                 className="text-[#ff5555] hover:bg-[#ff555522] rounded px-1 transition"
                 title="Vider et supprimer la pile de requêtes"
@@ -581,7 +591,7 @@ Règles d'or MANDATORY :
             type="button"
             disabled={occurrencesCount === 0 || isGlobalSearching}
             onClick={onReplace}
-            className={`${(pendingRequests && pendingRequests.length > 0) ? 'w-1/2' : 'w-full'} bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 ${occurrencesCount === 0 || isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''} ${activeStackIndex >= 0 && pendingRequests && pendingRequests.length > 0 ? 'outline outline-2 outline-primary-blue outline-offset-1' : ''} select-none`}
+            className={`${(pendingRequests && pendingRequests.length > 0) ? 'w-1/2' : 'w-full'} bg-cherry-red hover:bg-cherry-red-hover text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 ${occurrencesCount === 0 || isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''} select-none`}
             title="Appliquer cette requête individuellement"
           >
             {replaceText === "" ? '🗑️ SUPPRIMER L\'OCCURRENCE' : '⚙️ APPLIQUER'}
@@ -592,7 +602,7 @@ Règles d'or MANDATORY :
               type="button"
               disabled={isGlobalSearching}
               onClick={onPlayStack}
-              className={`w-1/2 bg-[#4caf50] hover:bg-[#45a049] text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 select-none flex items-center justify-center gap-1 ${isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''}`}
+              className={`w-1/2 bg-[#4caf50] hover:bg-[#45a049] text-white font-extrabold text-xs rounded-sm shadow-md transition duration-150 select-none flex items-center justify-center gap-1 ${isGlobalSearching ? 'opacity-40 cursor-not-allowed' : ''} ${activeStackIndex > 0 && activeStackIndex < pendingRequests.length ? 'outline outline-2 outline-primary-blue outline-offset-1' : ''}`}
               title="Appliquer les requêtes de la pile dans l'ordre à partir de la requête active."
             >
               ▶ APPLIQUER PILE
@@ -659,6 +669,7 @@ Règles d'or MANDATORY :
               disabled={isCodeEmpty || isGlobalSearching}
               placeholder={isCodeEmpty ? "" : "Ex: Refactorisation du calcul de version..."}
               className="w-full min-h-[30px] p-2 bg-bg-dark border border-border-dark rounded-sm text-sm font-mono text-hl-yellow resize-none shrink"
+              style={{ fontSize: 'calc(14px + var(--global-zoom-offset, 0px))' }}
             />
           )}
         </div>
@@ -687,8 +698,9 @@ Règles d'or MANDATORY :
                type="button"
                disabled={isCodeEmpty}
                onClick={() => onChangeIgnoreSpaces(!ignoreSpaces)}
+               onDoubleClick={() => !isCodeEmpty && onDoubleClickSmart && onDoubleClickSmart()}
                className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${isCodeEmpty ? 'opacity-40 cursor-not-allowed text-[#555]' : (ignoreSpaces ? 'bg-[#4caf50] text-white shadow-[0_0_8px_rgba(76,175,80,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]')}`}
-               title="Concilier espaces et majuscules (Smart)"
+               title="Concilier espaces et majuscules (Smart). Double-cliquez pour sauvegarder cette option par défaut."
             >
                SMART
             </button>
@@ -778,7 +790,7 @@ Règles d'or MANDATORY :
         <div 
           ref={zoomRef1}
           className="flex-1 min-h-[40px] border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
-          style={{ fontSize: 'var(--zoom-size, 14px)' }}
+          style={{ fontSize: 'calc(var(--zoom-size, 14px) + var(--global-zoom-offset, 0px))' }}
         >
           <div 
             ref={backdrop1Ref}
@@ -812,7 +824,7 @@ Règles d'or MANDATORY :
         <div 
           ref={zoomRef2}
           className="flex-1 min-h-[40px] border border-border-dark bg-bg-dark rounded-sm relative overflow-hidden"
-          style={{ fontSize: 'var(--zoom-size, 14px)' }}
+          style={{ fontSize: 'calc(var(--zoom-size, 14px) + var(--global-zoom-offset, 0px))' }}
         >
           <div 
             ref={backdrop2Ref}
@@ -847,29 +859,50 @@ Règles d'or MANDATORY :
           {/* Options de validation (Gauches) */}
           <div className="flex flex-col gap-2 flex-1 justify-start min-h-[88px]">
           
-          <div className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`} onClick={() => !isCodeEmpty && onChangeSplitChars(!splitChars)}>
-            <button 
-              disabled={isCodeEmpty}
-              className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${splitChars ? 'bg-[#007acc] text-white shadow-[0_0_8px_rgba(0,122,204,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
-            >
-              STRICT
-            </button>
-            <label className={`select-none text-[11px] ${splitChars ? 'text-white font-bold' : 'text-[#ccc]'} ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-              Moteur strict (LCS fin)
-            </label>
-          </div>
+          {(() => {
+            const availableWidthForLabels = (multiMode && occurrencesCount > 0) ? width * 0.55 : width;
+            const showLabels = availableWidthForLabels >= 210;
+            return (
+              <>
+                <div 
+                  className={`flex items-center gap-2 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`} 
+                  onClick={() => !isCodeEmpty && onChangeSplitChars(!splitChars)}
+                  title="Moteur Strict (LCS DraftSurge) :&#10;- ACTIF : Calcule une comparaison extrêmement fine au caractère près pour coloriser précisément les lettres/mots modifiés (tonalités violettes).&#10;- INACTIF : Calcule une comparaison simplifiée par blocs de mots.&#10;Note : Cette option n'affecte que le rendu visuel de la colorisation et n'altère pas le résultat final du remplacement dans le document."
+                >
+                  <button 
+                    disabled={isCodeEmpty}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${splitChars ? 'bg-[#007acc] text-white shadow-[0_0_8px_rgba(0,122,204,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
+                  >
+                    STRICT
+                  </button>
+                  {showLabels && (
+                    <label className={`select-none text-[11px] ${splitChars ? 'text-white font-bold' : 'text-[#ccc]'} ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      Moteur strict (LCS fin)
+                    </label>
+                  )}
+                </div>
 
-          <div className={`flex items-center gap-2 mt-1 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`} onClick={() => !isCodeEmpty && onChangeMultiMode(!multiMode)}>
-            <button 
-              disabled={isCodeEmpty}
-              className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${multiMode ? 'bg-[#5c2d91] text-white shadow-[0_0_8px_rgba(92,45,145,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
-            >
-              MULTI
-            </button>
-            <label className={`select-none text-[11px] ${multiMode ? 'text-white font-bold' : 'text-[#ccc]'} ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-              Multi-emplacement ({occurrencesCount} trouvé{occurrencesCount !== 1 ? 's' : ''})
-            </label>
-          </div>
+                <div 
+                  className={`flex items-center gap-2 mt-1 ${isCodeEmpty ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`} 
+                  onClick={() => !isCodeEmpty && onChangeMultiMode(!multiMode)}
+                  onDoubleClick={() => !isCodeEmpty && onDoubleClickMulti && onDoubleClickMulti()}
+                  title="Appliquer le remplacement à toutes les occurrences correspondantes trouvées. Double-cliquez pour sauvegarder cette option par défaut."
+                >
+                  <button 
+                    disabled={isCodeEmpty}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${multiMode ? 'bg-[#5c2d91] text-white shadow-[0_0_8px_rgba(92,45,145,0.6)]' : 'bg-[#555] text-[#ccc] hover:bg-[#666]'}`}
+                  >
+                    MULTI
+                  </button>
+                  {showLabels && (
+                    <label className={`select-none text-[11px] ${multiMode ? 'text-white font-bold' : 'text-[#ccc]'} ${isCodeEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      Multi-emplacement ({occurrencesCount} trouvé{occurrencesCount !== 1 ? 's' : ''})
+                    </label>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           </div>
 
@@ -932,7 +965,7 @@ Règles d'or MANDATORY :
         <div className="flex justify-between items-center mt-3">
           <div className="flex items-baseline gap-2 opacity-70 cursor-default">
             <span className="text-lg sm:text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cherry-red to-purple-500 uppercase tracking-wider leading-none">Rogue Cherry</span>
-            <span className="text-xs font-bold text-text-light/60">V1 Release / 8.11</span>
+            <span className="text-xs text-text-light/60">V1.9.0 / <span className="text-yellow-500 font-bold">Alpha V2</span></span>
           </div>
           <button
             type="button"

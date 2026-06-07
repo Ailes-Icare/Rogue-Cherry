@@ -23,6 +23,8 @@ L'interface de l'application est divisée horizontalement en trois colonnes prin
 2. **Zone Centrale** : En-tête de contrôle principal, bandeau de recherche globale, onglets multi-fichiers, éditeur de code source (`CodeEditor.jsx`) et barre de statut.
 3. **Panneau Droit (`SidebarRight.jsx`)** : Contrôleur d'historique (Time-Travel), importation/exportation de projets, et mini-views comparatives.
 
+Chacun des panneaux latéraux peut être **complètement replié (Collapsed)** grâce à un petit chevron interactif (▶ ou ◀) intégré directement sur les barres de séparation (splitters verticaux). Lorsqu'un panneau est replié, la zone centrale récupère la largeur correspondante de manière fluide. Un nouveau clic sur le chevron du splitter concerné redéploie le panneau latéral à sa largeur exacte précédente.
+
 ### Ratios et Contraintes de Largeur
 
 - **Proportions Initiales (Par défaut)** :
@@ -38,8 +40,9 @@ L'interface de l'application est divisée horizontalement en trois colonnes prin
 En cas de réduction de la largeur de la fenêtre du navigateur :
 1. **Étape 1 (Priorité Centrale)** : Les panneaux latéraux (Gauche et Droit) absorbent en priorité le delta négatif de largeur en se réduisant de manière équitable.
 2. **Étape 2 (Butées Latérales)** : Les panneaux latéraux continuent de rétrécir jusqu'à atteindre leur largeur minimale absolue de **280 px**.
-3. **Étape 3 (Réduction Centrale)** : Ce n'est qu'une fois les deux panneaux latéraux bloqués à 280px que la zone centrale commence elle-même à se réduire en deçà de 50%.
-4. **Étape 4 (Débordement)** : La zone centrale se bloque à **450 px**. Si la fenêtre rétrécit encore, un défilement horizontal global (`overflow-x-auto`) est appliqué à l'application.
+3. **Étape 3 (Repli Manuel Global)** : À tout moment, l'utilisateur peut choisir de masquer un ou les deux panneaux latéraux en cliquant sur leurs splitters respectifs. La largeur mémoire du panneau est conservée en arrière-plan.
+4. **Étape 4 (Réduction Centrale)** : Ce n'est qu'une fois les deux panneaux latéraux bloqués à 280px (ou complètement repliés) que la zone centrale commence elle-même à se réduire en deçà de sa répartition dynamique par défaut.
+5. **Étape 5 (Débordement)** : La zone centrale se bloque à **450 px**. Si la fenêtre rétrécit encore, un défilement horizontal global (`overflow-x-auto`) est appliqué à l'application.
 
 ---
 
@@ -80,7 +83,7 @@ La sidebar droite est structurée verticalement en 4 zones principales, délimit
 | **2. Tableau d'Historique (Time-Travel)** | [sidebar-right-history.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-history.md) | Flexible (géré par le splitter) |
 | *--- SPLITTER HORIZONTAL ---* | *Séparateur interactif* | - |
 | **3. Contrôles de Version & Actions** | [sidebar-right-controls.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-controls.md) | **Fixe et Incompressible** |
-| **4. Mini-Views AVANT / APRÈS** | [sidebar-right-miniviews.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-miniviews.md) | Flexible (Redimensionnable, min 120px) |
+| **4. Mini-Views AVANT / APRÈS** | [sidebar-right-miniviews.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-miniviews.md) | Flexible (Redimensionnable, min 100px) |
 
 ---
 

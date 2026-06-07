@@ -45,6 +45,7 @@ Dès qu'une pile multistack contient des requêtes en attente, le groupe de bout
   - Le bouton **▶ APPLIQUER PILE** apparaît à droite :
     - *Rôle* : Déclenche l'exécution séquentielle automatique de toutes les requêtes en attente de la pile, dans l'ordre chronologique, à partir de la requête actuellement sélectionnée.
     - *Style* : Fond vert vif (`bg-[#4caf50] hover:bg-[#45a049]`), texte blanc, extra-gras.
+      - **Indicateur visuel de pause (Liseré bleu)** : Si la pile multistack a été arrêtée en cours de route (index actif > 0), le bouton reçoit un liseré bleu lumineux animé (`shadow-[0_0_8px_#3b82f6] border border-blue-500`) pour indiquer à l'utilisateur qu'il peut reprendre l'exécution de la pile à cet endroit précis.
     - *Activation* : Désactivé si la recherche globale supérieure est active.
     - *Mécanique et Règles d'Interruption* :
       La pile se déroule automatiquement en appliquant chaque étape avec une temporisation d'animation de 500 ms jusqu'à ce qu'un événement provoque son arrêt :

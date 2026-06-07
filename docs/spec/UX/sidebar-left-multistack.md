@@ -119,8 +119,7 @@ Chaque ligne affiche à son extrémité gauche une icône de statut colorée ref
 
 Lors du traitement ou de la lecture pas-à-pas des requêtes de la pile (ex: exécution d'une pile ou transition automatique) :
 - **Temporisation de transition (Timer 500ms)** : Afin de permettre à l'utilisateur de suivre les modifications à l'écran, un délai d'attente de **500 ms** (0,5 seconde) est appliqué avant de déclencher le remplacement effectif de chaque étape de la pile (`handleReplace`). Ce délai permet d'observer brièvement la mise en valeur de la ligne cible et de fluidifier le rendu du live diff.
-
----
+- **Précalcul du texte (Anti-stale state)** : Lors de l'application consécutive de plusieurs requêtes dans la même boucle d'exécution React, la requête $N+1$ doit toujours être évaluée contre le résultat de la requête $N$. Puisque la mise à jour du Store (`store.currentText`) est asynchrone pour la vue, l'orchestrateur calcule le nouveau texte de façon synchrone (`latestText`) via `applyDeltaOnText` pour le transmettre à la méthode de chargement de l'UI (`loadRequestIntoUI`). Cela évite les alertes intempestives de "Requête introuvable" causées par un état textuel obsolète.
 
 ## Responsive et redimensionnement
 

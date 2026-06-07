@@ -21,10 +21,15 @@ export function useZoomable(initialSize = 14) -> callbackRef
 - **Isolation du Zoom** : Lorsque l'événement est intercepté avec `e.ctrlKey === true` :
   - Appelle `e.preventDefault()` pour empêcher le navigateur de zoomer sur toute la page web.
   - Appelle `e.stopPropagation()` pour empêcher les conteneurs parents de recevoir l'événement, ce qui permet d'isoler chaque zone de zoom de façon indépendante.
-- **Bornes physiques de zoom** :
-  - Incrémentation/décrémentation de la valeur en pixels.
+- **Bornes physiques de zoom local** :
+  - Incrémentation/décrémentation de la valeur en pixels via la molette.
   - La valeur est clampée de manière stricte entre **8 px** (minimum) et **40 px** (maximum).
-  - La valeur finale est injectée sous forme de variable CSS `--zoom-size` directement dans le style inline de l'élément cible, permettant de répercuter dynamiquement la taille sur le calque de fond et le textarea.
+  - La valeur locale est injectée sous forme de variable CSS `--zoom-size` directement dans le style inline de l'élément cible.
+- **Intégration du Zoom Global** :
+  - L'application dispose d'un décalage de zoom global (`--global-zoom-offset`) géré dans `App.jsx`.
+  - Les conteneurs combinant les deux mécanismes utilisent un calcul hybride CSS pour adapter leur taille de manière réactive :
+    `style={{ fontSize: 'calc(var(--zoom-size, 14px) + var(--global-zoom-offset, 0px))' }}`
+  - Cela permet de conserver des zones avec un zoom indépendant fort (via `useZoomable`) tout en respectant le niveau de confort de base défini globalement par l'utilisateur.
 
 ---
 
