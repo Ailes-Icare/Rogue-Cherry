@@ -60,4 +60,4 @@ export function useDraggable(options = { disabled: false }) -> { position, isDra
 
 - Les modales déplaçables (`VersionTagModal`, `MessageBox`) importent et s'appuient sur `useDraggable`.
 - Les zones de texte à zoom indépendant (`CodeEditor`, `SidebarLeft`, `SmartDebugger`) importent et utilisent `useZoomable`.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles d'agencement global.
+- Voir [ui-layout-main.md](../UX/ui-layout-main.md) pour les règles d'agencement global.

@@ -3,8 +3,8 @@
 **Fichier source** : `src/components/SmartDebugger.jsx` (1203 lignes)
 
 Ce document définit l'agencement visuel, le squelette structurel et les contrôles de positionnement de la modale de débogage. Pour les spécifications logiques, voir :
-- Le [Contrôleur de l'Éditeur Miroir (modal-debug-code-editor.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/modal-debug-code-editor.md)
-- Le [Contrôleur de Saisie et de Recherche (modal-debug-recherche.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/modal-debug-recherche.md)
+- Le [Contrôleur de l'Éditeur Miroir (modal-debug-code-editor.md)](../UX/modal-debug-code-editor.md)
+- Le [Contrôleur de Saisie et de Recherche (modal-debug-recherche.md)](../UX/modal-debug-recherche.md)
 
 ---
 
@@ -98,7 +98,7 @@ Dès que l'utilisateur saisit du texte dans le champ de recherche globale du dé
 - **Rétablissement** : Dès que le champ de recherche est vidé, la colonne gauche se réactive instantanément, retrouvant son opacité et ses états d'interaction (y compris l'état d'activation du Find dynamique `isFindActive` tel qu'il était avant le gel).
 
 ### 4.3 Comparaison avec le Layout Principal
-Bien que partageant le même code sous-jacent et les mêmes comportements réactifs (voir [zone-centrale-recherche.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-recherche.md) et [GlobalSearch.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/GlobalSearch.md)), la recherche globale du Débogueur présente les différences d'UI suivantes :
+Bien que partageant le même code sous-jacent et les mêmes comportements réactifs (voir [zone-centrale-recherche.md](../UX/zone-centrale-recherche.md) et [GlobalSearch.md](../UX/GlobalSearch.md)), la recherche globale du Débogueur présente les différences d'UI suivantes :
 - **Emplacement** : Elle est intégrée **en haut de la colonne droite (miroir)** du Débogueur, tandis que la recherche principale est située au-dessus de l'éditeur central de la page principale.
 - **Périmètre d'effet** : Ses sauts de navigation, son liseret rouge de ciblage de 1500ms et sa heatmap s'appliquent exclusivement sur le **Miroir de prévisualisation (colonne droite)** et n'affectent jamais l'éditeur principal de l'application.
 - **Périmètre de gel** : Son activation gèle la colonne gauche de la modale de débogage, tandis que la recherche globale principale gèle la Sidebar gauche de l'application.
@@ -117,7 +117,7 @@ Pour préserver l'espace de la barre de statut principale, la modale intègre **
 - **Position** : Situé en haut à droite du panneau droit, dans la barre d'en-tête noire du "Miroir de Prévisualisation du Texte Source".
 - **Action** : Active ou désactive l'affichage des caractères invisibles spécifiquement dans la zone d'affichage du code miroir à droite.
 
-*Ces deux contrôles fonctionnent sur le même principe visuel que le bouton œil de l'éditeur principal (voir [zone-centrale-bandeau-bas.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-bandeau-bas.md)), mais agissent indépendamment sur leurs panneaux respectifs.*
+*Ces deux contrôles fonctionnent sur le même principe visuel que le bouton œil de l'éditeur principal (voir [zone-centrale-bandeau-bas.md](../UX/zone-centrale-bandeau-bas.md)), mais agissent indépendamment sur leurs panneaux respectifs.*
 
 ---
 

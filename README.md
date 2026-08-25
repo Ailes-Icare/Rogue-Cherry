@@ -1,7 +1,17 @@
 # Rogue-Cherry
-🍒 **ROGUE CHERRY** Semantic Injection. Zero Dependency.
+🍒 **ROGUE CHERRY** Semantic Injection. Zéro appel réseau.
 
-> 🛡️ **Environment:** Restricted-Safe | ⚡ **Dependencies:** Zero-JS-Library | 🍒 **Release:** V1.0 Stable (React V8)
+> 🛡️ **Environnement :** poste verrouillé, sans droits d'installation | ⚡ **Réseau :** aucun appel sortant, aucun CDN, aucune API tierce | 🍒 **Version :** V1.0 Stable (moteur React)
+
+**Le livrable est un fichier HTML unique** : [`dist/index.html`](dist/index.html), ~1,4 Mo,
+à télécharger et ouvrir par double-clic. Ni Node, ni serveur, ni connexion.
+React et Tailwind sont compilés *dedans* — ils ne sont pas chargés depuis Internet.
+
+![Aperçu de Rogue Cherry : un document technique chargé, l'occurrence cible surlignée dans l'éditeur, et le diff sémantique mot à mot dans le panneau de remplacement](docs/captures/apercu-recherche.png)
+
+*Un document de spécification chargé, une occurrence unique localisée, et le
+diff sémantique qui montre mot à mot ce qui va changer avant d'appliquer.
+L'historique des versions se remplit à droite, à chaque opération.*
 
 ---
 
@@ -111,7 +121,7 @@ L'outil ne pardonne pas l'erreur, il l'annule.
 
 Sous la carrosserie, Rogue Cherry est propulsé par DraftSurge. Une architecture algorithmique taillée pour la précision mathématique et l'intégrité absolue de vos données :
 
-- **100% Local (Zero-Dependency) :** Vos données industrielles ne quittent jamais votre poste. Aucune API tierce, aucune librairie externe. L'outil est un coffre-fort fonctionnant en hors-ligne total.
+- **100 % local, zéro appel réseau :** vos données ne quittent jamais votre poste. Aucune API tierce, aucun CDN, aucune télémétrie — le fichier compilé n'ouvre pas une seule connexion. Les bibliothèques utilisées (React, Tailwind) sont *embarquées dans le fichier* au moment du build, jamais téléchargées à l'exécution. L'outil fonctionne en hors-ligne total, y compris sur un poste sans droits d'installation.
 
 - **Diffing Sémantique (Double Passe) :** L'algorithme isole la recherche et le remplacement pour générer une matrice de différences locales (LCS). Cette matrice est ensuite projetée mathématiquement sur le code global, éliminant tout artefact visuel ou bavage de couleur.
 
@@ -333,7 +343,7 @@ Par conséquent, l'ouverture directe du fichier source `index.html` (1 Ko) par d
 
 Deux modes d'utilisation s'offrent à vous :
 
-### 7.1. Mode Développeur (Modulaire / Rapide)
+### 10.1. Mode Développeur (Modulaire / Rapide)
 Idéal si vous souhaitez faire évoluer ou modifier le code source :
 1. Téléchargez et installez **Node.js** (recommandé LTS) pour disposer de la commande `npm`.
 2. Ouvrez une console dans le dossier du projet et installez les dépendances :
@@ -346,8 +356,10 @@ Idéal si vous souhaitez faire évoluer ou modifier le code source :
    ```
 4. Ouvrez l'adresse fournie par Vite (ex: `http://localhost:5173`) dans votre navigateur.
 
-### 7.2. Mode Production : Fichier HTML Unique Auto-Contenu (S.O.P. Standard) 🍒
-Conformément au cahier des charges initial, **Rogue Cherry peut être compilé en un seul fichier HTML autonome de ~250 Ko**, léger, auto-contenu et transportable (contenant la logique React, les styles Tailwind et les utilitaires d'invisibles inlinés) !
+### 10.2. Mode Production : Fichier HTML Unique Auto-Contenu (S.O.P. Standard) 🍒
+Conformément au cahier des charges initial, **Rogue Cherry se compile en un seul fichier HTML autonome**, auto-contenu et transportable : la logique React, les styles Tailwind et les utilitaires d'invisibles y sont tous inlinés. Il pèse **environ 1,4 Mo** — le prix de l'autonomie complète, à comparer aux quelques centaines de kilo-octets qu'il faudrait sinon aller chercher sur un CDN à chaque ouverture.
+
+**Vous n'êtes pas obligé de le compiler vous-même :** le fichier est livré dans ce dépôt, à [`dist/index.html`](dist/index.html).
 
 Pour générer ce fichier unique :
 1. Exécutez la commande de build suivante depuis votre terminal :

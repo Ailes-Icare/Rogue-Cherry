@@ -2,7 +2,7 @@
 
 **Contexte** : Bandeau supérieur de l'éditeur principal, intégré à `App.jsx` / `CodeEditor.jsx`.
 
-La recherche globale DraftSearch est un outil de navigation rapide indépendant de la pile d'historique. Elle utilise les algorithmes et l'échappement de sécurité décrits dans le [Moteur de Recherche Commun (recherche.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/recherche.md).
+La recherche globale DraftSearch est un outil de navigation rapide indépendant de la pile d'historique. Elle utilise les algorithmes et l'échappement de sécurité décrits dans le [Moteur de Recherche Commun (recherche.md)](recherche.md).
 
 ---
 
@@ -72,7 +72,7 @@ La recherche globale DraftSearch injecte `globalSearchMarks` dans `CodeEditor.js
 - Cela évite des collisions de marqueurs entre les deux systèmes de recherche.
 
 ### 3.5 Échappement de Sécurité (Escape Hatch)
-- Repose sur la mécanique commune de sécurité détaillée dans le [Moteur de Recherche Commun (recherche.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/recherche.md).
+- Repose sur la mécanique commune de sécurité détaillée dans le [Moteur de Recherche Commun (recherche.md)](recherche.md).
 - Si le document dépasse `maxLines` et que la recherche est inférieure à `minChars` caractères → alerte bloquante.
 
 ---

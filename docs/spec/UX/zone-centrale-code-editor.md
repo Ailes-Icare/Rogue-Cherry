@@ -9,9 +9,9 @@ Ce document décrit le rôle de contrôleur de la zone centrale vis-à-vis du co
 ## 1. Distinction : Composant vs Contrôleur
 
 Pour éviter les duplications et régressions, une séparation stricte est observée :
-- **Composant `CodeEditor.jsx`** : Fournit le moteur de rendu optimisé (Windowing / Virtualisation), la gouttière des numéros de ligne, le support des caractères invisibles, et la zone d'édition (textarea/div). C'est une boîte noire visuelle et fonctionnelle décrite dans [CodeEditor.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/CodeEditor.md).
+- **Composant `CodeEditor.jsx`** : Fournit le moteur de rendu optimisé (Windowing / Virtualisation), la gouttière des numéros de ligne, le support des caractères invisibles, et la zone d'édition (textarea/div). C'est une boîte noire visuelle et fonctionnelle décrite dans [CodeEditor.md](CodeEditor.md).
 - **Contrôleur de la Zone Centrale (`App.jsx`)** : C'est l'instance maîtresse de l'éditeur dans le flux principal. Il gère la persistance du texte, la distribution des marqueurs de diff, et l'intégration dans l'historique des versions.
-- **Contrôleur du Débogueur (`SmartDebugger.jsx`)** : C'est une instance secondaire de l'éditeur, isolée, utilisée spécifiquement pour le travail de débogage et de simulation (décrite dans [SmartDebugger.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/modal/SmartDebugger.md)).
+- **Contrôleur du Débogueur (`SmartDebugger.jsx`)** : C'est une instance secondaire de l'éditeur, isolée, utilisée spécifiquement pour le travail de débogage et de simulation (décrite dans [SmartDebugger.md](../modal/SmartDebugger.md)).
 
 **Le contrôleur est spécifique à la fenêtre principale sur quelques points particuliers :**
 - **Logo central (Filigrane) en arrière-plan** :
@@ -21,7 +21,7 @@ Pour éviter les duplications et régressions, une séparation stricte est obser
   - **Position** : Parfaitement centré horizontalement et verticalement dans la zone d'édition.
   - **Mécanique de Scroll fixe (CSS Layering)** : Le conteneur du logo est positionné en absolu (`absolute inset-0`) avec un `zIndex` de `0`. La couche d'affichage du texte du code (`editorWrapperRef`) est positionnée en superposition absolue (`absolute inset-0`) avec un `zIndex` de `1` et gère le défilement (`overflow: auto`). Le logo reste donc fixe à l'écran tandis que le code défile au premier plan.
   - **Gestion de mémoire** : Le logo est entièrement déchargé du DOM (pas simplement masqué) dès que le mode d'édition ou l'affichage des invisibles est activé.
-- **La présence du bandeau de statut au-dessous** (voir [zone-centrale-bandeau-bas.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-bandeau-bas.md))
+- **La présence du bandeau de statut au-dessous** (voir [zone-centrale-bandeau-bas.md](zone-centrale-bandeau-bas.md))
 - **L'UX de sélection in situ pour le Cherry-Picking** (voir Chapitre 4 de ce document)
 
 ---
@@ -72,7 +72,7 @@ L'une des responsabilités clés du contrôleur est de gérer la transition entr
 3. Le contrôleur mémorise la position de scroll actuelle (`savedScrollRef`) de sorte à rester là où se trouve l'utilisateur.
 4. L'éditeur bascule sur un `<textarea>` natif et positionne le curseur au milieu de l'écran visible pour éviter un scroll brutal du navigateur.
 5. **Déchargement du logo** : Le logo central en arrière-plan est instantanément retiré de la zone de texte. Ce déchargement est opéré via un démontage complet du composant d'arrière-plan dans React (`!isEditable && !showInvisibles`), ce qui libère la mémoire et évite tout lag ou ralentissement lors de la saisie au clavier.
-6. **Cumul du Mode Invisibles** : L'activation de l'édition libre n'empêche pas l'affichage cumulatif des caractères invisibles (espaces, tabulations, retours chariot). Si l'affichage des invisibles est activé (icône œil dans la barre de statut basse, voir [zone-centrale-bandeau-bas.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-bandeau-bas.md)), l'éditeur superpose un calque de rendu des invisibles synchronisé en défilement avec le textarea d'édition libre (mécanique détaillée dans [CodeEditor.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/CodeEditor.md)).
+6. **Cumul du Mode Invisibles** : L'activation de l'édition libre n'empêche pas l'affichage cumulatif des caractères invisibles (espaces, tabulations, retours chariot). Si l'affichage des invisibles est activé (icône œil dans la barre de statut basse, voir [zone-centrale-bandeau-bas.md](zone-centrale-bandeau-bas.md)), l'éditeur superpose un calque de rendu des invisibles synchronisé en défilement avec le textarea d'édition libre (mécanique détaillée dans [CodeEditor.md](CodeEditor.md)).
 
 ### 3.2 Sortie et Enregistrement des Modifications
 Lors du clic sur le bouton vert clignotant **ENREGISTRER** :

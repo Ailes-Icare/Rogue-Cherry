@@ -156,6 +156,6 @@ La pile Multistack s'insère dans une hiérarchie de flux et de superposition pr
 
 ## Dépendances et références
 
-- Voir [sidebar-left-top-band.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-top-band.md) pour la zone d'Assistant au-dessus.
-- Voir [sidebar-left-center.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-center.md) pour la zone de boutons d'action située immédiatement en dessous et les mécaniques d'application des consignes de la requete.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles du splitter, du responsive et de la superposition.
+- Voir [sidebar-left-top-band.md](sidebar-left-top-band.md) pour la zone d'Assistant au-dessus.
+- Voir [sidebar-left-center.md](sidebar-left-center.md) pour la zone de boutons d'action située immédiatement en dessous et les mécaniques d'application des consignes de la requete.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles du splitter, du responsive et de la superposition.

@@ -41,7 +41,7 @@ Ces éléments ne s'affichent que si le champ de recherche **n'est pas vide** :
 
 ## 2. Intégration Fonctionnelle
 
-Pour une description exhaustive du moteur de recherche, de la gestion de la sécurité (Escape Hatch) et des priorités d'affichage des marqueurs, se référer au document de spécifications dédié : [Recherche Globale (GlobalSearch.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/GlobalSearch.md).
+Pour une description exhaustive du moteur de recherche, de la gestion de la sécurité (Escape Hatch) et des priorités d'affichage des marqueurs, se référer au document de spécifications dédié : [Recherche Globale (GlobalSearch.md)](GlobalSearch.md).
 
 ---
 

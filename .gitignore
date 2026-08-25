@@ -1,0 +1,29 @@
+# Dependances : reinstallables par `npm install`, jamais versionnees.
+node_modules/
+
+# Build. dist/index.html est conserve volontairement : c'est le livrable,
+# le fichier unique a telecharger et ouvrir. Le reste du dossier, non.
+dist/*
+!dist/index.html
+
+# Sorties d'outillage local et brouillons de mise au point.
+*.log
+log.txt
+diff.txt
+diff_utf8.txt
+git_log_app.txt
+scratch_test*.js
+refactor*.cjs
+*_old.jsx
+
+# Environnements et caches
+.env
+.env.*
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Artefacts systeme
+Thumbs.db
+desktop.ini
+.DS_Store

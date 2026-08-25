@@ -17,9 +17,9 @@ Le bandeau supérieur de gestion est divisé horizontalement en deux blocs disti
   - **Titre à gauche** : Contraint horizontalement à une largeur fixe confortable de **70 px** (`w-[70px] flex-shrink-0`). Le texte "Gestion\nde projet" (14px, extra-gras, interligne serré `leading-[1.1]`) est centré verticalement et écrit sur exactement deux lignes sans retour automatique parasite (`whitespace-nowrap`).
     - **Bascule en texte vertical ("PROJET")** : Si la largeur de la sidebar descend sous **301 px** (soit une largeur disponible pour les barres inférieure à 281px), la Blue Card se réduit et le titre horizontal est automatiquement remplacé par une version verticale lettre-par-lettre épelant `"PROJET"` en taille compacte (10px, gras, lettres empilées). Cela libère l'espace horizontal nécessaire pour conserver la taille des boutons d'actions et du Reset.
   - **Cadre intérieur gris (`#1e1e1e`)** : Prend tout le reste de la largeur disponible (`flex-1`) et regroupe trois boutons d'action de taille égale disposés en ligne (gaps de 8px `gap-2` et paddings de 6px `p-[6px]`) :
-    - **Importer (📂)** : Charge un fichier JSON de projet Rogue Cherry (voir [json-project-schema-v8.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-schema-v8.md) pour la structure V8 attendue, et [json-project-v9-specs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-v9-specs.md) pour la conversion automatique en V9 multi-fichier).
+    - **Importer (📂)** : Charge un fichier JSON de projet Rogue Cherry (voir [json-project-schema-v8.md](../fonction/json-project-schema-v8.md) pour la structure V8 attendue, et [json-project-v9-specs.md](../fonction/json-project-v9-specs.md) pour la conversion automatique en V9 multi-fichier).
       - *État* : Couleur bleue vive (`btn-active-blue`) si aucun projet n'est chargé, gris discret (`btn-disabled-clickable`) si un projet est déjà ouvert.
-    - **Sauvegarder (💾)** : Persiste l'historique complet, les fichiers et l'état actuel dans un fichier JSON unique (voir [json-project-schema-v8.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-schema-v8.md) pour la structure de stockage).
+    - **Sauvegarder (💾)** : Persiste l'historique complet, les fichiers et l'état actuel dans un fichier JSON unique (voir [json-project-schema-v8.md](../fonction/json-project-schema-v8.md) pour la structure de stockage).
       - *État* : Vert vif (`btn-active`) si le projet contient des modifications non enregistrées (`isProjectDirty === true`), gris inactif sinon. Désactivé si aucun projet n'est ouvert.
     - **Fermer (❌)** : Décharge le projet courant de la mémoire de l'application et redirige l'utilisateur vers le SplashScreen d'accueil.
       - *État* : Actif si un projet est ouvert, désactivé sinon.
@@ -94,12 +94,12 @@ Lorsque l'utilisateur travaille sur plusieurs projets distincts en parallèle, u
 
 ## Division des boutons en mode Multi-Fichiers (Spécifications V9)
 
-Dès qu'un projet ouvert contient **2 fichiers internes ou plus**, les boutons de sauvegarde (💾) et d'export (présents dans la barre de contrôles d'action) se divisent verticalement pour introduire des sous-boutons (voir [json-project-v9-specs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-v9-specs.md) pour les détails techniques de l'arborescence et de l'export) :
+Dès qu'un projet ouvert contient **2 fichiers internes ou plus**, les boutons de sauvegarde (💾) et d'export (présents dans la barre de contrôles d'action) se divisent verticalement pour introduire des sous-boutons (voir [json-project-v9-specs.md](../fonction/json-project-v9-specs.md) pour les détails techniques de l'arborescence et de l'export) :
 
 - **Sauvegarder TOUT** :
   - Déclenche un prompt MessageBox demandant à l'utilisateur de choisir entre :
-    1. *Sauvegarder le JSON unique* : Exporte un fichier JSON global contenant tous les fichiers et l'historique commun (voir [json-project-v9-specs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-v9-specs.md#51-sauvegarde-unique-en-fichier-json-global)).
-    2. *Sauvegarder chaque fichier* : Écrit séparément chaque fichier sur le disque. Utilise l'API *File System Access* (via le pointeur `fileHandle` conservé en mémoire) pour écraser silencieusement les fichiers d'origine sans ouvrir de boîte de dialogue système répétitive (voir [json-project-v9-specs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-v9-specs.md#52-sauvegarde-physique-individuelle-des-fichiers-sur-le-disque)).
+    1. *Sauvegarder le JSON unique* : Exporte un fichier JSON global contenant tous les fichiers et l'historique commun (voir [json-project-v9-specs.md](../fonction/json-project-v9-specs.md#51-sauvegarde-unique-en-fichier-json-global)).
+    2. *Sauvegarder chaque fichier* : Écrit séparément chaque fichier sur le disque. Utilise l'API *File System Access* (via le pointeur `fileHandle` conservé en mémoire) pour écraser silencieusement les fichiers d'origine sans ouvrir de boîte de dialogue système répétitive (voir [json-project-v9-specs.md](../fonction/json-project-v9-specs.md#52-sauvegarde-physique-individuelle-des-fichiers-sur-le-disque)).
 - **Exporter TOUT** :
   - Génère un JSON simplifié contenant l'état final de tous les fichiers du projet, avec leurs métadonnées (nom de fichier, chemin relatif, et suffixe unique si collision de nom).
   - Enregistre ce JSON d'export directement dans le dossier de téléchargement sous le nom standardisé `nom projet - version - allexport.json` avec un en-tête d'explications destiné à guider une IA.
@@ -108,6 +108,6 @@ Dès qu'un projet ouvert contient **2 fichiers internes ou plus**, les boutons d
 
 ## Dépendances et références
 
-- Voir [sidebar-right-history.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-history.md) pour la table d'historique située immédiatement au-dessous.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles générales d'agencement et de redimensionnement de la sidebar droite.
-- Voir [zone-centrale-onglets.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-onglets.md) pour la comparaison avec la barre d'onglets des fichiers de la zone centrale.
+- Voir [sidebar-right-history.md](sidebar-right-history.md) pour la table d'historique située immédiatement au-dessous.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles générales d'agencement et de redimensionnement de la sidebar droite.
+- Voir [zone-centrale-onglets.md](zone-centrale-onglets.md) pour la comparaison avec la barre d'onglets des fichiers de la zone centrale.

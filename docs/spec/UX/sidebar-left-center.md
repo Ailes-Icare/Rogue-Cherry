@@ -84,11 +84,11 @@ Une fois qu'une requête (unitaire ou au sein de la pile) a été appliquée ave
 Dès qu'une application de requête est effectuée (que ce soit pour une requête unitaire ou suite à un clic sur l'une des requêtes d'une pile multistack), le comportement visuel de l'éditeur de code transitionne :
 
 - **Remplacement de la couleur de recherche** : La colorisation jaune consécutive (qui résulte soit de la recherche active via le Find, soit du focus temporaire sur une requête de la pile) est entièrement remplacée par la colorisation DraftSurge.
-- **Persistance et Cumul** : Cette colorisation DraftSurge (définie en détail dans [CodeEditor.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/CodeEditor.md)) est persistante. Elle est sauvegardée dans le document de travail, s'additionne aux colorisations DraftSurge qui auraient pu exister précédemment, et n'empêche pas l'affichage des colorisations des futures requêtes ou recherches.
+- **Persistance et Cumul** : Cette colorisation DraftSurge (définie en détail dans [CodeEditor.md](CodeEditor.md)) est persistante. Elle est sauvegardée dans le document de travail, s'additionne aux colorisations DraftSurge qui auraient pu exister précédemment, et n'empêche pas l'affichage des colorisations des futures requêtes ou recherches.
 
 Pour des détails sur la gestion de l'état du code source et l'implémentation de l'éditeur, voir :
-- [Zone Centrale — Contrôleur de l'Éditeur de Code](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-code-editor.md)
-- [Spécifications : Éditeur de Code Principal](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/CodeEditor.md)
+- [Zone Centrale — Contrôleur de l'Éditeur de Code](zone-centrale-code-editor.md)
+- [Spécifications : Éditeur de Code Principal](CodeEditor.md)
 
 ---
 
@@ -117,6 +117,6 @@ Le groupe de boutons d'action bénéficie d'une priorité visuelle haute au sein
 
 ## Dépendances et références
 
-- Voir [sidebar-left-multistack.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-multistack.md) pour la pile de requêtes située au-dessus.
-- Voir [sidebar-left-bottom-inputs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-inputs.md) pour les zones de texte et de saisie situées en dessous du splitter.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles complètes du splitter horizontal, du responsive et de la superposition.
+- Voir [sidebar-left-multistack.md](sidebar-left-multistack.md) pour la pile de requêtes située au-dessus.
+- Voir [sidebar-left-bottom-inputs.md](sidebar-left-bottom-inputs.md) pour les zones de texte et de saisie situées en dessous du splitter.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles complètes du splitter horizontal, du responsive et de la superposition.

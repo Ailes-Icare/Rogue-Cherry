@@ -66,5 +66,5 @@ Sur des fichiers de code géants (ex: > 10 000 lignes), effectuer un remplacemen
 
 ## 5. Dépendances et références
 
-- Voir [CodeEditor.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/CodeEditor.md) pour la description de l'éditeur qui consomme le rendu des invisibles.
-- Voir [diffEngine.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/diffEngine.md) pour les calculs de diffs qui s'appuient sur ces utilitaires de texte.
+- Voir [CodeEditor.md](../UX/CodeEditor.md) pour la description de l'éditeur qui consomme le rendu des invisibles.
+- Voir [diffEngine.md](diffEngine.md) pour les calculs de diffs qui s'appuient sur ces utilitaires de texte.

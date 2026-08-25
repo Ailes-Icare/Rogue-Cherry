@@ -95,6 +95,6 @@ Si des requêtes ultérieures entrent en collision avec la zone concernée par l
 
 ## Dépendances et références
 
-- Voir [sidebar-right-history.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-history.md) pour le tableau d'historique situé au-dessus.
-- Voir [sidebar-right-miniviews.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-miniviews.md) pour les miniatures AVANT/APRÈS situées au-dessous.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles de responsive et d'agencement.
+- Voir [sidebar-right-history.md](sidebar-right-history.md) pour le tableau d'historique situé au-dessus.
+- Voir [sidebar-right-miniviews.md](sidebar-right-miniviews.md) pour les miniatures AVANT/APRÈS situées au-dessous.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles de responsive et d'agencement.

@@ -13,7 +13,7 @@ La zone basse de la sidebar gauche (`SidebarLeft.jsx`) constitue une barre de co
 Ces contrôles modifient la façon dont le moteur évalue la requête FIND/REPLACE.
 
 > [!NOTE]
-> **Position de l'option SMART** : Pour des raisons d'ergonomie et de liaison directe avec le champ de saisie FIND, l'option **SMART** (sensibilité à la casse et aux espaces) est physiquement située dans la ligne d'en-tête du champ FIND (voir [sidebar-left-bottom-inputs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-inputs.md#2-zone-de-texte-principale-recherche-1-find)), et non dans cette barre basse. Les boutons de cette section gauche ne gèrent donc que les options **STRICT** et **MULTI**.
+> **Position de l'option SMART** : Pour des raisons d'ergonomie et de liaison directe avec le champ de saisie FIND, l'option **SMART** (sensibilité à la casse et aux espaces) est physiquement située dans la ligne d'en-tête du champ FIND (voir [sidebar-left-bottom-inputs.md](sidebar-left-bottom-inputs.md#2-zone-de-texte-principale-recherche-1-find)), et non dans cette barre basse. Les boutons de cette section gauche ne gèrent donc que les options **STRICT** et **MULTI**.
 
 - **Moteur STRICT** :
   - *Comportement* : Active ou désactive le mode de recherche DraftSurge (LCS DraftSurge, via le booléen `splitChars`). Cette recherche DraftSurge n'est pas liée au fait de savoir reconnaître une chaîne de caractères dans la zone centrale, mais à des fins purement visuelles et de contrôle. Cela permet tout simplement de reconnaître les éléments qui ont été modifiés dans une ligne, quasiment au caractère près, ou au contraire d'en avoir une représentation simplifiée — au risque d'être parfois légèrement inexact — des sous-ensembles de type mots ou groupements de lettres devant être raccordés les uns aux autres de manière assez logique. En conséquence, cette fonction n'a un impact, au final, que sur la colorisation DraftSurge des éléments remplacés. 
@@ -102,12 +102,12 @@ Le choix de cocher ou décocher une occurrence dans ce tableau de Cherry-Picking
 - La zone basse possède une hauteur structurelle fixe incompressible qui s'adapte à la présence du Cherry-Picking :
   - **Sans Cherry-Picking** : Hauteur physique brute de **160 px** sanctuarisée.
   - **Avec Cherry-Picking** : Hauteur physique brute de **220 px** sanctuarisée.
-- **Butée de sécurité du Splitter** : Lors des calculs de redimensionnement par le splitter horizontal, une marge de garde de 20 px est ajoutée sur ces dimensions physiques. Ainsi, les contraintes de butée basse appliquées au splitter sont respectivement de **180 px** (sans Cherry-Picking) et de **240 px** (avec Cherry-Picking) pour éviter tout rognage ou scrollbar parasite sur les éléments d'options et de Cherry-Picking (voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md#1-splitter-gauche)).
+- **Butée de sécurité du Splitter** : Lors des calculs de redimensionnement par le splitter horizontal, une marge de garde de 20 px est ajoutée sur ces dimensions physiques. Ainsi, les contraintes de butée basse appliquées au splitter sont respectivement de **180 px** (sans Cherry-Picking) et de **240 px** (avec Cherry-Picking) pour éviter tout rognage ou scrollbar parasite sur les éléments d'options et de Cherry-Picking (voir [ui-layout-main.md](ui-layout-main.md#1-splitter-gauche)).
 - Cette contrainte de hauteur influe sur le redimensionnement du splitter horizontal supérieur, garantissant que le panneau de Cherry-Picking et les boutons restent entièrement accessibles et ne glissent jamais hors de l'écran.
 
 ---
 
 ## Dépendances et références
 
-- Voir [sidebar-left-bottom-inputs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-inputs.md) pour les champs de texte situés juste au-dessus.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles globales du layout et du responsive vertical.
+- Voir [sidebar-left-bottom-inputs.md](sidebar-left-bottom-inputs.md) pour les champs de texte situés juste au-dessus.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles globales du layout et du responsive vertical.

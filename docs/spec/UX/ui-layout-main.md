@@ -52,12 +52,12 @@ La sidebar gauche est structurée verticalement en 5 zones distinctes, répartie
 
 | Zone | Fichier de spécification associé | Type de hauteur |
 |---|---|---|
-| **1. Bandeau de Requête (Assistant)** | [sidebar-left-top-band.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-top-band.md) | Adaptative (Complet / Replié) |
-| **2. Pile de requêtes (Multistack)** | [sidebar-left-multistack.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-multistack.md) | Flexible (Défilement interne) |
-| **3. Boutons d'Action Principaux** | [sidebar-left-center.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-center.md) | **Fixe et Incompressible** |
+| **1. Bandeau de Requête (Assistant)** | [sidebar-left-top-band.md](sidebar-left-top-band.md) | Adaptative (Complet / Replié) |
+| **2. Pile de requêtes (Multistack)** | [sidebar-left-multistack.md](sidebar-left-multistack.md) | Flexible (Défilement interne) |
+| **3. Boutons d'Action Principaux** | [sidebar-left-center.md](sidebar-left-center.md) | **Fixe et Incompressible** |
 | *--- SPLITTER HORIZONTAL ---* | *Séparateur interactif* | - |
-| **4. Zones de saisie (textes)** | [sidebar-left-bottom-inputs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-inputs.md) | Flexible (Défilement/Zoom) |
-| **5. Barre Basse (Options & Cherry-Picking)** | [sidebar-left-bottom-bar.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-bar.md) | **Fixe et Incompressible** |
+| **4. Zones de saisie (textes)** | [sidebar-left-bottom-inputs.md](sidebar-left-bottom-inputs.md) | Flexible (Défilement/Zoom) |
+| **5. Barre Basse (Options & Cherry-Picking)** | [sidebar-left-bottom-bar.md](sidebar-left-bottom-bar.md) | **Fixe et Incompressible** |
 
 ### Comportement de Superposition et Empilement (Layers & Clipping) de la Sidebar Gauche
 
@@ -79,11 +79,11 @@ La sidebar droite est structurée verticalement en 4 zones principales, délimit
 
 | Zone | Fichier de spécification associé | Type de hauteur |
 |---|---|---|
-| **1. Gestion de Projet & Onglets** | [sidebar-right-top-project.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-top-project.md) | **Fixe et Incompressible** (72px) |
-| **2. Tableau d'Historique (Time-Travel)** | [sidebar-right-history.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-history.md) | Flexible (géré par le splitter) |
+| **1. Gestion de Projet & Onglets** | [sidebar-right-top-project.md](sidebar-right-top-project.md) | **Fixe et Incompressible** (72px) |
+| **2. Tableau d'Historique (Time-Travel)** | [sidebar-right-history.md](sidebar-right-history.md) | Flexible (géré par le splitter) |
 | *--- SPLITTER HORIZONTAL ---* | *Séparateur interactif* | - |
-| **3. Contrôles de Version & Actions** | [sidebar-right-controls.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-controls.md) | **Fixe et Incompressible** |
-| **4. Mini-Views AVANT / APRÈS** | [sidebar-right-miniviews.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-miniviews.md) | Flexible (Redimensionnable, min 100px) |
+| **3. Contrôles de Version & Actions** | [sidebar-right-controls.md](sidebar-right-controls.md) | **Fixe et Incompressible** |
+| **4. Mini-Views AVANT / APRÈS** | [sidebar-right-miniviews.md](sidebar-right-miniviews.md) | Flexible (Redimensionnable, min 100px) |
 
 ---
 
@@ -127,19 +127,19 @@ Lorsque l'espace vertical ou horizontal de l'application devient extrêmement co
 
 Ce document sert de référence d'agencement global pour l'interface :
 - **Sidebar Gauche** :
-  - [sidebar-left-top-band.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-top-band.md)
-  - [sidebar-left-multistack.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-multistack.md)
-  - [sidebar-left-center.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-center.md)
-  - [sidebar-left-bottom-inputs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-inputs.md)
-  - [sidebar-left-bottom-bar.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-bar.md)
+  - [sidebar-left-top-band.md](sidebar-left-top-band.md)
+  - [sidebar-left-multistack.md](sidebar-left-multistack.md)
+  - [sidebar-left-center.md](sidebar-left-center.md)
+  - [sidebar-left-bottom-inputs.md](sidebar-left-bottom-inputs.md)
+  - [sidebar-left-bottom-bar.md](sidebar-left-bottom-bar.md)
 - **Sidebar Droite** :
-  - [sidebar-right-top-project.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-top-project.md)
-  - [sidebar-right-history.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-history.md)
-  - [sidebar-right-controls.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-controls.md)
-  - [sidebar-right-miniviews.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-miniviews.md)
+  - [sidebar-right-top-project.md](sidebar-right-top-project.md)
+  - [sidebar-right-history.md](sidebar-right-history.md)
+  - [sidebar-right-controls.md](sidebar-right-controls.md)
+  - [sidebar-right-miniviews.md](sidebar-right-miniviews.md)
 - **Modifications Historiques** :
-  - [UI-layout-principal.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/UI-layout-principal.md) (Notice de redirection historique)
+  - [UI-layout-principal.md](UI-layout-principal.md) (Notice de redirection historique)
 - **Spécifications Fonctionnelles** :
-  - [helpers.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/helpers.md) (Utilitaires de texte, rendu d'invisibles windowing)
-  - [hooks.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/hooks.md) (Hooks useZoomable et useDraggable)
+  - [helpers.md](../fonction/helpers.md) (Utilitaires de texte, rendu d'invisibles windowing)
+  - [hooks.md](../fonction/hooks.md) (Hooks useZoomable et useDraggable)
 

@@ -3,8 +3,8 @@
 **Fichier source** : `src/components/CodeEditor.jsx` (955 lignes)
 
 Ce document décrit le composant visuel et fonctionnel `CodeEditor` (rendu, windowing, modes visuels, gutter). Pour les couches de contrôle, voir :
-- Le [Contrôleur de la Zone Centrale (zone-centrale-code-editor.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-code-editor.md)
-- Le [Contrôleur du Débogueur (SmartDebugger.md)](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/modal/SmartDebugger.md)
+- Le [Contrôleur de la Zone Centrale (zone-centrale-code-editor.md)](zone-centrale-code-editor.md)
+- Le [Contrôleur du Débogueur (SmartDebugger.md)](../modal/SmartDebugger.md)
 
 ---
 

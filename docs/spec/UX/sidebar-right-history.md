@@ -25,16 +25,16 @@ Le tableau est composé de 5 colonnes et d'un en-tête fixé en haut (`sticky to
     - Le texte de recherche (FIND) et le texte de remplacement (REPLACE) sont chargés dans les Mini-Views comparatives respectives (AVANT et APRÈS).
     - Le commentaire associé à la version (`history[selectedIndex].comment`) est chargé dans la TextBox de commentaire en lecture seule située dans la zone centrale de la section basse de la sidebar droite.
     - Les badges de métadonnées associés (**SMART** et/ou **MULTI** / **CHERRY-PICK** avec ses indices convertis en base-1) s'affichent de façon dynamique au-dessus de la TextBox.
-  - **Reconstruction du texte source** : Le contrôleur d'historique reconstruit l'état exact du code source à cette étape précise (`rebuildTextAt`) et met à jour dynamiquement le contenu du `CodeEditor` principal. Cette reconstruction s'effectue en rejouant les deltas légers depuis le snapshot le plus proche, **sans tenir compte des modifications postérieures à la ligne sélectionnée** (voir l'algorithme détaillé dans [json-project-schema-v8.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-schema-v8.md#4-algorithme-de-reconstruction-temporelle-rebuildtextat)).
+  - **Reconstruction du texte source** : Le contrôleur d'historique reconstruit l'état exact du code source à cette étape précise (`rebuildTextAt`) et met à jour dynamiquement le contenu du `CodeEditor` principal. Cette reconstruction s'effectue en rejouant les deltas légers depuis le snapshot le plus proche, **sans tenir compte des modifications postérieures à la ligne sélectionnée** (voir l'algorithme détaillé dans [json-project-schema-v8.md](../fonction/json-project-schema-v8.md#4-algorithme-de-reconstruction-temporelle-rebuildtextat)).
   - **Auto-centrage du code** : Dès la sélection, l'éditeur de code principal fait défiler (scroll) le texte pour se centrer précisément sur la ligne de code ciblée par la requête. Dans le cas d'une requête multi-occurrence (Cherry-Picking), le centrage s'effectue automatiquement sur la première occurrence.
-- **Règle Multi-Fichiers (V9)** : Si l'utilisateur clique sur une version de l'historique liée à un fichier spécifique, la zone centrale bascule automatiquement sur l'onglet de ce fichier (en le rouvrant s'il avait été fermé) pour afficher le code correspondant. Le routing et le calcul de l'arborescence à cet index sont décrits dans [json-project-v9-specs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-v9-specs.md#3-algorithme-de-reconstruction-de-lespace-de-travail-v9).
+- **Règle Multi-Fichiers (V9)** : Si l'utilisateur clique sur une version de l'historique liée à un fichier spécifique, la zone centrale bascule automatiquement sur l'onglet de ce fichier (en le rouvrant s'il avait été fermé) pour afficher le code correspondant. Le routing et le calcul de l'arborescence à cet index sont décrits dans [json-project-v9-specs.md](../fonction/json-project-v9-specs.md#3-algorithme-de-reconstruction-de-lespace-de-travail-v9).
 
 
 ---
 
 ## États visuels et couleurs des lignes
 
-L'affichage des lignes s'adapte à leur type et statut pour offrir un repérage rapide. Chaque ligne de l'interface correspond à un enregistrement JSON de la pile d'historique (voir [json-project-schema-v8.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/json-project-schema-v8.md#2-structure-des-enregistrements-dhistorique-history) pour les structures et types précis) :
+L'affichage des lignes s'adapte à leur type et statut pour offrir un repérage rapide. Chaque ligne de l'interface correspond à un enregistrement JSON de la pile d'historique (voir [json-project-schema-v8.md](../fonction/json-project-schema-v8.md#2-structure-des-enregistrements-dhistorique-history) pour les structures et types précis) :
 
 | Type de ligne / État | Couleur de fond | Couleur du texte | Règle / Signification |
 |---|---|---|---|
@@ -163,6 +163,6 @@ Le tableau d'historique enregistre de manière automatique les différentes acti
 
 ## Dépendances et références
 
-- Voir [sidebar-right-top-project.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-top-project.md) pour les boutons de chargement de projet au-dessus.
-- Voir [sidebar-right-controls.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-controls.md) pour la barre d'outils de navigation située sous le tableau.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles de dimensionnement et de Splitter.
+- Voir [sidebar-right-top-project.md](sidebar-right-top-project.md) pour les boutons de chargement de projet au-dessus.
+- Voir [sidebar-right-controls.md](sidebar-right-controls.md) pour la barre d'outils de navigation située sous le tableau.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles de dimensionnement et de Splitter.

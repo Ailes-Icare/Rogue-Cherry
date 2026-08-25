@@ -33,7 +33,7 @@ Une barre de recherche indépendante est placée en haut du panneau droit (miroi
 
 ## 3. Configuration de l'Échappement de Sécurité (Escape Hatch)
 
-La modale utilise le concept d'échappement de sécurité (voir [recherche.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/recherche.md)) avec une interface utilisateur dédiée :
+La modale utilise le concept d'échappement de sécurité (voir [recherche.md](recherche.md)) avec une interface utilisateur dédiée :
 
 -   **Alerte** : Un bandeau d'alerte rouge clignotant s'affiche en cas de dépassement des limites (recherche trop courte sur document trop grand).
 -   **Dialogue d'outrepassation (Double-clic)** : Double-cliquer sur l'alerte ouvre une boîte de dialogue proposant 3 options :

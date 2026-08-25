@@ -97,6 +97,6 @@ L'Assistant format requête occupe le sommet du conteneur de flux de la sidebar 
 
 ## Dépendances et références
 
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles générales du splitter horizontal, du responsive et de la superposition.
-- Voir [sidebar-left-multistack.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-multistack.md) pour la pile de requêtes située immédiatement sous le bandeau.
-- Voir [sidebar-left-center.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-center.md) pour le groupe de boutons d'action en bas de la section supérieure.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles générales du splitter horizontal, du responsive et de la superposition.
+- Voir [sidebar-left-multistack.md](sidebar-left-multistack.md) pour la pile de requêtes située immédiatement sous le bandeau.
+- Voir [sidebar-left-center.md](sidebar-left-center.md) pour le groupe de boutons d'action en bas de la section supérieure.

@@ -155,6 +155,6 @@ Conformément à la spécification originelle exigeant une distinction d'effet e
 ---
 
 ## 5. Références fonctionnelles
-- Voir [hooks.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/hooks.md) pour les détails sur la logique de déplacement de fenêtres (`useDraggable`) et du zoom Ctrl+molette (`useZoomable`).
-- Voir [helpers.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/fonction/helpers.md) pour l'échappement HTML et le rendu des invisibles.
+- Voir [hooks.md](../fonction/hooks.md) pour les détails sur la logique de déplacement de fenêtres (`useDraggable`) et du zoom Ctrl+molette (`useZoomable`).
+- Voir [helpers.md](../fonction/helpers.md) pour l'échappement HTML et le rendu des invisibles.
 

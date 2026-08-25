@@ -82,5 +82,5 @@ L'agencement des mini-views AVANT et APRÈS s'adapte dynamiquement aux contraint
 
 ## Dépendances et références
 
-- Voir [sidebar-right-controls.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-right-controls.md) pour la barre de boutons de contrôles de miniatures située immédiatement au-dessus.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles de responsive et d'agencement.
+- Voir [sidebar-right-controls.md](sidebar-right-controls.md) pour la barre de boutons de contrôles de miniatures située immédiatement au-dessus.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles de responsive et d'agencement.

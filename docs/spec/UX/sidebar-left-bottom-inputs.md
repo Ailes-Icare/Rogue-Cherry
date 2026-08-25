@@ -62,7 +62,7 @@ La zone inférieure de la sidebar gauche (`SidebarLeft.jsx`) contient les zones 
   - **Sélection rapide via Modale** : Un clic simple sur les chiffres du badge (ex: `1 / 3`) ouvre la modale de sélection de ligne `LineChoiceModal`, permettant à l'utilisateur de sauter instantanément à une occurrence précise en tapant son index.
 
 - **Ambiguïté et Paradoxe : Badge FIND vs Mode MULTI (Barre Basse)** :
-  Il existe une distinction sémantique et comportementale critique entre le nombre d'occurrences trouvé par le Find et le bouton **MULTI** situé dans la barre de contrôle basse (voir [sidebar-left-bottom-bar.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-bar.md)) :
+  Il existe une distinction sémantique et comportementale critique entre le nombre d'occurrences trouvé par le Find et le bouton **MULTI** situé dans la barre de contrôle basse (voir [sidebar-left-bottom-bar.md](sidebar-left-bottom-bar.md)) :
   
   - **Le Badge FIND (Haut)** a un rôle **purement informatif et de navigation** géré par DraftSearch. Il indique simplement combien de fois la chaîne de caractères à chercher est présente dans le document. Même si 10 occurrences sont détectées (`1 / 10`), l'application par défaut reste unitaire : si l'utilisateur clique sur **APPLIQUER**, seule l'occurrence focalisée à l'écran (l'index actif) sera modifiée.
   - **Le Mode MULTI (Barre Basse)** a un rôle **décisionnel d'application**. Son activation (bouton MULTI allumé en violet) indique que la modification doit cibler plusieurs emplacements à la fois. Cela déclenche l'apparition sous les zones de texte du **tableau de multi-occurrences (Cherry-Picking)**. L'utilisateur peut y cocher/décocher des cases pour définir quelles occurrences appliquer (les sélectionnées passant en jaune vif et les exclues en jaune pâle avec liseret pointillé).
@@ -161,6 +161,6 @@ Dans l'expérience globale de saisie et d'application des requêtes, il est impo
 
 ## Dépendances et références
 
-- Voir [sidebar-left-center.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-center.md) pour la zone des boutons située au-dessus.
-- Voir [sidebar-left-bottom-bar.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-bar.md) pour les options de validation et le Cherry-Picking sous les textareas.
-- Voir [ui-layout-main.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/ui-layout-main.md) pour les règles du splitter et du responsive global.
+- Voir [sidebar-left-center.md](sidebar-left-center.md) pour la zone des boutons située au-dessus.
+- Voir [sidebar-left-bottom-bar.md](sidebar-left-bottom-bar.md) pour les options de validation et le Cherry-Picking sous les textareas.
+- Voir [ui-layout-main.md](ui-layout-main.md) pour les règles du splitter et du responsive global.

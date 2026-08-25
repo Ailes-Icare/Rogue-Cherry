@@ -10,7 +10,7 @@ Le bandeau supérieur regroupe le titre dynamique du projet ainsi que la barre d
 
 - **Hauteur totale** : la hauteur physique du conteneur est par défaut, en pleinte taille à 95px. elle pourra se réduire à 48px (voir chapitre 3.3)
 - **Séparateur horizontal** : Directement au-dessous du bandeau se trouve une ligne de séparation horizontale purement esthétique (couleur `#444444` / `border-b border-border-dark`), d'une épaisseur de 1px.
-- **Placement sous-jacent** : Juste en dessous de cette ligne de séparation esthétique se trouve le système d'onglets (décrit dans [zone-centrale-onglets.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/zone-centrale-onglets.md)).
+- **Placement sous-jacent** : Juste en dessous de cette ligne de séparation esthétique se trouve le système d'onglets (décrit dans [zone-centrale-onglets.md](zone-centrale-onglets.md)).
 
 ---
 

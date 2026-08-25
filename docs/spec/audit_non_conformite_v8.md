@@ -17,13 +17,13 @@
 
 ## ❌ Non-Conformités Majeures (Régressions Bloquantes)
 
-### 1. [SidebarRight.jsx](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/SidebarRight.jsx) — Défilement synchrone des mini-views (Scroll-Sync) brisé
+### 1. [SidebarRight.jsx](../../src/components/SidebarRight.jsx) — Défilement synchrone des mini-views (Scroll-Sync) brisé
 *   **Statut specs** : 🟢 Implémenté | **Code** : ❌ Non conforme
-*   **Problème** : Dans [SidebarRight.jsx](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/SidebarRight.jsx#L90-L91), `beforeScrollRef` et `afterScrollRef` sont instanciés avec le hook `useZoomable(10)`. Or, `useZoomable` retourne une fonction callback ref (`callbackRef`) et non un objet standard avec une propriété `.current`. L'accès subséquent à `beforeScrollRef.current` et `afterScrollRef.current` à la ligne 124-125 renvoie `undefined`. L'écouteur de scroll n'est jamais attaché, rendant la synchronisation de défilement bidirectionnelle (🔗) inopérante.
+*   **Problème** : Dans [SidebarRight.jsx](../../src/components/SidebarRight.jsx#L90-L91), `beforeScrollRef` et `afterScrollRef` sont instanciés avec le hook `useZoomable(10)`. Or, `useZoomable` retourne une fonction callback ref (`callbackRef`) et non un objet standard avec une propriété `.current`. L'accès subséquent à `beforeScrollRef.current` et `afterScrollRef.current` à la ligne 124-125 renvoie `undefined`. L'écouteur de scroll n'est jamais attaché, rendant la synchronisation de défilement bidirectionnelle (🔗) inopérante.
 *   **Impact** : Le défilement synchronisé entre la vue "AVANT" et "APRÈS" dans la Sidebar Droite est inutilisable.
 *   **Action corrective** : Modifier `useZoomable.js` pour que la fonction retournée possède également une propriété `.current` assignée dynamiquement lors de l'appel du callback, ou adapter le composant pour capturer les nœuds DOM.
 
-### 2. [CodeEditor.jsx](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/CodeEditor.jsx) — Virtualisation des lignes absente en Mode Lecture Seule (Lag de rendu)
+### 2. [CodeEditor.jsx](../../src/components/CodeEditor.jsx) — Virtualisation des lignes absente en Mode Lecture Seule (Lag de rendu)
 *   **Statut specs** : 🟢 Implémenté | **Code** : ❌ Non conforme
 *   **Problème** : La virtualisation de l'affichage (`visibleRange`) n'est pas appliquée lors du rendu du tableau `lineRecords` en mode lecture seule. Toutes les lignes (par exemple, 50 000 lignes) sont injectées simultanément dans le DOM à la ligne 937. Seul le rendu des caractères invisibles est restreint à la zone visible. De plus, `onScroll` à la ligne 809 ne recalcule `visibleRange` que si `showInvisibles` est activé, et ré-exécute le re-rendu de manière sous-optimale.
 *   **Impact** : Ralentissement et gel immédiat du navigateur lors du chargement de fichiers de taille moyenne à grande en mode lecture seule.
@@ -33,27 +33,27 @@
 
 ## ⚠️ Non-Conformités Modérées (Comportements & Raccourcis)
 
-### 3. [CodeEditor.jsx](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/CodeEditor.jsx) — Durée et lifetime du liseret rouge de Recherche Globale
+### 3. [CodeEditor.jsx](../../src/components/CodeEditor.jsx) — Durée et lifetime du liseret rouge de Recherche Globale
 *   **Statut specs** : 🟢 Implémenté | **Code** : ⚠️ Partiel
-*   **Problème** : Le liseret rouge (30 secondes) de ciblage d'occurrence de la recherche globale (`targetHighlightLine`) est immédiatement réinitialisé à `null` lorsque le texte de recherche est effacé (`!globalSearchBarText`). La spécification ([CodeEditor.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/CodeEditor.md#L97)) dicte que ce liseret de ciblage doit persister 30 secondes même après fermeture, effacement ou masquage de la recherche globale afin de garder le repère visuel.
+*   **Problème** : Le liseret rouge (30 secondes) de ciblage d'occurrence de la recherche globale (`targetHighlightLine`) est immédiatement réinitialisé à `null` lorsque le texte de recherche est effacé (`!globalSearchBarText`). La spécification ([CodeEditor.md](UX/CodeEditor.md#L97)) dicte que ce liseret de ciblage doit persister 30 secondes même après fermeture, effacement ou masquage de la recherche globale afin de garder le repère visuel.
 *   **Impact** : Effacer la barre de recherche globale fait disparaître prématurément le repère visuel sur la ligne trouvée.
 *   **Action corrective** : Modifier le `useEffect` d'écoute de la recherche globale pour ne pas vider `targetHighlightLine` si la recherche est effacée.
 
-### 4. [useZoomable.js](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/hooks/useZoomable.js) — Raccourci clavier de réinitialisation `Ctrl+0` manquant
+### 4. [useZoomable.js](../../src/hooks/useZoomable.js) — Raccourci clavier de réinitialisation `Ctrl+0` manquant
 *   **Statut specs** : 🟢 Implémenté | **Code** : ⚠️ Partiel
-*   **Problème** : Le raccourci clavier `Ctrl+0` permettant de réinitialiser la taille de police des zones zoomables à **14 px** (par défaut) n'est implémenté ni dans `useZoomable.js` ni dans les formulaires de saisie de la Sidebar gauche ([sidebar-left-bottom-inputs.md](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/docs/spec/UX/sidebar-left-bottom-inputs.md#L131)).
+*   **Problème** : Le raccourci clavier `Ctrl+0` permettant de réinitialiser la taille de police des zones zoomables à **14 px** (par défaut) n'est implémenté ni dans `useZoomable.js` ni dans les formulaires de saisie de la Sidebar gauche ([sidebar-left-bottom-inputs.md](UX/sidebar-left-bottom-inputs.md#L131)).
 *   **Impact** : Impossibilité pour l'utilisateur de réinitialiser rapidement le zoom des zones de texte à la taille standard.
 *   **Action corrective** : Ajouter un écouteur d'événement `keydown` global dans le hook `useZoomable.js` interceptant `Ctrl+0` et réinitialisant la propriété CSS `--zoom-size` à `initialSize`.
 
-### 5. [SidebarLeft.jsx](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/SidebarLeft.jsx) — Comportement responsif (Collapse) de la Barre Basse manquant
+### 5. [SidebarLeft.jsx](../../src/components/SidebarLeft.jsx) — Comportement responsif (Collapse) de la Barre Basse manquant
 *   **Statut specs** : 🟢 Implémenté | **Code** : ⚠️ Partiel
 *   **Problème** : Les labels textuels « Moteur strict (LCS fin) » et « Multi-emplacement (N trouvés) » ne se masquent pas de manière réactive si la largeur de la sidebar gauche (`width`) est réduite. De plus, il manque le tooltip (attribut `title`) explicatif du bouton STRICT.
 *   **Impact** : Encombrement visuel et rognage lorsque le panneau de Cherry-Picking est actif et que la sidebar est à sa largeur minimale (280px).
 *   **Action corrective** : Utiliser la prop `width` dans `SidebarLeft.jsx` pour masquer dynamiquement les labels textuels (par exemple lorsque la largeur est < 340px) et rajouter un tooltip explicatif complet au bouton STRICT.
 
-### 6. [SmartDebugger.jsx](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/SmartDebugger.jsx) — Calcul de windowing miroir défectueux
+### 6. [SmartDebugger.jsx](../../src/components/SmartDebugger.jsx) — Calcul de windowing miroir défectueux
 *   **Statut specs** : 🟢 Implémenté | **Code** : ⚠️ Partiel
-*   **Problème** : Le `useEffect` chargé du calcul du windowing d'invisibles pour le miroir ([SmartDebugger.jsx:L240](file:///c:/Users/inso/Documents/GitHub/Rogue-Cherry/src/components/SmartDebugger.jsx#L240)) fait la vérification `if (showMirrorInvisibles && zoomRefMirror.current)`. Puisque `zoomRefMirror` est une fonction callback, `.current` est `undefined`, ce qui désactive de fait le calcul dynamique de la plage de visibilité.
+*   **Problème** : Le `useEffect` chargé du calcul du windowing d'invisibles pour le miroir ([SmartDebugger.jsx:L240](../../src/components/SmartDebugger.jsx#L240)) fait la vérification `if (showMirrorInvisibles && zoomRefMirror.current)`. Puisque `zoomRefMirror` est une fonction callback, `.current` est `undefined`, ce qui désactive de fait le calcul dynamique de la plage de visibilité.
 *   **Impact** : Pas de recalcul ni de limitation optimisée de l'affichage des invisibles dans le miroir de débogage.
 *   **Action corrective** : Même résolution que la Non-Conformité n°1 (exposition de `.current` sur le callback ref).
 
