@@ -15,7 +15,7 @@ L'historique des versions se remplit à droite, à chaque opération.*
 
 ---
 
-## 1. MISSION BRIEFING : A QUOI ÇA SERT ?
+## 1. MISSION BRIEFING : À QUOI ÇA SERT ?
 
 Concrètement, Rogue Cherry sert à chercher un extrait de texte spécifique au sein d'un document volumineux pour le remplacer par un autre. L'outil s'appuie sur un processus de recherche **puissant, robuste et visuellement assisté**, qui archive méticuleusement chaque modification dans un **historique traçable**.
 
@@ -23,7 +23,7 @@ Au-delà du traditionnel "copier/coller" manuel, sa véritable force réside dan
 
 Cette approche chirurgicale dépasse largement le simple cadre du développement logiciel. Qu'il s'agisse de créer du code, de rédiger de la documentation technique, ou de corriger au mot près un article de publication scientifique, Rogue Cherry s'adapte. Il a été spécifiquement conçu pour **"augmenter" les capacités des IA conversationnelles traditionnelles**, leur permettant de modifier de très longs documents sans risque de casse accidentelle sur le reste du fichier, et sans surcharger inutilement la mémoire de la conversation.
 
-L'objectif tactique est simple : ne plus avoir à réécrire ou regénérer un document entier à chaque itération. Vous **"snipez"** précisément les zones qui méritent un correctif pour vous concentrer uniquement sur l'essentiel, sans aucun parasite. 🍒
+L'objectif tactique est simple : ne plus avoir à réécrire ou régénérer un document entier à chaque itération. Vous **"snipez"** précisément les zones qui méritent un correctif pour vous concentrer uniquement sur l'essentiel, sans aucun parasite. 🍒
 
 D'où son nom d'opération : **Rogue Cherry**.
 
